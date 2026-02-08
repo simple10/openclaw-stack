@@ -12,7 +12,7 @@ This playbook configures:
 
 ## Prerequisites
 
-- [01-base-setup.md](01-base-setup.md) completed on VPS-1
+- [02-base-setup.md](02-base-setup.md) completed on VPS-1
 - SSH access as `adminclaw` on port 222
 
 ## Variables

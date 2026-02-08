@@ -111,7 +111,7 @@ Replace single `ANTHROPIC_API_KEY` with all provider mappings:
 
 **5b. Required field validation (~line 120):** Replace `ANTHROPIC_API_KEY` check with `AI_GATEWAY_WORKER_URL` and `AI_GATEWAY_AUTH_TOKEN` checks.
 
-### 6. `playbooks/08-workers.md` (lines 80-83)
+### 6. `playbooks/01-workers.md` (lines 80-83)
 
 Update architecture comment:
 

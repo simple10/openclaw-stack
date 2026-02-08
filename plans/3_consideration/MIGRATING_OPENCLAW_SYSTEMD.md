@@ -47,7 +47,7 @@ VPS-2 (10.0.0.2): UNCHANGED
 
 ## Implementation
 
-### 1. Add Node.js 22 + pnpm to `playbooks/01-base-setup.md` (VPS-1 only)
+### 1. Add Node.js 22 + pnpm to `playbooks/02-base-setup.md` (VPS-1 only)
 
 New section after system update:
 
@@ -286,7 +286,7 @@ Minimal changes — both `cloudflare-tunnel.md` and `caddy.md` already connect t
 
 | File | Change |
 |------|--------|
-| `playbooks/01-base-setup.md` | Add Node.js 22 + pnpm install section (VPS-1 only) |
+| `playbooks/02-base-setup.md` | Add Node.js 22 + pnpm install section (VPS-1 only) |
 | `playbooks/04-vps1-openclaw.md` | **Major rewrite** — replace containerized gateway with native systemd setup |
 | `playbooks/networking/cloudflare-tunnel.md` | Update troubleshooting commands |
 | `playbooks/networking/caddy.md` | Update troubleshooting commands |

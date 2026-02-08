@@ -21,7 +21,8 @@
       "Bash(echo:*)",
       "WebFetch(domain:docs.openclaw.ai)",
       "Bash(npm install:*)",
-      "Bash(npm run typecheck:*)"
+      "Bash(npm run typecheck:*)",
+      "Bash(git mv:*)"
     ]
   }
 }

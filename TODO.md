@@ -10,7 +10,8 @@
 - [x] Update openclaw-config.env — remove VPS-2, OTEL vars
 - [x] Update all playbooks for single-VPS architecture
 - [x] Update CLAUDE.md, REQUIREMENTS.md, README.md
-- [x] Create Workers deployment playbook (08-workers.md)
+- [x] Create Workers deployment playbook (01-workers.md)
+
 ## Next Steps
 
 - [ ] Deploy the AI Gateway worker & test end-to-end

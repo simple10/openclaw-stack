@@ -107,7 +107,7 @@ state: ready | error
 
 | Playbook | Status | Verified | Notes |
 |----------|--------|----------|-------|
-| 01-base-setup | ✓ | YYYY-MM-DD | |
+| 02-base-setup | ✓ | YYYY-MM-DD | |
 | 03-docker | ✓ | YYYY-MM-DD | |
 | 04-vps1-openclaw | ✓ | YYYY-MM-DD | |
 | 05-cloudflare-tunnel | ✓ | YYYY-MM-DD | |

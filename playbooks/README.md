@@ -15,12 +15,12 @@ For existing deployments, run `00-analysis-mode.md` first to verify current stat
 
 ## Execution Order
 
-1. `01-base-setup.md` - VPS-1
-2. `03-docker.md` - VPS-1
-3. `04-vps1-openclaw.md` - VPS-1
-4. `05-cloudflare-tunnel.md` - VPS-1
-5. `06-backup.md` - VPS-1
-6. `08-workers.md` - Deploy Cloudflare Workers (AI Gateway + Log Receiver)
+1. `01-workers.md` - Deploy Cloudflare Workers (AI Gateway + Log Receiver) — runs locally, triggered during config validation
+2. `02-base-setup.md` - VPS-1
+3. `03-docker.md` - VPS-1
+4. `04-vps1-openclaw.md` - VPS-1
+5. `05-cloudflare-tunnel.md` - VPS-1
+6. `06-backup.md` - VPS-1
 7. Reboot VPS-1
 8. `07-verification.md` - VPS-1 + Workers
 9. `98-post-deploy.md` - First access & device pairing

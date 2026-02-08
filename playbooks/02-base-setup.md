@@ -1,4 +1,4 @@
-# 01 - Base Setup
+# 02 - Base Setup
 
 Base system configuration for VPS-1.
 
@@ -28,13 +28,13 @@ From `../openclaw-config.env`:
 
 ## Execution Order
 
-Complete sections 1.1-1.8 on VPS-1.
+Complete sections 2.1-2.8 on VPS-1.
 
 Connect initially as `ubuntu` (OVH default), then use `adminclaw` after section 1.5.
 
 ---
 
-## 1.1 System Update & Essential Packages
+## 2.1 System Update & Essential Packages
 
 Run on: **VPS-1**
 
@@ -55,7 +55,7 @@ sudo apt install -y \
 
 ---
 
-## 1.2 Create Dedicated Users
+## 2.2 Create Dedicated Users
 
 Run on: **VPS-1**
 
@@ -120,7 +120,7 @@ sudo su - openclaw
 
 ---
 
-## 1.3 UFW Firewall Setup
+## 2.3 UFW Firewall Setup
 
 Run on: **VPS-1**
 
@@ -143,7 +143,7 @@ sudo ufw --force enable
 
 ---
 
-## 1.4 SSH Hardening
+## 2.4 SSH Hardening
 
 Run on: **VPS-1**
 
@@ -215,7 +215,7 @@ ss -tlnp | grep 222
 
 ---
 
-## 1.5 Verify SSH Port Change and Remove Port 22
+## 2.5 Verify SSH Port Change and Remove Port 22
 
 **IMPORTANT**: Test SSH on port 222 BEFORE removing port 22 from the firewall.
 
@@ -233,7 +233,7 @@ sudo ufw status
 
 ---
 
-## 1.6 Fail2ban Configuration
+## 2.6 Fail2ban Configuration
 
 Run on: **VPS-1**
 
@@ -261,7 +261,7 @@ sudo systemctl restart fail2ban
 
 ---
 
-## 1.7 Automatic Security Updates
+## 2.7 Automatic Security Updates
 
 Run on: **VPS-1**
 
@@ -287,7 +287,7 @@ sudo systemctl enable unattended-upgrades
 
 ---
 
-## 1.8 Kernel Hardening
+## 2.8 Kernel Hardening
 
 Run on: **VPS-1**
 

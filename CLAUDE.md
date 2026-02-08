@@ -17,13 +17,13 @@ All deployment steps are in modular playbooks under `playbooks/`:
 | Playbook | Description |
 |----------|-------------|
 | `00-analysis-mode.md` | Analyze existing deployment |
-| `01-base-setup.md` | Users, SSH, UFW, fail2ban, kernel |
+| `01-workers.md` | Cloudflare Workers deployment (AI Gateway + Log Receiver) |
+| `02-base-setup.md` | Users, SSH, UFW, fail2ban, kernel |
 | `03-docker.md` | Docker installation and hardening |
 | `04-vps1-openclaw.md` | Sysbox, networks, gateway, Vector |
 | `05-cloudflare-tunnel.md` | Cloudflare Tunnel setup |
 | `06-backup.md` | Backup scripts and cron jobs |
 | `07-verification.md` | Testing and verification |
-| `08-workers.md` | Cloudflare Workers deployment (AI Gateway + Log Receiver) |
 | `98-post-deploy.md` | First access & device pairing |
 | `99-new-feature-planning.md` | Process for planning new features |
 | `99-new-feature-implementation.md` | Process for implementing planned features |
@@ -64,13 +64,11 @@ SSH_PORT=222                                # SSH port (initially 22 then change
 OPENCLAW_DOMAIN=openclaw.example.com
 AI_GATEWAY_WORKER_URL=https://ai-gateway-proxy.<account>.workers.dev
 AI_GATEWAY_AUTH_TOKEN=<worker-auth-token>
+LOG_WORKER_URL=https://log-receiver.<account>.workers.dev/logs
+LOG_WORKER_TOKEN=<generated-token>
 
 # URL subpaths (no trailing slash; empty string "" to serve at root)
 OPENCLAW_DOMAIN_PATH=/_openclaw
-
-# Workers
-LOG_WORKER_URL=https://log-receiver.<account>.workers.dev/logs
-LOG_WORKER_TOKEN=<generated-token>
 
 # Alerting
 TELEGRAM_BOT_TOKEN=
@@ -118,10 +116,22 @@ Required fields to check in openclaw-config.env:
 - `OPENCLAW_DOMAIN` - Must be set
 - `AI_GATEWAY_WORKER_URL` - Must be set (AI Gateway Worker URL)
 - `AI_GATEWAY_AUTH_TOKEN` - Must be set (AI Gateway auth token)
+- `LOG_WORKER_URL` - Must be set (Log Receiver Worker URL)
+- `LOG_WORKER_TOKEN` - Must be set (Log Receiver auth token)
 
 If any required field is missing, report all missing fields and ask user to update the file.
 
-If all required fields are present, test SSH access to VPS-1:
+**If all required fields are present:** Check for placeholder values in `AI_GATEWAY_WORKER_URL`, `AI_GATEWAY_AUTH_TOKEN`, `LOG_WORKER_URL`, and `LOG_WORKER_TOKEN`. Scan for angle-bracket placeholders (e.g., `<account>`, `<worker-auth-token>`, `<generated-token>`).
+
+**If placeholders detected:** Stop and prompt:
+
+> "Worker configuration contains placeholder values. Workers must be deployed first to get real URLs and auth tokens.
+>
+> Deploying workers now using `playbooks/01-workers.md`..."
+
+Then execute the `01-workers.md` playbook to deploy both workers. After deployment, update `openclaw-config.env` with the real Worker URLs and auth tokens, then re-validate.
+
+If all fields are present and contain real values (no placeholders), test SSH access to VPS-1:
 
 ```bash
 ssh -i <SSH_KEY_PATH> -o ConnectTimeout=10 -o BatchMode=yes -p <SSH_PORT> <SSH_USER>@<VPS1_IP> echo "VPS1 OK"
@@ -162,8 +172,9 @@ Present playbook selection:
 >
 > **Core deployment** (selected by default):
 >
-> - [x] Base deployment (01, 03, 04, 05, 06-08)
->   - Includes: base-setup, docker, openclaw, cloudflare-tunnel, backup, workers, verification
+> - [x] Base deployment (02, 03, 04, 05, 06-07)
+>   - Includes: base-setup, docker, openclaw, cloudflare-tunnel, backup, verification
+>   - Note: Workers (01) are deployed automatically during config validation
 >
 > **Optional features** (from `playbooks/extras/`):
 >
@@ -245,19 +256,18 @@ After action selection, show summary:
 ### Full Deployment
 
 ```
-1. Validate openclaw-config.env
-2. Execute 01-base-setup.md on VPS-1
+1. Validate openclaw-config.env (including placeholder detection + auto worker deployment)
+2. Execute 02-base-setup.md on VPS-1
 3. Execute 03-docker.md on VPS-1
 4. Execute 04-vps1-openclaw.md on VPS-1
 5. Execute 05-cloudflare-tunnel.md on VPS-1
 6. Execute 06-backup.md on VPS-1
-7. Execute 08-workers.md (deploy Cloudflare Workers)
-8. Reboot VPS-1
-9. Execute 07-verification.md
-10. Execute 98-post-deploy.md
+7. Reboot VPS-1
+8. Execute 07-verification.md
+9. Execute 98-post-deploy.md
 ```
 
-All steps are sequential on a single VPS. Workers deployment (step 7) runs from the local machine using `wrangler`.
+All steps are sequential on a single VPS. Workers deployment (01-workers) runs from the local machine using `wrangler` and is triggered automatically during config validation if needed.
 
 ---
 
@@ -339,11 +349,11 @@ Each playbook contains detailed troubleshooting sections. Common issues:
 
 | Issue | Playbook Section |
 |-------|------------------|
-| SSH lockout | `01-base-setup.md` -> Troubleshooting |
+| SSH lockout | `02-base-setup.md` -> Troubleshooting |
 | Container won't start | `04-vps1-openclaw.md` -> Troubleshooting |
 | Tunnel not starting | `05-cloudflare-tunnel.md` -> Troubleshooting |
 | Backup permission denied | `06-backup.md` -> Troubleshooting |
-| Worker deployment fails | `08-workers.md` -> Troubleshooting |
+| Worker deployment fails | `01-workers.md` -> Troubleshooting |
 | Vector not shipping logs | `04-vps1-openclaw.md` -> Troubleshooting |
 
 ---

@@ -14,7 +14,7 @@ This playbook configures:
 
 ## Prerequisites
 
-- Base deployment complete (`01-07` playbooks)
+- Base deployment complete (`02-07` playbooks)
 - OpenClaw gateway running on VPS-1
 - At least **2GB free disk space** on VPS-1 (sandbox images ~1.3GB + gateway extras ~450MB)
 

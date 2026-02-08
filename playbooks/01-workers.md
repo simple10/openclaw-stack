@@ -1,4 +1,4 @@
-# 08 - Cloudflare Workers Deployment
+# 01 - Cloudflare Workers Deployment
 
 Deploy the AI Gateway and Log Receiver Workers to Cloudflare.
 
@@ -11,8 +11,6 @@ This playbook deploys:
 
 ## Prerequisites
 
-- [04-vps1-openclaw.md](04-vps1-openclaw.md) completed
-- [05-cloudflare-tunnel.md](05-cloudflare-tunnel.md) completed
 - Cloudflare account with Workers enabled
 - Node.js and npm installed locally
 - `wrangler` CLI available (installed as devDependency)
@@ -28,7 +26,7 @@ From `../openclaw-config.env`:
 
 ---
 
-## 8.1 Deploy AI Gateway Worker
+## 1.1Deploy AI Gateway Worker
 
 The AI Gateway Worker proxies LLM API requests through Cloudflare AI Gateway, providing usage analytics without exposing real API keys on the VPS.
 
@@ -93,7 +91,7 @@ curl -s https://<worker-url>/health
 
 ---
 
-## 8.2 Deploy Log Receiver Worker
+## 1.2Deploy Log Receiver Worker
 
 The Log Receiver Worker receives batched log events from Vector and `console.log()`s them. Cloudflare captures Worker console output via real-time Logs dashboard and Logpush.
 
@@ -158,7 +156,7 @@ curl -X POST https://<worker-url>/logs \
 
 ---
 
-## 8.3 Configure Cloudflare Health Check
+## 1.3Configure Cloudflare Health Check
 
 Set up uptime monitoring for the gateway.
 

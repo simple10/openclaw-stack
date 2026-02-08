@@ -119,7 +119,7 @@ Then, add your VPS IP and other values to the config file.
 
 The AI Gateway Worker proxies all LLM requests through Cloudflare. Real provider API keys are configured as Worker secrets (via `wrangler secret put`) and never stored on the VPS.
 
-- [ ] **AI Gateway Worker URL**: Deploy the Worker first (see `playbooks/08-workers.md`), then set `AI_GATEWAY_WORKER_URL`
+- [ ] **AI Gateway Worker URL**: Deploy the Worker first (see `playbooks/01-workers.md`), then set `AI_GATEWAY_WORKER_URL`
 - [ ] **AI Gateway Auth Token**: Set `AI_GATEWAY_AUTH_TOKEN` to the Worker's `AUTH_TOKEN` secret
 - [ ] **Telegram Bot Token** (optional): Create via [@BotFather](https://t.me/BotFather)
 - [ ] **Discord Bot Token** (optional): From [Discord Developer Portal](https://discord.com/developers/applications)
@@ -242,13 +242,13 @@ openclaw-vps/
 │   ├── CLOUDFLARE-TUNNEL.md  # Cloudflare Tunnel reference
 │   └── TESTING.md            # Testing instructions
 └── playbooks/                # Deployment playbooks (for Claude)
-    ├── 01-base-setup.md
+    ├── 01-workers.md
+    ├── 02-base-setup.md
     ├── 03-docker.md
     ├── 04-vps1-openclaw.md
     ├── 05-cloudflare-tunnel.md
     ├── 06-backup.md
     ├── 07-verification.md
-    ├── 08-workers.md
     └── 98-post-deploy.md
 ```
 

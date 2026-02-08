@@ -15,7 +15,7 @@ This playbook verifies:
 
 - All previous playbooks completed
 - 05-cloudflare-tunnel.md completed
-- Workers deployed (08-workers.md)
+- Workers deployed (01-workers.md)
 - VPS-1 rebooted after configuration
 
 ## Pre-Verification: Reboot VPS-1
