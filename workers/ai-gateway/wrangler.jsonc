@@ -6,7 +6,7 @@
     // Set these to your Cloudflare account and AI Gateway IDs
     "GATEWAY_ID": "ai-gateway"
     // Secrets (set via `wrangler secret put`):
-    //   "ACCOUNT_ID": "YOUR_ACCOUNT_ID",
+    //   "ACCOUNT_ID": "YOUR_CLOUDFLARE_ACCOUNT_ID", - use `wrangler whoami` to get account ID
     //   AUTH_TOKEN       — token clients use to authenticate to this worker
     //   OPENAI_API_KEY   — forwarded to OpenAI via AI Gateway
     //   ANTHROPIC_API_KEY — forwarded to Anthropic via AI Gateway
