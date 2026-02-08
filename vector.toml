@@ -5,10 +5,16 @@
 [sources.docker_logs]
 type = "docker_logs"
 
+# Enrich with VPS identity (host field is already set by docker_logs source)
+[transforms.enrich]
+type = "remap"
+inputs = ["docker_logs"]
+source = '.vps_ip = "${VPS1_IP}"'
+
 # Ship to Cloudflare Log Receiver Worker
 [sinks.cloudflare_worker]
 type = "http"
-inputs = ["docker_logs"]
+inputs = ["enrich"]
 uri = "${LOG_WORKER_URL}"
 encoding.codec = "json"
 auth.strategy = "bearer"

@@ -149,6 +149,7 @@ DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:-}
 # Log shipping to Cloudflare Worker
 LOG_WORKER_URL=${LOG_WORKER_URL}
 LOG_WORKER_TOKEN=${LOG_WORKER_TOKEN}
+VPS1_IP=${VPS1_IP}
 
 # Docker compose variables (required by repo's docker-compose.yml)
 OPENCLAW_CONFIG_DIR=/home/openclaw/.openclaw
@@ -283,6 +284,7 @@ services:
     environment:
       - LOG_WORKER_URL=${LOG_WORKER_URL}
       - LOG_WORKER_TOKEN=${LOG_WORKER_TOKEN}
+      - VPS1_IP=${VPS1_IP}
     deploy:
       resources:
         limits:
@@ -307,24 +309,33 @@ Ships Docker container logs to the Cloudflare Log Receiver Worker.
 #!/bin/bash
 sudo -u openclaw tee /home/openclaw/openclaw/vector.toml << 'EOF'
 # Vector configuration — ships Docker container logs to Cloudflare Log Receiver Worker
+# https://vector.dev/docs/
 
+# Collect logs from all Docker containers
 [sources.docker_logs]
 type = "docker_logs"
 
+# Enrich with VPS identity (host field is already set by docker_logs source)
+[transforms.enrich]
+type = "remap"
+inputs = ["docker_logs"]
+source = '.vps_ip = "${VPS1_IP}"'
+
+# Ship to Cloudflare Log Receiver Worker
 [sinks.cloudflare_worker]
 type = "http"
-inputs = ["docker_logs"]
+inputs = ["enrich"]
 uri = "${LOG_WORKER_URL}"
 encoding.codec = "json"
 auth.strategy = "bearer"
 auth.token = "${LOG_WORKER_TOKEN}"
 
 [sinks.cloudflare_worker.batch]
-max_bytes = 262144
-timeout_secs = 60
+max_bytes = 262144    # 256KB per batch
+timeout_secs = 60     # Ship at least every 60s
 
 [sinks.cloudflare_worker.request]
-retry_max_duration_secs = 300
+retry_max_duration_secs = 300   # Keep retrying for 5 min on failures
 EOF
 
 # Create data directory for Vector state
