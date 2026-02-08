@@ -4,33 +4,32 @@ import type { Config, VpsTarget, SshResult } from './types.ts';
 // Suppress zx verbose output by default
 $.verbose = false;
 
-function sshArgs(cfg: Config, target: VpsTarget): string[] {
-  const ip = target === 'vps1' ? cfg.VPS1_IP : cfg.VPS2_IP;
+function sshArgs(cfg: Config): string[] {
   return [
     '-i', cfg.SSH_KEY_PATH,
     '-p', cfg.SSH_PORT,
     '-o', 'ConnectTimeout=10',
     '-o', 'BatchMode=yes',
     '-o', 'StrictHostKeyChecking=accept-new',
-    `${cfg.SSH_USER}@${ip}`,
+    `${cfg.SSH_USER}@${cfg.VPS1_IP}`,
   ];
 }
 
 /**
- * Execute a command on a remote VPS and return stdout.
+ * Execute a command on the VPS and return stdout.
  * Throws on non-zero exit.
  */
 export async function ssh(cfg: Config, target: VpsTarget, cmd: string): Promise<string> {
-  const args = sshArgs(cfg, target);
+  const args = sshArgs(cfg);
   const result = await $`ssh ${args} ${cmd}`;
   return result.stdout.trim();
 }
 
 /**
- * Execute a command on a remote VPS, returning a result object (never throws).
+ * Execute a command on the VPS, returning a result object (never throws).
  */
 export async function sshSafe(cfg: Config, target: VpsTarget, cmd: string): Promise<SshResult> {
-  const args = sshArgs(cfg, target);
+  const args = sshArgs(cfg);
   try {
     const result = await $`ssh ${args} ${cmd}`;
     return {
@@ -55,8 +54,7 @@ export async function sshSafe(cfg: Config, target: VpsTarget, cmd: string): Prom
  * Returns when the remote command completes or the user presses Ctrl+C.
  */
 export async function sshStream(cfg: Config, target: VpsTarget, cmd: string): Promise<void> {
-  const ip = target === 'vps1' ? cfg.VPS1_IP : cfg.VPS2_IP;
-  const proc = $`ssh -i ${cfg.SSH_KEY_PATH} -p ${cfg.SSH_PORT} -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new ${cfg.SSH_USER}@${ip} ${cmd}`;
+  const proc = $`ssh -i ${cfg.SSH_KEY_PATH} -p ${cfg.SSH_PORT} -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new ${cfg.SSH_USER}@${cfg.VPS1_IP} ${cmd}`;
   proc.stdout.pipe(process.stdout);
   proc.stderr.pipe(process.stderr);
 
@@ -76,8 +74,7 @@ export async function sshStream(cfg: Config, target: VpsTarget, cmd: string): Pr
  * Interactive SSH session with PTY allocation (for shell access, interactive commands).
  */
 export async function sshInteractive(cfg: Config, target: VpsTarget, cmd: string): Promise<void> {
-  const ip = target === 'vps1' ? cfg.VPS1_IP : cfg.VPS2_IP;
-  const proc = $`ssh -t -i ${cfg.SSH_KEY_PATH} -p ${cfg.SSH_PORT} -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new ${cfg.SSH_USER}@${ip} ${cmd}`;
+  const proc = $`ssh -t -i ${cfg.SSH_KEY_PATH} -p ${cfg.SSH_PORT} -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new ${cfg.SSH_USER}@${cfg.VPS1_IP} ${cmd}`;
   proc.stdin.pipe(process.stdin);
   proc.stdout.pipe(process.stdout);
   proc.stderr.pipe(process.stderr);
@@ -91,11 +88,10 @@ export async function sshInteractive(cfg: Config, target: VpsTarget, cmd: string
 
 // ── Docker helpers ──────────────────────────────────────────────
 
-const VPS1_COMPOSE_DIR = '/home/openclaw/openclaw';
-const VPS2_COMPOSE_DIR = '/home/openclaw/monitoring';
+const COMPOSE_DIR = '/home/openclaw/openclaw';
 
 /**
- * Run docker compose commands on a VPS.
+ * Run docker compose commands on the VPS.
  * adminclaw can't cd into /home/openclaw, so we use sudo sh -c.
  */
 export async function dockerCompose(
@@ -103,8 +99,7 @@ export async function dockerCompose(
   target: VpsTarget,
   subcmd: string
 ): Promise<string> {
-  const dir = target === 'vps1' ? VPS1_COMPOSE_DIR : VPS2_COMPOSE_DIR;
-  return ssh(cfg, target, `sudo sh -c 'cd ${dir} && sudo -u openclaw docker compose ${subcmd}'`);
+  return ssh(cfg, target, `sudo sh -c 'cd ${COMPOSE_DIR} && sudo -u openclaw docker compose ${subcmd}'`);
 }
 
 /**
@@ -115,8 +110,7 @@ export async function dockerComposeSafe(
   target: VpsTarget,
   subcmd: string
 ): Promise<SshResult> {
-  const dir = target === 'vps1' ? VPS1_COMPOSE_DIR : VPS2_COMPOSE_DIR;
-  return sshSafe(cfg, target, `sudo sh -c 'cd ${dir} && sudo -u openclaw docker compose ${subcmd}'`);
+  return sshSafe(cfg, target, `sudo sh -c 'cd ${COMPOSE_DIR} && sudo -u openclaw docker compose ${subcmd}'`);
 }
 
 /**
@@ -127,8 +121,7 @@ export async function dockerComposeStream(
   target: VpsTarget,
   subcmd: string
 ): Promise<void> {
-  const dir = target === 'vps1' ? VPS1_COMPOSE_DIR : VPS2_COMPOSE_DIR;
-  return sshStream(cfg, target, `sudo sh -c 'cd ${dir} && sudo -u openclaw docker compose ${subcmd}'`);
+  return sshStream(cfg, target, `sudo sh -c 'cd ${COMPOSE_DIR} && sudo -u openclaw docker compose ${subcmd}'`);
 }
 
 /**

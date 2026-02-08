@@ -17,9 +17,7 @@ export function subheader(title: string): void {
 }
 
 export function vpsLabel(target: VpsTarget): string {
-  if (target === 'vps1') return chalk.magenta('[VPS-1]');
-  if (target === 'vps2') return chalk.blue('[VPS-2]');
-  return chalk.gray('[BOTH]');
+  return chalk.magenta('[VPS-1]');
 }
 
 export function printResult(r: CheckResult): void {
