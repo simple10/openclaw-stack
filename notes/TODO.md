@@ -1,5 +1,9 @@
 # TODO
 
+AGENTS: IGNORE THIS TODO LIST - for development only
+
+- [ ] Wipe grafana vps and try single vps deploy of openclaw
+
 ## Completed (this branch)
 
 - [x] Create branch otel-v1 and push to github — saves a snapshot of the OTEL work
