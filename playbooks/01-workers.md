@@ -217,24 +217,6 @@ This monitors gateway reachability through the Cloudflare Tunnel.
 
 ---
 
-## Verification
-
-```bash
-# AI Gateway Worker
-curl -s https://<ai-gateway-url>/health
-
-# Log Receiver Worker
-curl -s https://<log-receiver-url>/health
-
-# Test log ingestion
-curl -X POST https://<log-receiver-url>/logs \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{"container_name":"test","message":"verification","stream":"stdout","timestamp":"2026-02-07T00:00:00Z"}'
-```
-
----
-
 ## Troubleshooting
 
 ### Worker Not Deploying
@@ -271,10 +253,3 @@ curl -X POST <LOG_WORKER_URL> \
 2. Check that requests are going through the Worker (not directly to Anthropic)
 3. Check Worker logs for errors: Dashboard -> Workers -> ai-gateway-proxy -> Logs
 
----
-
-## Future Extensions
-
-- **Logpush:** Configure Cloudflare Logpush to send Worker logs to R2, S3, or external destinations for long-term storage
-- **R2 Storage:** Modify Log Receiver Worker to write logs to R2 buckets in addition to console.log()
-- **Alerts:** Add Worker-based alerting (e.g., error rate thresholds)

@@ -4,6 +4,7 @@ certs/
 *.key
 tmp/
 _bak/
+source/openclaw/
 
 openclaw-config.env
 node_modules/

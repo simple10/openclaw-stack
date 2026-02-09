@@ -83,56 +83,13 @@ Only check for optional features that show signs of being installed.
 
 ## After Analysis
 
-Present findings to the user:
-
-```
-## Analysis Complete: <IP>
-
-**Base Playbooks:** 5/6 passing
-**Networking:** cloudflare-tunnel ✓
-**Optional Features:** 1 detected (sandbox-and-browser ✓)
-
-### Issues Found
-
-1. **06-backup** - Cron job missing
-   - Expected: `/etc/cron.d/openclaw-backup`
-   - Found: File does not exist
-
-### What would you like to do?
-
-- Fix the issues listed above
-- Implement additional features
-- Continue without changes
-```
-
-Wait for user direction before making any changes.
+Present findings grouped by playbook with pass/fail status. List any issues found with expected vs. actual state. Ask the user what to do before making any changes.
 
 ---
 
 ## Single Playbook Verification
 
-When verifying a single playbook:
-
-1. Run only that playbook's verification checks
-2. Report results for that playbook only
-
-Example:
-
-```
-## Verification: 06-backup
-
-**Status:** ✗ Failed
-
-### Checks
-- [✓] Backup script exists
-- [✗] Cron job installed
-- [✓] Backup directory exists
-
-### Failed Check Details
-- Cron job: `/etc/cron.d/openclaw-backup` not found
-
-Fix this issue?
-```
+When verifying a single playbook, run only that playbook's verification checks and report results with pass/fail for each check. Ask before fixing issues.
 
 ---
 

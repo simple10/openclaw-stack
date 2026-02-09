@@ -197,43 +197,15 @@ If the device shows as approved but the browser still can't connect, ask the use
 
 ## 8.5 Reference: Device Management
 
-Present this reference block for the user to save:
+**CLI commands** (from local machine via SSH):
+```bash
+openclaw devices list                    # List pending/approved
+openclaw devices approve <requestId>     # Approve a device
+```
 
-```
-╔══════════════════════════════════════════════════════════════╗
-║                   Device Pairing Reference                   ║
-╠══════════════════════════════════════════════════════════════╣
-║                                                              ║
-║  APPROVE DEVICES VIA CLI                                     ║
-║  ─────────────────────                                       ║
-║  # List pending/approved devices:                            ║
-║  ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \ ║
-║    "openclaw devices list"                                   ║
-║                                                              ║
-║  # Approve a pending device:                                 ║
-║  ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \ ║
-║    "openclaw devices approve <requestId>"                    ║
-║                                                              ║
-║  APPROVE FROM CONTROL UI                                     ║
-║  ───────────────────────                                     ║
-║  Once at least one device is paired, you can approve         ║
-║  new devices directly from the OpenClaw Control UI           ║
-║  without using the CLI.                                      ║
-║                                                              ║
-║  INTERACTIVE CONTAINER ACCESS                                ║
-║  ────────────────────────────                                ║
-║  ./scripts/openclaw_remote.sh                                ║
-║                                                              ║
-║  NOTES                                                       ║
-║  ─────                                                       ║
-║  • Pending requests expire after 5 minutes (TTL).            ║
-║  • The browser automatically retries the connection.         ║
-║  • Each retry creates a new pending request.                 ║
-║  • If a request expired, refresh the page to create a new    ║
-║    one, then approve it.                                     ║
-║                                                              ║
-╚══════════════════════════════════════════════════════════════╝
-```
+**Control UI:** Once one device is paired, approve new devices from the Control UI.
+
+**Notes:** Pending requests expire after 5 minutes. The browser auto-retries, creating new requests. Refresh the page if a request expired.
 
 ---
 

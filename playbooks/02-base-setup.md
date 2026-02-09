@@ -61,17 +61,12 @@ sudo apt install -y \
 
 Run on: **VPS-1**
 
-This deployment uses a two-user security model:
+Two-user security model (see [REQUIREMENTS.md § 2.2](../REQUIREMENTS.md#22-two-user-security-model) for rationale):
 
 | User | SSH Access | Sudo | Purpose |
 |------|------------|------|---------|
 | `adminclaw` | Key only | Passwordless | System administration, Claude automation |
 | `openclaw` | None | None | Runs application, owns app files |
-
-**Security Benefits:**
-- If `openclaw` is compromised (e.g., RCE vulnerability), attacker CANNOT escalate to root
-- `adminclaw` is not a well-known username (unlike `ubuntu`)
-- Clear separation: admin tasks vs application runtime
 
 **IMPORTANT**: You will be prompted to set passwords. Remember these - you may need them for console access.
 
@@ -215,19 +210,13 @@ echo "Verifying SSH is listening on port 222..."
 ss -tlnp | grep 222
 ```
 
----
-
-## 2.5 Verify SSH Port Change and Remove Port 22
-
-**IMPORTANT**: Test SSH on port 222 BEFORE removing port 22 from the firewall.
-
-**NOTE**: Verify this before proceeding to later phases.
+**IMPORTANT**: Test SSH on port 222 from your LOCAL machine BEFORE removing port 22:
 
 ```bash
-# From your LOCAL machine, test SSH on port 222 (using adminclaw, not openclaw)
+# From LOCAL machine — test port 222
 ssh -i ~/.ssh/ovh_openclaw_ed25519 -p 222 adminclaw@<VPS1_IP> "echo 'Port 222 works!'"
 
-# If successful, SSH back in on port 222 and remove port 22 from UFW
+# If successful, SSH back in on 222 and remove port 22
 ssh -i ~/.ssh/ovh_openclaw_ed25519 -p 222 adminclaw@<VPS1_IP>
 sudo ufw delete allow 22/tcp
 sudo ufw status

@@ -110,39 +110,16 @@ Restates what's already in the Configuration Explained table (which we're also r
 **5c. Compact § 4.8c entrypoint preamble (lines 525-540)**
 16-line description of what the entrypoint does. The entrypoint script itself has inline comments. Reduce to a 3-line summary and let the script comments speak for themselves.
 
-**5d. Fix sandbox-common-setup.sh bug in entrypoint (lines 656-667)**
-The current 04 entrypoint naively calls `sandbox-common-setup.sh` and reports success without verification. But the upstream script has a confirmed bug: its heredoc Dockerfile inherits `USER sandbox` from the base image and runs `apt-get` without `USER root`, causing silent failure (swallowed by `set +e`).
+**5d. Add known-issue note about sandbox-common build (near lines 656-667)**
+The entrypoint calls `sandbox-common-setup.sh` which has a confirmed upstream bug: its heredoc Dockerfile inherits `USER sandbox` from the base image and runs `apt-get` without `USER root`, causing silent failure. Add a comment in the entrypoint noting this is a known issue to be addressed separately. No fallback logic — keep the entrypoint simple.
 
-Merge the fallback rebuild from `extras/sandbox-and-browser.md` (lines 195-209) into 04's entrypoint. Replace lines 656-667 with:
+Add a note like:
 
 ```bash
-      # Build common sandbox image if missing (includes Node.js, git, common tools)
-      if ! docker image inspect openclaw-sandbox-common:bookworm-slim > /dev/null 2>&1; then
-        echo "[entrypoint] Common sandbox image not found, building..."
-        if [ -f /app/scripts/sandbox-common-setup.sh ]; then
-          /app/scripts/sandbox-common-setup.sh
-        fi
-        # Verify the build actually succeeded — upstream sandbox-common-setup.sh has a
-        # known bug where it doesn't add USER root before apt-get. The base image sets
-        # USER sandbox, so apt-get fails with "Permission denied" and the build silently
-        # produces no image (swallowed by set +e above).
-        if docker image inspect openclaw-sandbox-common:bookworm-slim > /dev/null 2>&1; then
-          echo "[entrypoint] Common sandbox image built successfully"
-        else
-          echo "[entrypoint] WARNING: upstream script failed, rebuilding with USER root fix..."
-          printf 'FROM openclaw-sandbox:bookworm-slim\nUSER root\nENV DEBIAN_FRONTEND=noninteractive\nRUN apt-get update && apt-get install -y --no-install-recommends curl wget jq coreutils grep nodejs npm python3 git ca-certificates unzip build-essential file && rm -rf /var/lib/apt/lists/*\nRUN npm install -g pnpm\nUSER 1000\n' | docker build -t openclaw-sandbox-common:bookworm-slim -
-          if docker image inspect openclaw-sandbox-common:bookworm-slim > /dev/null 2>&1; then
-            echo "[entrypoint] Common sandbox image built (manual fallback)"
-          else
-            echo "[entrypoint] ERROR: Common sandbox image build failed"
-          fi
-        fi
-      else
-        echo "[entrypoint] Common sandbox image already exists"
-      fi
+      # Known issue: upstream sandbox-common-setup.sh doesn't add USER root before
+      # apt-get. The base image sets USER sandbox, so this build will fail silently.
+      # TODO: Fix upstream or patch the script. See notes/sandbox-common-bug.md
 ```
-
-This is the tested fix from the extras entrypoint — try upstream first, verify, fallback with `USER root`.
 
 **5e. Compact Security Notes section (lines 988-997)**
 Several items restate what's already in the compose override comments and REQUIREMENTS.md. Reduce to 3-4 key points.
@@ -152,12 +129,11 @@ Several items restate what's already in the compose override comments and REQUIR
 ### 6. `playbooks/extras/sandbox-and-browser.md`
 
 **6a. Replace duplicated entrypoint script (lines 89-249) with reference**
-The extras entrypoint was the version with the sandbox-common fallback fix. Now that 04's entrypoint includes this fix (change 5d above), the extras copy is fully redundant. Replace the 160-line heredoc with a short reference:
+The extras entrypoint is a 160-line copy of 04's version (with a fallback that we're removing). Replace with a short reference:
 
 ```
-The entrypoint script is defined in `04-vps1-openclaw.md` § 4.8c. It already includes
-sandbox bootstrap with the upstream USER root fix, Docker daemon startup, Claude sandbox
-build, and privilege drop. No changes needed here.
+The entrypoint script is defined in `04-vps1-openclaw.md` § 4.8c. It includes sandbox
+bootstrap, Docker daemon startup, Claude sandbox build, and privilege drop.
 
 If the entrypoint on VPS-1 is outdated, redeploy it from § 4.8c.
 ```
@@ -233,14 +209,14 @@ ASCII art reference card (37 lines). Replace with a compact markdown block (~10 
 | REQUIREMENTS.md | 829 | ~620 | ~210 |
 | 02-base-setup.md | 427 | ~400 | ~27 |
 | 03-docker.md | 180 | ~150 | ~30 |
-| 04-vps1-openclaw.md | 998 | ~965 | ~33 |
+| 04-vps1-openclaw.md | 998 | ~950 | ~48 |
 | extras/sandbox-and-browser.md | 570 | ~380 | ~190 |
 | 01-workers.md | 281 | ~260 | ~21 |
 | 07-verification.md | 344 | ~330 | ~14 |
 | 00-analysis-mode.md | 143 | ~110 | ~33 |
 | 06-backup.md | 241 | ~215 | ~26 |
 | 08-post-deploy.md | 263 | ~235 | ~28 |
-| **Total** | **~4668** | **~3975** | **~695** |
+| **Total** | **~4668** | **~3960** | **~710** |
 
 ---
 

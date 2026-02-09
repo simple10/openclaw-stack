@@ -211,7 +211,7 @@ sudo docker inspect openclaw-gateway --format '{{.HostConfig.PidsLimit}}'
 
 ## 7.8 Security Verification
 
-Active security testing to confirm gateway ports aren't externally reachable and the built-in security audit passes. This is critical because Docker bypasses UFW — even with UFW blocking a port, a container binding to `0.0.0.0` exposes it to the internet.
+Confirm gateway ports aren't externally reachable and the built-in security audit passes.
 
 ### External Port Reachability (run from LOCAL machine)
 
@@ -258,7 +258,7 @@ openclaw doctor --deep
 
 **Expected warning (safe to ignore):**
 
-- **Security: Gateway bound to "lan" (0.0.0.0)** — required for Docker deployments. cloudflared (systemd on host) connects via Docker bridge — traffic arrives from `172.30.0.1` on `eth0`, not loopback. `bind: loopback` would make the gateway unreachable. Actual network security is enforced by daemon.json localhost binding (section 3.2 of `03-docker.md`), so gateway ports are never exposed to the public network.
+- **Security: Gateway bound to "lan" (0.0.0.0)** — required for Docker deployments for Cloudflare Tunnel to reach the OpenClaw Gateway. See [REQUIREMENTS.md § 3.7](../REQUIREMENTS.md#37-openclawjson-configuration) for rationale.
 
 **If you see other warnings:**
 

@@ -44,7 +44,7 @@ See [playbooks/README.md](playbooks/README.md) for detailed playbook documentati
 - **Update stale comments.** If code changes make a comment inaccurate, fix the comment.
 - **Add comments for non-obvious settings.** Explain *why*, not *what*.
 - **Always use bind mounts, never named volumes.** All Docker container data must use bind mounts to directories under the service's working directory (e.g., `./data/<service>:/path`). Named volumes hide data inside `/var/lib/docker/volumes/` where it cannot be easily backed up with `rsync`. Bind mounts keep everything on the host filesystem under known paths.
-- **Use the `openclaw` CLI wrapper for OpenClaw commands.** From the VPS host: `openclaw <subcommand>` (wrapper script at `/usr/local/bin/openclaw` handles docker exec). Inside the container: `openclaw <subcommand>` (symlink to `/app/openclaw.mjs`). If you need explicit docker exec: `sudo docker exec --user node openclaw-gateway openclaw <subcommand>`. Always use `--user node` — the gateway runs as `node` (via gosu privilege drop). Admin/system commands inside the container (e.g., `docker images`, `chmod`, `ps aux`) can run as root (the default).
+- **Use the `openclaw` CLI wrapper for OpenClaw commands.** VPS host: `openclaw <subcommand>` (wrapper at `/usr/local/bin/openclaw`). Inside container: `openclaw <subcommand>` (symlink). For explicit docker exec, always use `--user node`: `sudo docker exec --user node openclaw-gateway openclaw <subcommand>`.
 
 ---
 
@@ -87,165 +87,32 @@ SSH_USER and SSH_PORT are changed in the hardening steps during deployment.
 
 ## Setup Question Flow
 
-**ALWAYS start this flow when the user's intent is ambiguous or general** (e.g., "hi", "start", "let's go", "help me", or any message that doesn't clearly ask for something else like editing a specific file). Also start this flow when the user explicitly requests deployment or mentions VPS work. The Setup Question Flow is the default entry point for this project.
+**ALWAYS start this flow when the user's intent is ambiguous or general** (e.g., "hi", "start", "let's go", "help me"). Also start when the user explicitly requests deployment or mentions VPS work. This is the default entry point.
 
 ### Step 0: Check Configuration File
 
-Before presenting any options, check if `openclaw-config.env` exists:
+If any of these configuration check steps fail, instruct the user how to fix it and wait for them
+to provide missing config values in the chat or in openclaw-config.env before continuing.
+When values are provided in chat, update the appropriate var in `openclaw-config.env` then rerun
+these configuration checks in order, starting with #1.
 
-```bash
-ls openclaw-config.env 2>/dev/null
-```
+1. Check `openclaw-config.env` exists. If missing, tell user to `cp openclaw-config.example.env openclaw-config.env` and fill in values. Give the user the option to copy the example env for them.
 
-**If missing:** Stop and prompt the user:
+2. Validate required fields: `VPS1_IP`, `SSH_KEY_PATH` (must exist on local system), `SSH_USER`, `OPENCLAW_DOMAIN`, `AI_GATEWAY_WORKER_URL`, `AI_GATEWAY_AUTH_TOKEN`, `LOG_WORKER_URL`, `LOG_WORKER_TOKEN`. Report all missing fields.
 
-> "No `openclaw-config.env` found. Please create this file with your configuration:
->
-> ```bash
-> cp openclaw-config.example.env openclaw-config.env
-> # Then fill in the required values
-> ```
->
-> Once created, let me know and we'll continue."
+3. Check `CF_TUNNEL_TOKEN`. If empty, tell user to follow the steps in [docs/CLOUDFLARE-TUNNEL.md](docs/CLOUDFLARE-TUNNEL.md) to create a tunnel in Cloudflare Dashboard, then copy the tunnel token into the
+chat session or update openclaw-config.env.
 
-**If exists:** Validate required fields:
+4. Scan worker fields for angle-bracket placeholders (e.g., `<account>`). If found, deploy workers via `playbooks/01-workers.md` and update config with real values.
 
-Required fields to check in openclaw-config.env:
+5. Test SSH: `ssh -i <SSH_KEY_PATH> -o ConnectTimeout=10 -o BatchMode=yes -p <SSH_PORT> <SSH_USER>@<VPS1_IP> echo "VPS1 OK"`. If fails, tell user to `ssh-add <SSH_KEY_PATH>` and verify connectivity.
 
-- `VPS1_IP` - Must be a valid IP
-- `SSH_KEY_PATH` - Must exist on local system
-- `SSH_USER` - Must be set (typically `ubuntu` for fresh OVH VPS)
-- `OPENCLAW_DOMAIN` - Must be set
-- `AI_GATEWAY_WORKER_URL` - Must be set (AI Gateway Worker URL)
-- `AI_GATEWAY_AUTH_TOKEN` - Must be set (AI Gateway auth token)
-- `LOG_WORKER_URL` - Must be set (Log Receiver Worker URL)
-- `LOG_WORKER_TOKEN` - Must be set (Log Receiver auth token)
+### Step 1: Deployment Type
 
-If any required field is missing, report all missing fields and ask user to update the file.
+Ask: **New deployment** (fresh VPS) or **Existing deployment** (already configured)?
 
-**Then check `CF_TUNNEL_TOKEN`:** If empty or missing, prompt the user with instructions to create a tunnel in the Cloudflare Dashboard:
-
-> "`CF_TUNNEL_TOKEN` is not set. You need to create a tunnel in the Cloudflare Dashboard:
->
-> 1. Go to **CF Dashboard** -> **Zero Trust** -> **Networks** -> **Tunnels**
-> 2. Click **Create a tunnel** -> Choose **Cloudflared**
-> 3. Name it (e.g., `openclaw`)
-> 4. Copy the **tunnel token** (long base64 string starting with `ey...`)
-> 5. **Skip** the public hostname configuration — save the tunnel without routes
-> 6. Paste the token into `openclaw-config.env` as `CF_TUNNEL_TOKEN=ey...`"
-
-**If all required fields are present:** Check for placeholder values in `AI_GATEWAY_WORKER_URL`, `AI_GATEWAY_AUTH_TOKEN`, `LOG_WORKER_URL`, and `LOG_WORKER_TOKEN`. Scan for angle-bracket placeholders (e.g., `<account>`, `<worker-auth-token>`, `<generated-token>`).
-
-**If placeholders detected:** Stop and prompt:
-
-> "Worker configuration contains placeholder values. Workers must be deployed first to get real URLs and auth tokens.
->
-> Deploying workers now using `playbooks/01-workers.md`..."
-
-Then execute the `01-workers.md` playbook to deploy both workers. After deployment, update `openclaw-config.env` with the real Worker URLs and auth tokens, then re-validate.
-
-If all fields are present and contain real values (no placeholders), test SSH access to VPS-1:
-
-```bash
-ssh -i <SSH_KEY_PATH> -o ConnectTimeout=10 -o BatchMode=yes -p <SSH_PORT> <SSH_USER>@<VPS1_IP> echo "VPS1 OK"
-```
-
-**If SSH fails:** Stop and help troubleshoot:
-
-> "Cannot connect to VPS. Please add your ssh key and make sure you can SSH in:
->
-> "Add your ssh key:"
-> ssh-add <SSH_KEY_PATH>
->
-> "Test SSH:"
-> ssh -p <SSH_PORT> <SSH_USER>@<VPS1_IP> echo "VPS1 OK"
->
-> "Once SSH works, return here and say 'continue'
-
-**If SSH succeeds:** Proceed to Step 1.
-
-### Step 1: Deployment Type Selection
-
-Present the main options:
-
-> "What would you like to do?"
->
-> 1. **New deployment** - Fresh VPS, run full setup
-> 2. **Existing deployment** - VPS already has some configuration
-
----
-
-### Path A: New Deployment
-
-#### A1. Playbook Selection
-
-Present playbook selection:
-
-> "Select playbooks to run:"
->
-> **Core deployment** (selected by default):
->
-> - [x] Base deployment (02, 03, 04, 06-07)
->   - Includes: base-setup, docker, openclaw, backup, verification
->   - Note: Workers (01) are deployed automatically during config validation
->
-> **Optional features** (from `playbooks/extras/`):
->
-> - [ ] Sandbox & Browser (`extras/sandbox-and-browser.md`) — Rich sandbox, browser, gateway packages, Claude Code CLI
-
-#### A2. Confirmation
-
-Show summary and confirm:
-
-> "Ready to deploy:
->
-> - VPS-1: `<VPS1_IP>` (OpenClaw)
-> - Domain: `<OPENCLAW_DOMAIN>`
-> - Networking: Cloudflare Tunnel
-> - Playbooks: Base deployment
->
-> Proceed?"
-
----
-
-### Path B: Existing Deployment
-
-#### B1. Existing Deployment Options
-
-Present options for existing deployments:
-
-> "What would you like to do?"
->
-> 1. **Analyze** - Run live VPS checks (`00-analysis-mode.md`)
-> 2. **Test** - Run verification checks (`07-verification.md`)
-> 3. **Modify** - Add features or make changes
-
-#### B2. Modify Sub-flow
-
-When user selects "Modify":
-
-> "What modifications do you want to make?"
->
-> **Available extras** (from `playbooks/extras/`):
->
-> - [ ] Sandbox & Browser (`extras/sandbox-and-browser.md`) — Rich sandbox, browser, gateway packages, Claude Code CLI
->
-> **Other options:**
->
-> - **Something else** - Describe what you need
-
-If user selects "Something else," use plan mode to design the feature.
-
-#### B3. Confirmation
-
-After action selection, show summary:
-
-> "Ready to execute:
->
-> - VPS-1: `<VPS1_IP>`
-> - Action: [selected action]
->
-> Proceed?"
+- **New deployment:** Present playbook selection — core (02-04, 06-07, workers auto-deployed in step 0) plus optional extras (`extras/sandbox-and-browser.md`). Confirm VPS IP, domain, and selected playbooks before proceeding.
+- **Existing deployment:** Ask: **Analyze** (`00-analysis-mode.md`), **Test** (`07-verification.md`), or **Modify** (select extras or describe custom changes). If "something else," use plan mode.
 
 ---
 
@@ -307,36 +174,11 @@ sudo ufw allow <port>  # Add rule
 sudo ufw reload    # Reload
 ```
 
-### Workers (from local machine)
-
-```bash
-# Log Receiver Worker
-cd workers/log-receiver
-npm run deploy                    # Deploy
-curl https://<log-worker>/health  # Health check
-
-# AI Gateway Worker
-cd workers/ai-gateway
-npm run deploy                    # Deploy
-curl https://<ai-gateway>/health  # Health check
-```
-
 ---
 
 ## Security Model
 
-Two-user security model on VPS-1:
-
-| User | SSH Access | Sudo | Purpose |
-|------|------------|------|---------|
-| `adminclaw` | Key only (port 222) | Passwordless | System administration |
-| `openclaw` | None | None | Application runtime |
-
-Security benefits:
-
-- If `openclaw` is compromised, attacker cannot escalate to root
-- `adminclaw` is not a well-known username
-- Clear separation: admin tasks vs application runtime
+See [REQUIREMENTS.md § 2.2](REQUIREMENTS.md#22-two-user-security-model) for the two-user security model (`adminclaw` for admin, `openclaw` for runtime).
 
 ---
 
@@ -361,31 +203,4 @@ For detailed architecture, configuration, and gotchas, see [REQUIREMENTS.md](REQ
 
 ## Security Checklist
 
-### VPS-1 (OpenClaw)
-
-- [ ] SSH hardened (port 222, key-only, AllowUsers adminclaw)
-- [ ] UFW enabled with minimal rules (SSH only)
-- [ ] Fail2ban running
-- [ ] Automatic security updates enabled
-- [ ] Kernel hardening applied
-- [ ] Sysbox runtime installed
-- [ ] OpenClaw gateway running
-- [ ] Vector shipping logs to Worker
-- [ ] Backup cron job configured
-- [ ] Host alerter cron job configured
-- [ ] Gateway ports (18789, 18790) not reachable from external network
-- [ ] Security audit passes with no critical or warning findings
-
-### Networking (Cloudflare Tunnel)
-
-- [ ] Port 443 closed
-- [ ] Tunnel running on VPS-1
-- [ ] DNS routes through tunnel
-- [ ] Cloudflare Access configured
-
-### Workers
-
-- [ ] Log Receiver Worker deployed and healthy
-- [ ] AI Gateway Worker deployed and healthy
-- [ ] Worker auth tokens set as secrets
-- [ ] Cloudflare Health Check configured
+See [07-verification.md § 7.6](playbooks/07-verification.md) for the full security checklist.

@@ -132,10 +132,6 @@ cat /home/openclaw/.openclaw/logs/backup.log
 | `.openclaw/workspace/` | User workspaces and data |
 | `openclaw/.env` | Environment variables |
 
-### Storage Convention
-
-All Docker containers use **bind mounts** (never named volumes) so data is directly accessible on the host for `rsync` backup. New services must follow the `./data/<service>:/container/path` convention.
-
 ---
 
 ## Restore Procedure
@@ -208,27 +204,7 @@ cat /home/openclaw/.openclaw/logs/backup.log
 
 ## Off-Site Backup (Optional)
 
-For additional protection, sync backups to external storage:
-
-### Using rclone
-
-```bash
-# Install rclone
-sudo apt install rclone
-
-# Configure remote (e.g., S3, Backblaze, etc.)
-rclone config
-
-# Add to backup script
-rclone sync /home/openclaw/.openclaw/backups remote:openclaw-backups
-```
-
-### Using rsync to another server
-
-```bash
-# Backup OpenClaw config and data
-rsync -avz /home/openclaw/.openclaw/ user@backup-server:/path/to/backups/vps1-openclaw/
-```
+Sync backups to external storage via `rclone sync /home/openclaw/.openclaw/backups remote:openclaw-backups` or `rsync -avz /home/openclaw/.openclaw/ user@backup-server:/path/to/backups/`.
 
 ---
 

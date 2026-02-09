@@ -356,34 +356,11 @@ sudo -u openclaw mkdir -p /home/openclaw/openclaw/data/vector
 
 ```bash
 #!/bin/bash
-# IMPORTANT: OpenClaw rejects unknown config keys - only use documented keys
-
-# Validate commands.restart is accepted before applying:
-# sudo docker exec --user node openclaw-gateway openclaw gateway --help 2>&1 | grep -i restart
-# If OpenClaw rejects the key, remove the "commands" block below.
-
-# bind: "lan" is required because cloudflared (systemd) connects via Docker bridge.
-#   Traffic arrives inside the container from 172.30.0.1 on eth0, not loopback.
-#   Using "loopback" would make the gateway unreachable via the tunnel.
-#   The openclaw doctor warning about lan binding is expected and safe —
-#   Docker daemon.json forces all port bindings to 127.0.0.1 (see 03-docker.md).
-#
-# trustedProxies: cloudflared connects via Docker bridge (172.30.0.1). Without this,
-#   gateway rejects X-Forwarded-* headers from the tunnel.
-#   NOTE: Only exact IPs work — CIDR ranges are NOT supported.
-#
-# Device pairing:
-#   New devices must be approved before they can connect. The gateway's auto-approve
-#   only works for localhost connections, so tunnel users need CLI approval:
-#
-#   1. User opens https://<DOMAIN>/chat?token=<TOKEN> → gets "pairing required"
-#   2. Admin approves via SSH:
-#        openclaw devices list
-#        openclaw devices approve <requestId>
-#   3. User's browser auto-retries → connected
-#
-#   Once one device is paired, subsequent devices can be approved from the Control UI.
-#   Pending requests expire after 5 minutes — the browser retries and creates new ones.
+# IMPORTANT: OpenClaw rejects unknown config keys — only use documented keys.
+# bind: "lan" required (Docker bridge traffic, not loopback). openclaw doctor warning is expected.
+# trustedProxies: exact IPs only, CIDR ranges NOT supported.
+# Device pairing: tunnel users need CLI approval — see 08-post-deploy.md.
+# See REQUIREMENTS.md § 3.7 for full rationale.
 
 sudo tee /home/openclaw/.openclaw/openclaw.json << 'JSONEOF'
 {
@@ -512,32 +489,9 @@ sudo chmod +x /home/openclaw/scripts/build-openclaw.sh
 
 ---
 
-## 4.8b Build-Time Patches (Reference)
-
-The build script (4.8a) applies one patch inline using `sed`. It auto-skips when already applied:
-
-1. **Docker + gosu**: Installs `docker.io` and `gosu` for nested Docker daemon (sandbox isolation via Sysbox). Adds node user to docker group for socket access after privilege drop.
-
-No separate patch files needed — the build script contains the patch directly.
-
----
-
 ## 4.8c Create Gateway Entrypoint Script
 
-The entrypoint script runs as root (container uses `user: "0:0"`) and handles several setup tasks before dropping privileges and starting the gateway:
-
-1. **Lock file cleanup** — removes stale `gateway.*.lock` files left by unclean shutdowns
-2. **Config permissions fix** — ensures `openclaw.json` is `chmod 600` (gateway may rewrite with looser permissions)
-3. **Sandbox credentials ownership fix** — chowns `.claude-sandbox` to node (1000) to undo Sysbox uid remapping
-4. **CLI symlink** — creates `/usr/local/bin/openclaw` → `/app/openclaw.mjs` so `openclaw <cmd>` works in the container
-5. **Start nested Docker daemon** — launches `dockerd` for sandbox isolation (Sysbox auto-provisions `/var/lib/docker`)
-6. **Sandbox image bootstrap** — builds default, common, browser, and claude sandbox images if missing
-7. **Claude sandbox build** — layers `openclaw-sandbox-claude` on top of common with Claude Code CLI via `docker build`
-8. **Privilege drop** — `exec gosu node "$@"` drops from root to node user (uid 1000) for the gateway process
-
-The full gateway command (`node dist/index.js gateway ...`) is specified in `docker-compose.override.yml`, not hardcoded here. This makes the entrypoint agnostic to the gateway command format.
-
-> **Note:** Do NOT use `exec tini --` in the script. Docker's `init: true` already provides tini as PID 1. Double-wrapping would break signal forwarding.
+Runs as root (`user: "0:0"`). Handles lock cleanup, permission fixes, dockerd startup, sandbox image builds, then drops to node via `exec gosu node "$@"`. See inline comments for details.
 
 ```bash
 #!/bin/bash
@@ -654,6 +608,9 @@ if command -v dockerd > /dev/null 2>&1; then
       fi
 
       # Build common sandbox image if missing (includes Node.js, git, common tools)
+      # Known issue: upstream sandbox-common-setup.sh doesn't add USER root before
+      # apt-get. The base image sets USER sandbox, so this build may fail silently.
+      # See extras/sandbox-and-browser.md troubleshooting for the manual fallback.
       if ! docker image inspect openclaw-sandbox-common:bookworm-slim > /dev/null 2>&1; then
         echo "[entrypoint] Common sandbox image not found, building..."
         if [ -f /app/scripts/sandbox-common-setup.sh ]; then
@@ -987,11 +944,7 @@ curl -s http://localhost:18789/health
 
 ## Security Notes
 
-- `read_only: false` — required for Docker-in-Docker (Sysbox auto-mounts inherit the flag). Sysbox user namespace isolation provides equivalent protection.
-- tmpfs mounts for `/tmp`, `/var/tmp`, `/run`, `/var/log` limit persistent writable paths
-- Container starts as root (`user: "0:0"`) but Sysbox maps uid 0 → unprivileged uid on host
-- Entrypoint drops to node (uid 1000) via `gosu` before starting gateway process
-- `no-new-privileges` prevents privilege escalation (gosu drops, doesn't gain)
-- Resource limits prevent runaway containers
-- Sysbox provides secure container-in-container isolation (user namespace, /proc, /sys virtualization)
-- Inner Docker socket group set to `docker`, node user is a member
+- `read_only: false` + `user: "0:0"` — required for Sysbox Docker-in-Docker. Sysbox user namespace isolation provides equivalent protection. Entrypoint drops to node via gosu.
+- `no-new-privileges` prevents escalation; resource limits (cpus, memory, pids) prevent runaway containers
+- tmpfs mounts limit persistent writable paths; inner Docker socket group set to `docker`
+- See [REQUIREMENTS.md § 3.4](../REQUIREMENTS.md#34-gateway-container-docker-composeoverrideyml) for full rationale

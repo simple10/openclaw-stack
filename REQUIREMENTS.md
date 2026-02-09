@@ -292,42 +292,11 @@ Key parameters:
 | `cpus` | `4` (limit), `1` (reservation) | Resource bounds |
 | `memory` | `8G` (limit), `2G` (reservation) | Resource bounds |
 
-**tmpfs mounts:**
+See `04-vps1-openclaw.md` § 4.6 for the full `docker-compose.override.yml`.
 
-| Path | Size | Purpose |
-|------|------|---------|
-| `/tmp` | 1G | Sandbox builds, large operations |
-| `/var/tmp` | 200M | Temporary files |
-| `/run` | 100M | Runtime files |
-| `/var/log` | 100M | `dockerd.log` (nested Docker daemon) |
+`--bind lan` is required for Docker deployments. `loopback` doesn't work because Docker port-forwards traffic through the bridge network — connections from cloudflared arrive from `172.30.0.1` on `eth0`, not loopback. `openclaw doctor` warns about this; actual security is enforced by daemon.json localhost binding (§ 2.8).
 
-**Volumes (bind mounts):**
-
-- `./scripts/entrypoint-gateway.sh:/app/scripts/entrypoint-gateway.sh:ro` — Custom entrypoint
-- `/home/openclaw/.claude-sandbox:/home/node/.claude-sandbox` — Sandbox Claude credentials
-
-**Command:**
-
-```
-node dist/index.js gateway --allow-unconfigured --bind lan --port 18789
-```
-
-`--bind lan` is required for Docker deployments. `loopback` doesn't work because Docker
-port-forwards traffic through the bridge network — inside the container, connections from
-cloudflared arrive from `172.30.0.1` on `eth0`, not on loopback. `openclaw doctor` warns
-about this, but the actual network security is enforced by daemon.json localhost binding
-(section 3.1).
-
-**Environment variables:**
-
-- `NODE_ENV=production`
-- `ANTHROPIC_API_KEY` — Set to `AI_GATEWAY_AUTH_TOKEN` (Worker auth, not a real Anthropic key)
-- `ANTHROPIC_BASE_URL` — Set to `AI_GATEWAY_WORKER_URL` (routes requests through Worker)
-- `OPENAI_API_KEY` — Set to `AI_GATEWAY_AUTH_TOKEN`
-- `OPENAI_BASE_URL` — Set to `AI_GATEWAY_WORKER_URL`
-- `GOOGLE_API_KEY`, `XAI_API_KEY`, `GROQ_API_KEY`, `CEREBRAS_API_KEY`, `MISTRAL_API_KEY`, `OPENROUTER_API_KEY` — All set to `AI_GATEWAY_AUTH_TOKEN` (prevents real key leakage; unsupported providers fail at Worker with 404)
-- `TELEGRAM_BOT_TOKEN` — From `.env` (optional)
-- `TZ=UTC`
+All LLM provider API keys are set to `AI_GATEWAY_AUTH_TOKEN` and base URLs to `AI_GATEWAY_WORKER_URL`, routing everything through the AI Gateway Worker. Unsupported providers fail at the Worker (404), preventing leakage to default endpoints.
 
 ### 3.5 Entrypoint Script (`scripts/entrypoint-gateway.sh`)
 
@@ -375,70 +344,7 @@ git checkout -- Dockerfile 2>/dev/null || true
 
 **Important:** OpenClaw rejects unknown keys. Only use documented configuration keys.
 
-```json
-{
-  "commands": {
-    "restart": true
-  },
-  "gateway": {
-    "bind": "lan",
-    "mode": "local",
-    "trustedProxies": ["172.30.0.1"],
-    "controlUi": {
-      "basePath": "<OPENCLAW_DOMAIN_PATH>"
-    }
-  },
-  "agents": {
-    "defaults": {
-      "sandbox": {
-        "mode": "all",
-        "scope": "agent",
-        "docker": {
-          "image": "openclaw-sandbox-claude:bookworm-slim",
-          "containerPrefix": "openclaw-sbx-",
-          "workdir": "/workspace",
-          "readOnlyRoot": true,
-          "tmpfs": ["/tmp", "/var/tmp", "/run", "/home/linuxbrew:uid=1000,gid=1000"],
-          "network": "bridge",
-          "user": "1000:1000",
-          "capDrop": ["ALL"],
-          "env": { "LANG": "C.UTF-8" },
-          "pidsLimit": 256,
-          "memory": "1g",
-          "memorySwap": "2g",
-          "cpus": 1,
-          "binds": ["/home/node/.claude-sandbox:/home/linuxbrew/.claude"]
-        },
-        "browser": {
-          "enabled": true,
-          "image": "openclaw-sandbox-browser:bookworm-slim",
-          "containerPrefix": "openclaw-sbx-browser-",
-          "cdpPort": 9222,
-          "vncPort": 5900,
-          "noVncPort": 6080,
-          "headless": false,
-          "enableNoVnc": true,
-          "autoStart": true,
-          "autoStartTimeoutMs": 12000
-        },
-        "prune": {
-          "idleHours": 168,
-          "maxAgeDays": 60
-        }
-      }
-    }
-  },
-  "tools": {
-    "sandbox": {
-      "tools": {
-        "allow": ["exec", "process", "read", "write", "edit", "apply_patch", "browser",
-                  "sessions_list", "sessions_history", "sessions_send", "sessions_spawn", "session_status"],
-        "deny": ["canvas", "nodes", "cron", "discord", "gateway"]
-      }
-    }
-  }
-}
-```
+See `04-vps1-openclaw.md` § 4.8 for the full `openclaw.json` content.
 
 **Key design decisions:**
 
@@ -498,59 +404,11 @@ printf 'FROM openclaw-sandbox-common:bookworm-slim\nUSER root\nRUN apt-get updat
 **Container name:** `vector`
 **Network:** `openclaw-gateway-net`
 
-**Config file:** `/home/openclaw/openclaw/vector.yaml` (bind mounted to `/etc/vector/vector.yaml:ro`). YAML format is used because the Vector Alpine image defaults to `vector.yaml`, avoiding the need for a `command` override in compose.
+**Config file:** `/home/openclaw/openclaw/vector.yaml` (bind mounted to `/etc/vector/vector.yaml:ro`). YAML format matches the Vector Alpine image default, avoiding a `command` override.
 
-**Purpose:** Ships Docker container logs to the Cloudflare Log Receiver Worker. Replaces Promtail + Loki from the previous two-VPS architecture.
+**Purpose:** Ships Docker container logs to the Cloudflare Log Receiver Worker.
 
-**Container definition (docker-compose.override.yml):**
-
-```yaml
-vector:
-  image: timberio/vector:0.43.1-alpine
-  container_name: vector
-  restart: always
-  volumes:
-    - /var/run/docker.sock:/var/run/docker.sock:ro
-    - ./vector.yaml:/etc/vector/vector.yaml:ro
-    - ./data/vector:/var/lib/vector
-  environment:
-    - LOG_WORKER_URL=${LOG_WORKER_URL}
-    - LOG_WORKER_TOKEN=${LOG_WORKER_TOKEN}
-  deploy:
-    resources:
-      limits:
-        cpus: "0.25"
-        memory: 128M
-  networks:
-    - openclaw-gateway-net
-```
-
-**Vector config (`vector.yaml`):**
-
-```yaml
-# Collect logs from all Docker containers
-sources:
-  docker_logs:
-    type: docker_logs
-
-# Ship to Cloudflare Log Receiver Worker
-sinks:
-  cloudflare_worker:
-    type: http
-    inputs:
-      - docker_logs
-    uri: "${LOG_WORKER_URL}"
-    encoding:
-      codec: json
-    auth:
-      strategy: bearer
-      token: "${LOG_WORKER_TOKEN}"
-    batch:
-      max_bytes: 262144    # 256KB per batch
-      timeout_secs: 60     # Ship at least every 60s
-    request:
-      retry_max_duration_secs: 300   # Keep retrying for 5 min on failures
-```
+See `04-vps1-openclaw.md` § 4.6 (compose) and § 4.7 (vector.yaml) for the full configs.
 
 **Fields per event** (auto-included by `docker_logs` source):
 
@@ -653,22 +511,12 @@ curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
 
 **Location:** `/home/openclaw/openclaw/.env`
 
-| Variable | Purpose |
-|----------|---------|
-| `OPENCLAW_GATEWAY_TOKEN` | 64-char hex token for URL-based auth |
-| `AI_GATEWAY_WORKER_URL` | AI Gateway Worker URL (all LLM base URLs point here) |
-| `AI_GATEWAY_AUTH_TOKEN` | AI Gateway auth token (used as all provider API keys) |
-| `TELEGRAM_BOT_TOKEN` | Optional: Telegram integration |
-| `DISCORD_BOT_TOKEN` | Optional: Discord integration |
-| `OPENCLAW_CONFIG_DIR` | `/home/openclaw/.openclaw` |
-| `OPENCLAW_WORKSPACE_DIR` | `/home/openclaw/.openclaw/workspace` |
-| `OPENCLAW_GATEWAY_PORT` | `18789` — Port number only (DO NOT use IP:port format; CLI misparses it). Localhost binding is handled by Docker daemon `"ip": "127.0.0.1"` in daemon.json, not here. |
-| `OPENCLAW_BRIDGE_PORT` | `18790` — Port number only |
-| `OPENCLAW_GATEWAY_BIND` | `lan` — Required for Docker deployments (loopback won't receive Docker bridge-forwarded traffic from cloudflared). `openclaw doctor` warns about this; the warning is expected — see section 3.7. |
-| `LOG_WORKER_URL` | Full URL to Log Receiver Worker (must include `/logs` path) |
-| `LOG_WORKER_TOKEN` | Bearer token for Log Receiver Worker authentication |
+See `04-vps1-openclaw.md` § 4.5 for the full variable list and creation script.
 
-**Gotcha:** `.env` values with spaces MUST be quoted (e.g., `VAR="a b c"`). Unquoted values cause bash `source .env` to treat words as separate commands.
+**Critical gotchas:**
+
+- `OPENCLAW_GATEWAY_PORT` must be port number only (`18789`), NOT IP:port format (`127.0.0.1:18789`). The CLI misparses IP:port and extracts `127` as the port. Localhost binding is handled by daemon.json.
+- `.env` values with spaces MUST be quoted (e.g., `VAR="a b c"`). Unquoted values cause bash `source .env` to break.
 
 ---
 
@@ -781,48 +629,34 @@ curl https://<worker-name>.<account>.workers.dev/health
 
 ### Security & Access
 
-- **UsePAM must be `yes` on Ubuntu** — Setting it to `no` breaks SSH authentication entirely
-- **Ubuntu systemd socket activation** — SSH port change requires both `sshd_config` AND systemd socket override
-- **UFW before SSH port change** — Always configure UFW rules BEFORE changing SSH port to prevent lockout
-- **adminclaw can't cd into `/home/openclaw/`** — Directory is 750. Use `sudo -u openclaw bash -c "cd ... && ..."` or `sudo sh -c 'cd ... && ...'`
+- **UsePAM must be `yes` on Ubuntu** — `no` breaks SSH authentication entirely
+- **SSH port change requires both** `sshd_config` AND systemd socket override (Ubuntu socket activation)
+- **UFW before SSH port change** — configure UFW rules BEFORE changing SSH port to prevent lockout
+- **adminclaw can't cd into `/home/openclaw/`** — 750 perms. Use `sudo -u openclaw bash -c "cd ... && ..."`
+- **Docker bypasses UFW** — iptables DOCKER chain runs before INPUT. Fix requires **two** daemon.json settings: `"ip": "127.0.0.1"` (default bridge) + `"default-network-opts"` with `host_binding_ipv4` (user-defined bridges). Port binding changes require full container + network recreation (`docker compose down`, `docker network rm`, recreate, `up -d`).
 
-### Container & Docker
+### Container & Build
 
-- **`read_only: false` is required** for gateway container — Sysbox auto-mounts inherit this flag, and dockerd needs writable `/var/lib/docker`
-- **`user: "0:0"` is required** — Sysbox maps uid 0 to unprivileged host uid. Entrypoint drops to node via gosu.
-- **Container name is `openclaw-gateway`** (explicit `container_name`), not `openclaw-openclaw-gateway-1`
-- **No `openclaw` binary on PATH** — Use `node dist/index.js` instead. Full: `sudo docker exec --user node openclaw-gateway node dist/index.js <subcommand>` — always use `--user node` to match the gateway's runtime user (gosu drops from root to node).
-
-### Build & Patching
-
-- **Patches must go before `USER node`** in Dockerfile — npm/apt can't write to system dirs after user change
-- **Failed builds leave patches in place** — `git checkout` cleanup only runs on success. Manually restore before retry: `git checkout -- Dockerfile`
-- **`.env` values with spaces must be quoted** — `VAR=a b c` breaks `source .env`
-- **`OPENCLAW_GATEWAY_PORT` must be port only, not IP:port** — `127.0.0.1:18789` causes CLI to misparse `127` as the port. Use just `18789`. The `.env` is baked into the Docker image at `/app/.env` and read by the gateway at runtime
-- **`sed /i` with backslash continuations breaks Dockerfiles** — Use single-line RUN commands
-- **Only 1 patch remains** — Docker+gosu (#1). Claude Code CLI and OTEL patches no longer needed. Agent tools (ffmpeg, imagemagick, Claude Code CLI) are in the claude sandbox image, not the gateway.
+- **`read_only: false` + `user: "0:0"` required** — Sysbox auto-mounts inherit `read_only`; entrypoint drops to node via gosu
+- **Container name is `openclaw-gateway`** (explicit `container_name`)
+- **Patches must go before `USER node`** — apt/npm can't write to system dirs after user change. Failed builds leave patches in place — manually `git checkout -- Dockerfile` before retry.
+- **`OPENCLAW_GATEWAY_PORT` must be port only** — `127.0.0.1:18789` causes CLI to misparse `127` as port
+- **Only 1 patch remains** — Docker+gosu. Agent tools are in the claude sandbox image, not the gateway.
 
 ### UID & Ownership
 
-- Host `ubuntu` is uid 1000, host `openclaw` is uid 1002. Container `node` is uid 1000.
-- Container files in `.openclaw` are owned by uid 1000 (matches `ubuntu`, not `openclaw`)
-- Sysbox remaps host uid 1000 to uid 1002 inside container — entrypoint `chown` fixes sandbox credentials
-- Backups must run as root (uid 1000 files not readable by openclaw uid 1002)
+- Host `ubuntu` = uid 1000, host `openclaw` = uid 1002, container `node` = uid 1000
+- `.openclaw` files owned by uid 1000 (matches `ubuntu`, not `openclaw`). Backups must run as root.
+- Sysbox remaps host uid 1000 to uid 1002 inside container — entrypoint `chown` fixes this
 
 ### Sandbox
 
-- **Do NOT use `docker build -f - /dev/null`** in Sysbox — rejects `/dev/null` as build context
+- **Do NOT use `docker build -f - /dev/null`** in Sysbox — use `printf ... | docker build -t tag -`
 - **Do NOT use `docker run`/`docker commit`** — creates dirty layers. Use `docker build` with FROM.
 - **Entrypoint heredocs via SSH** mangle shebangs — use `scp` instead
 
-### Docker & UFW
-
-- **Docker bypasses UFW** — Docker manipulates iptables directly via the DOCKER chain, which is processed before UFW's INPUT chain. This means container port mappings (e.g., `ports: "18789:18789"`) are reachable from the internet even if UFW has no rule allowing them. The fix requires **two** settings in `/etc/docker/daemon.json`: `"ip": "127.0.0.1"` (default bridge) and `"default-network-opts"` with `host_binding_ipv4` (user-defined bridges like `openclaw-gateway-net`). Both are needed because `ip` only affects the default bridge network. Compose files can still override with an explicit address if needed.
-- **Port binding changes require container AND network recreation** — Changing daemon.json and restarting Docker is not enough. `default-network-opts` only applies to newly created networks, so existing user-defined networks must be removed and recreated. Use `docker compose down`, `docker network rm <net>`, recreate the network, then `docker compose up -d`.
-
 ### Vector (Log Shipping)
 
-- **`LOG_WORKER_URL` must include the `/logs` path** — Vector sends to this URL directly, it does not append any path. Example: `https://log-receiver.<account>.workers.dev/logs`
-- **Checkpoint recovery** — If `./data/vector/` is deleted, Vector will re-ship all available Docker logs from the beginning. This is safe (Worker is idempotent) but may cause a burst of log traffic.
-- **Docker socket required** — Vector needs `/var/run/docker.sock` mounted read-only to discover and tail container logs.
-- **Batch timeout is 60 seconds** — Logs may take up to 60 seconds to appear in the Worker after being written. This is the normal batching delay, not a bug.
+- **`LOG_WORKER_URL` must include `/logs` path** — Vector sends to this URL directly
+- **Batch timeout is 60 seconds** — normal batching delay, not a bug
+- If `./data/vector/` is deleted, Vector re-ships all logs from the beginning (safe but bursty)
