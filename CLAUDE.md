@@ -47,7 +47,7 @@ See [playbooks/README.md](playbooks/README.md) for detailed playbook documentati
 - **Update stale comments.** If code changes make a comment inaccurate, fix the comment.
 - **Add comments for non-obvious settings.** Explain *why*, not *what*.
 - **Always use bind mounts, never named volumes.** All Docker container data must use bind mounts to directories under the service's working directory (e.g., `./data/<service>:/path`). Named volumes hide data inside `/var/lib/docker/volumes/` where it cannot be easily backed up with `rsync`. Bind mounts keep everything on the host filesystem under known paths.
-- **Always use `--user node` when running OpenClaw CLI commands via `docker exec`.** The gateway runs as `node` (via gosu privilege drop), so exec commands must match the runtime user context. Running as root could mask permission issues or produce different behavior. Example: `sudo docker exec --user node openclaw-gateway node dist/index.js <subcommand>`. Admin/system commands inside the container (e.g., `docker images`, `chmod`, `ps aux`) can run as root (the default).
+- **Use the `openclaw` CLI wrapper for OpenClaw commands.** From the VPS host: `openclaw <subcommand>` (wrapper script at `/usr/local/bin/openclaw` handles docker exec). Inside the container: `openclaw <subcommand>` (symlink to `/app/openclaw.mjs`). If you need explicit docker exec: `sudo docker exec --user node openclaw-gateway openclaw <subcommand>`. Always use `--user node` — the gateway runs as `node` (via gosu privilege drop). Admin/system commands inside the container (e.g., `docker images`, `chmod`, `ps aux`) can run as root (the default).
 
 ---
 

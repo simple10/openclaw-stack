@@ -233,7 +233,7 @@ sudo ss -tlnp
 Run OpenClaw's built-in security scanner. This does NOT need device pairing — it performs local HTTP probes inside the container.
 
 ```bash
-sudo docker exec --user node openclaw-gateway node dist/index.js security audit --deep
+openclaw security audit --deep
 ```
 
 **Expected:** 0 critical, 0 warnings. 1 info finding is normal. If the audit reports ECONNREFUSED on an unexpected port, check that `OPENCLAW_GATEWAY_PORT` in the container's `.env` is set to `18789` (port only, not `IP:port`).
@@ -243,7 +243,7 @@ sudo docker exec --user node openclaw-gateway node dist/index.js security audit 
 Run OpenClaw's diagnostic checker inside the container.
 
 ```bash
-sudo docker exec --user node openclaw-gateway node openclaw.mjs doctor --deep
+openclaw doctor --deep
 ```
 
 **Expected:** Only finding should be the Security warning about `lan` binding. No State integrity or Sandbox warnings.

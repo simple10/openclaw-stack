@@ -359,7 +359,7 @@ sudo -u openclaw mkdir -p /home/openclaw/openclaw/data/vector
 # IMPORTANT: OpenClaw rejects unknown config keys - only use documented keys
 
 # Validate commands.restart is accepted before applying:
-# sudo docker exec --user node openclaw-gateway node dist/index.js gateway --help 2>&1 | grep -i restart
+# sudo docker exec --user node openclaw-gateway openclaw gateway --help 2>&1 | grep -i restart
 # If OpenClaw rejects the key, remove the "commands" block below.
 
 # bind: "lan" is required because cloudflared (systemd) connects via Docker bridge.
@@ -378,8 +378,8 @@ sudo -u openclaw mkdir -p /home/openclaw/openclaw/data/vector
 #
 #   1. User opens https://<DOMAIN>/chat?token=<TOKEN> → gets "pairing required"
 #   2. Admin approves via SSH:
-#        sudo docker exec --user node openclaw-gateway node dist/index.js devices list
-#        sudo docker exec --user node openclaw-gateway node dist/index.js devices approve <requestId>
+#        openclaw devices list
+#        openclaw devices approve <requestId>
 #   3. User's browser auto-retries → connected
 #
 #   Once one device is paired, subsequent devices can be approved from the Control UI.
@@ -529,10 +529,11 @@ The entrypoint script runs as root (container uses `user: "0:0"`) and handles se
 1. **Lock file cleanup** — removes stale `gateway.*.lock` files left by unclean shutdowns
 2. **Config permissions fix** — ensures `openclaw.json` is `chmod 600` (gateway may rewrite with looser permissions)
 3. **Sandbox credentials ownership fix** — chowns `.claude-sandbox` to node (1000) to undo Sysbox uid remapping
-4. **Start nested Docker daemon** — launches `dockerd` for sandbox isolation (Sysbox auto-provisions `/var/lib/docker`)
-5. **Sandbox image bootstrap** — builds default, common, browser, and claude sandbox images if missing
-6. **Claude sandbox build** — layers `openclaw-sandbox-claude` on top of common with Claude Code CLI via `docker build`
-7. **Privilege drop** — `exec gosu node "$@"` drops from root to node user (uid 1000) for the gateway process
+4. **CLI symlink** — creates `/usr/local/bin/openclaw` → `/app/openclaw.mjs` so `openclaw <cmd>` works in the container
+5. **Start nested Docker daemon** — launches `dockerd` for sandbox isolation (Sysbox auto-provisions `/var/lib/docker`)
+6. **Sandbox image bootstrap** — builds default, common, browser, and claude sandbox images if missing
+7. **Claude sandbox build** — layers `openclaw-sandbox-claude` on top of common with Claude Code CLI via `docker build`
+8. **Privilege drop** — `exec gosu node "$@"` drops from root to node user (uid 1000) for the gateway process
 
 The full gateway command (`node dist/index.js gateway ...`) is specified in `docker-compose.override.yml`, not hardcoded here. This makes the entrypoint agnostic to the gateway command format.
 
@@ -592,6 +593,14 @@ if [ -d "$openclaw_dir" ]; then
     chown -R 1000:1000 "$openclaw_dir"
     echo "[entrypoint] Fixed .openclaw ownership to node (1000)"
   fi
+fi
+
+# ── 1e. Create openclaw CLI symlink ──────────────────────────────────
+# /app/openclaw.mjs has #!/usr/bin/env node shebang and is executable.
+# Symlink to /usr/local/bin so 'openclaw' works anywhere in the container.
+if [ ! -L /usr/local/bin/openclaw ]; then
+  ln -sf /app/openclaw.mjs /usr/local/bin/openclaw
+  echo "[entrypoint] Created /usr/local/bin/openclaw symlink"
 fi
 
 # ── 2. Start nested Docker daemon (Sysbox provides isolation) ───────
@@ -786,6 +795,34 @@ sudo chmod 644 /etc/cron.d/openclaw-alerts
 
 ---
 
+## 4.8e Create OpenClaw CLI Host Wrapper
+
+Create a convenience wrapper so `adminclaw` can run `openclaw <command>` directly from the VPS host without typing the full `docker exec` prefix.
+
+```bash
+#!/bin/bash
+# Write wrapper directly to /usr/local/bin (not a symlink — adminclaw can't
+# traverse /home/openclaw/scripts/ due to directory permissions)
+sudo tee /usr/local/bin/openclaw << 'WRAPEOF'
+#!/bin/bash
+# OpenClaw CLI wrapper — runs commands inside the gateway container as node user
+exec sudo docker exec --user node openclaw-gateway openclaw "$@"
+WRAPEOF
+
+sudo chmod +x /usr/local/bin/openclaw
+```
+
+After this, `adminclaw` can run commands like:
+
+```bash
+openclaw --version
+openclaw doctor --deep
+openclaw security audit --deep
+openclaw devices list
+```
+
+---
+
 ## 4.9 Build and Start OpenClaw
 
 ```bash
@@ -914,7 +951,7 @@ sudo -u openclaw /home/openclaw/scripts/build-openclaw.sh
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'
 
 # 5. Verify new version
-sudo docker exec --user node openclaw-gateway node dist/index.js --version
+openclaw --version
 curl -s http://localhost:18789/health
 
 # 6. Cleanup old rollback images (keep last 3)
@@ -939,7 +976,7 @@ docker tag "openclaw:rollback-$(date +%Y%m%d)" openclaw:local
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'
 
 # 4. Verify
-sudo docker exec --user node openclaw-gateway node dist/index.js --version
+openclaw --version
 curl -s http://localhost:18789/health
 ```
 
