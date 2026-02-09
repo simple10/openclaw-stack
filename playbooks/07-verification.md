@@ -162,6 +162,7 @@ ip link show wg0 2>&1 | grep -q "does not exist" && echo "No WireGuard (correct)
 - [ ] Vector shipping logs
 - [ ] Backup cron job configured
 - [ ] Host alerter cron job configured
+- [ ] Container ports bound to localhost only (not 0.0.0.0)
 
 ```bash
 sudo systemctl status sysbox
@@ -169,6 +170,11 @@ sudo -u openclaw docker compose ps
 sudo docker logs --tail 5 vector
 cat /etc/cron.d/openclaw-backup
 cat /etc/cron.d/openclaw-alerts
+
+# Verify gateway and bridge ports bind to localhost only (not 0.0.0.0)
+# Docker bypasses UFW, so 0.0.0.0 binding exposes ports to the internet
+sudo ss -tlnp | grep -E '187(89|90)'
+# Expected: 127.0.0.1:18789 and 127.0.0.1:18790 (NOT 0.0.0.0)
 ```
 
 ### Cloudflare Workers

@@ -2,7 +2,7 @@
 
 AGENTS: IGNORE THIS TODO LIST - for development only
 
-- [ ] Wipe grafana vps and try single vps deploy of openclaw
+- [ ] Add verification or post-deploy step to run `node openclaw.mjs security audit --deep` on openclaw-gateway
 
 ## Completed (this branch)
 

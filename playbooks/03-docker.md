@@ -65,6 +65,12 @@ sudo mkdir -p /etc/docker
 
 sudo tee /etc/docker/daemon.json << 'EOF'
 {
+  "ip": "127.0.0.1",
+  "default-network-opts": {
+    "bridge": {
+      "com.docker.network.bridge.host_binding_ipv4": "127.0.0.1"
+    }
+  },
   "log-driver": "json-file",
   "log-opts": {
     "max-size": "50m",
@@ -91,6 +97,8 @@ sudo systemctl restart docker
 
 | Setting | Purpose |
 |---------|---------|
+| `ip: 127.0.0.1` | Bind published ports on the **default bridge** to localhost only. Docker bypasses UFW (iptables DOCKER chain is processed before INPUT), so without this, ports are reachable from the internet even if UFW blocks them. |
+| `default-network-opts` | Bind published ports on **user-defined bridge networks** to localhost only. `ip` only affects the default bridge; this covers networks like `openclaw-gateway-net`. Both settings together ensure all container ports bind to localhost. |
 | `log-driver: json-file` | Standard logging with rotation |
 | `max-size: 50m` | Rotate logs at 50MB |
 | `max-file: 5` | Keep 5 rotated log files |
@@ -165,6 +173,7 @@ docker system df
 ## Security Notes
 
 - Both `adminclaw` and `openclaw` have Docker access
+- `ip` + `default-network-opts` ensures all container port mappings bind to localhost only — Docker bypasses UFW (manipulates iptables directly), so this is essential for keeping ports off the public interface
 - `no-new-privileges` prevents container privilege escalation
 - Log rotation prevents disk exhaustion
 - `userland-proxy: false` improves network performance and security

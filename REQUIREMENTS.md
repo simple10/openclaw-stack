@@ -163,6 +163,12 @@ Key parameters:
 
 ```json
 {
+  "ip": "127.0.0.1",
+  "default-network-opts": {
+    "bridge": {
+      "com.docker.network.bridge.host_binding_ipv4": "127.0.0.1"
+    }
+  },
   "log-driver": "json-file",
   "log-opts": { "max-size": "50m", "max-file": "5" },
   "storage-driver": "overlay2",
@@ -177,6 +183,8 @@ Key parameters:
 
 | Setting | Rationale |
 |---------|-----------|
+| `ip: 127.0.0.1` | Bind published ports on the **default bridge** to localhost only. Docker bypasses UFW (iptables DOCKER chain runs before INPUT chain), so without this, container ports are reachable from the internet even if UFW blocks them. |
+| `default-network-opts` | Bind published ports on **user-defined bridge networks** to localhost only. `ip` only affects the default bridge; this covers networks like `openclaw-gateway-net`. Both settings together ensure all container ports bind to localhost. |
 | `json-file` with rotation | Standard logging with 50MB/5 files rotation |
 | `overlay2` | Recommended storage driver |
 | `live-restore: true` | Containers survive daemon restarts |
@@ -643,7 +651,7 @@ curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
 | `DISCORD_BOT_TOKEN` | Optional: Discord integration |
 | `OPENCLAW_CONFIG_DIR` | `/home/openclaw/.openclaw` |
 | `OPENCLAW_WORKSPACE_DIR` | `/home/openclaw/.openclaw/workspace` |
-| `OPENCLAW_GATEWAY_PORT` | `18789` — Port number only (DO NOT use IP:port format; CLI misparses it) |
+| `OPENCLAW_GATEWAY_PORT` | `18789` — Port number only (DO NOT use IP:port format; CLI misparses it). Localhost binding is handled by Docker daemon `"ip": "127.0.0.1"` in daemon.json, not here. |
 | `OPENCLAW_BRIDGE_PORT` | `18790` — Port number only |
 | `OPENCLAW_GATEWAY_BIND` | `lan` |
 | `LOG_WORKER_URL` | Full URL to Log Receiver Worker (must include `/logs` path) |
@@ -795,6 +803,11 @@ curl https://<worker-name>.<account>.workers.dev/health
 - **Do NOT use `docker build -f - /dev/null`** in Sysbox — rejects `/dev/null` as build context
 - **Do NOT use `docker run`/`docker commit`** — creates dirty layers. Use `docker build` with FROM.
 - **Entrypoint heredocs via SSH** mangle shebangs — use `scp` instead
+
+### Docker & UFW
+
+- **Docker bypasses UFW** — Docker manipulates iptables directly via the DOCKER chain, which is processed before UFW's INPUT chain. This means container port mappings (e.g., `ports: "18789:18789"`) are reachable from the internet even if UFW has no rule allowing them. The fix requires **two** settings in `/etc/docker/daemon.json`: `"ip": "127.0.0.1"` (default bridge) and `"default-network-opts"` with `host_binding_ipv4` (user-defined bridges like `openclaw-gateway-net`). Both are needed because `ip` only affects the default bridge network. Compose files can still override with an explicit address if needed.
+- **Port binding changes require container AND network recreation** — Changing daemon.json and restarting Docker is not enough. `default-network-opts` only applies to newly created networks, so existing user-defined networks must be removed and recreated. Use `docker compose down`, `docker network rm <net>`, recreate the network, then `docker compose up -d`.
 
 ### Vector (Log Shipping)
 
