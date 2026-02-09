@@ -1,4 +1,4 @@
-# 98 - Post-Deploy: First Access & Device Pairing
+# 08 - Post-Deploy: First Access & Device Pairing
 
 Interactive guide for accessing OpenClaw and pairing your first device after deployment.
 
@@ -20,7 +20,7 @@ After `07-verification.md` confirms all services are healthy, this playbook walk
 
 ---
 
-## 98.1 Retrieve Gateway Token
+## 8.1 Retrieve Gateway Token
 
 Read the gateway token from VPS-1:
 
@@ -39,7 +39,7 @@ https://<OPENCLAW_DOMAIN><OPENCLAW_DOMAIN_PATH>/chat?token=<TOKEN>
 
 ---
 
-## 98.2 Open the URL
+## 8.2 Open the URL
 
 Tell the user to open the URL in their browser.
 
@@ -57,7 +57,7 @@ Ask the user to confirm they can see the page (even with the pairing error) befo
 
 ---
 
-## 98.3 Approve Device Pairing
+## 8.3 Approve Device Pairing
 
 After the user confirms they opened the URL, approve their device.
 
@@ -125,7 +125,7 @@ ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
 
 ---
 
-## 98.4 Verify Connection
+## 8.4 Verify Connection
 
 Ask the user to confirm:
 
@@ -148,7 +148,7 @@ If the device shows as approved but the browser still can't connect, ask the use
 
 ---
 
-## 98.5 Reference: Device Management
+## 8.5 Reference: Device Management
 
 Present this reference block for the user to save:
 

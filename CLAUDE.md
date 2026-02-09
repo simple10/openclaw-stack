@@ -25,9 +25,7 @@ All deployment steps are in modular playbooks under `playbooks/`:
 | `06-backup.md` | Backup scripts and cron jobs |
 | `07-verification.md` | Testing and verification |
 | `maintenance.md` | Token rotation schedules and procedures |
-| `98-post-deploy.md` | First access & device pairing |
-| `99-new-feature-planning.md` | Process for planning new features |
-| `99-new-feature-implementation.md` | Process for implementing planned features |
+| `08-post-deploy.md` | First access & device pairing |
 
 Optional features are in `playbooks/extras/`:
 
@@ -216,32 +214,17 @@ Show summary and confirm:
 
 ### Path B: Existing Deployment
 
-#### B1. Check for State Files
-
-```bash
-ls .state/*.md 2>/dev/null
-```
-
-**If no state files exist:**
-
-> "No state files found. I recommend analyzing your current setup first to understand what's already configured.
->
-> Run analysis mode now?"
->
-> - **Yes** - Execute `00-analysis-mode.md`
-> - **No** - Skip analysis and proceed to options
-
-#### B2. Existing Deployment Options
+#### B1. Existing Deployment Options
 
 Present options for existing deployments:
 
 > "What would you like to do?"
 >
-> 1. **Re-analyze** - Verify current state matches state files
+> 1. **Analyze** - Run live VPS checks (`00-analysis-mode.md`)
 > 2. **Test** - Run verification checks (`07-verification.md`)
 > 3. **Modify** - Add features or make changes
 
-#### B3. Modify Sub-flow
+#### B2. Modify Sub-flow
 
 When user selects "Modify":
 
@@ -255,9 +238,9 @@ When user selects "Modify":
 >
 > - **Something else** - Describe what you need
 
-If user selects "Something else," trigger `99-new-feature-planning.md` workflow.
+If user selects "Something else," use plan mode to design the feature.
 
-#### B4. Confirmation
+#### B3. Confirmation
 
 After action selection, show summary:
 
@@ -283,7 +266,7 @@ After action selection, show summary:
 6. Execute 06-backup.md on VPS-1
 7. Reboot VPS-1
 8. Execute 07-verification.md
-9. Execute 98-post-deploy.md
+9. Execute 08-post-deploy.md
 ```
 
 All steps are sequential on a single VPS. Workers deployment (01-workers) runs from the local machine using `wrangler` and is triggered automatically during config validation if needed.

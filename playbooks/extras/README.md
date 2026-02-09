@@ -28,4 +28,4 @@ Optional features are enhancements that:
 
 ## Adding Optional Features
 
-See [99-new-feature-planning.md](../99-new-feature-planning.md) for the process to plan and implement new optional features.
+To plan and implement a new optional feature, use plan mode to design the feature based on existing playbooks as templates.

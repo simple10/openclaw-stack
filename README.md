@@ -302,7 +302,7 @@ openclaw-vps/
     ├── 05-cloudflare-tunnel.md
     ├── 06-backup.md
     ├── 07-verification.md
-    └── 98-post-deploy.md
+    └── 08-post-deploy.md
 ```
 
 ---
