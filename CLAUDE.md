@@ -21,7 +21,6 @@ All deployment steps are in modular playbooks under `playbooks/`:
 | `02-base-setup.md` | Users, SSH, UFW, fail2ban, kernel |
 | `03-docker.md` | Docker installation and hardening |
 | `04-vps1-openclaw.md` | Sysbox, networks, gateway, Vector |
-| `05-cloudflare-tunnel.md` | Cloudflare Tunnel setup |
 | `06-backup.md` | Backup scripts and cron jobs |
 | `07-verification.md` | Testing and verification |
 | `maintenance.md` | Token rotation schedules and procedures |
@@ -186,8 +185,8 @@ Present playbook selection:
 >
 > **Core deployment** (selected by default):
 >
-> - [x] Base deployment (02, 03, 04, 05, 06-07)
->   - Includes: base-setup, docker, openclaw, cloudflare-tunnel, backup, verification
+> - [x] Base deployment (02, 03, 04, 06-07)
+>   - Includes: base-setup, docker, openclaw, backup, verification
 >   - Note: Workers (01) are deployed automatically during config validation
 >
 > **Optional features** (from `playbooks/extras/`):
@@ -259,11 +258,10 @@ After action selection, show summary:
 2. Execute 02-base-setup.md on VPS-1
 3. Execute 03-docker.md on VPS-1
 4. Execute 04-vps1-openclaw.md on VPS-1
-5. Execute 05-cloudflare-tunnel.md on VPS-1
-6. Execute 06-backup.md on VPS-1
-7. Reboot VPS-1
-8. Execute 07-verification.md
-9. Execute 08-post-deploy.md
+5. Execute 06-backup.md on VPS-1
+6. Reboot VPS-1
+7. Execute 07-verification.md
+8. Execute 08-post-deploy.md
 ```
 
 All steps are sequential on a single VPS. Workers deployment (01-workers) runs from the local machine using `wrangler` and is triggered automatically during config validation if needed.
@@ -350,7 +348,7 @@ Each playbook contains detailed troubleshooting sections. Common issues:
 |-------|------------------|
 | SSH lockout | `02-base-setup.md` -> Troubleshooting |
 | Container won't start | `04-vps1-openclaw.md` -> Troubleshooting |
-| Tunnel not starting | `05-cloudflare-tunnel.md` -> Troubleshooting |
+| Tunnel not starting | `07-verification.md` -> Tunnel Issues |
 | Backup permission denied | `06-backup.md` -> Troubleshooting |
 | Worker deployment fails | `01-workers.md` -> Troubleshooting |
 | Vector not shipping logs | `04-vps1-openclaw.md` -> Troubleshooting |

@@ -19,11 +19,10 @@ For existing deployments, run `00-analysis-mode.md` first to verify current stat
 2. `02-base-setup.md` - VPS-1
 3. `03-docker.md` - VPS-1
 4. `04-vps1-openclaw.md` - VPS-1
-5. `05-cloudflare-tunnel.md` - VPS-1
-6. `06-backup.md` - VPS-1
-7. Reboot VPS-1
-8. `07-verification.md` - VPS-1 + Workers
-9. `08-post-deploy.md` - First access & device pairing
+5. `06-backup.md` - VPS-1
+6. Reboot VPS-1
+7. `07-verification.md` - VPS-1 + Workers
+8. `08-post-deploy.md` - First access & device pairing
 
 ## Maintenance
 

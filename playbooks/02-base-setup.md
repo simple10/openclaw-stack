@@ -12,6 +12,7 @@ This playbook configures:
 - Fail2ban intrusion prevention
 - Automatic security updates
 - Kernel hardening
+- Cloudflare Tunnel (cloudflared)
 
 ## Prerequisites
 
@@ -25,10 +26,11 @@ From `../openclaw-config.env`:
 - `VPS1_IP` - Public IP of VPS-1
 - `SSH_KEY_PATH` - Path to SSH private key
 - `SSH_USER` - Initial SSH user (ubuntu)
+- `CF_TUNNEL_TOKEN` - Cloudflare Tunnel token
 
 ## Execution Order
 
-Complete sections 2.1-2.8 on VPS-1.
+Complete sections 2.1-2.9 on VPS-1.
 
 Connect initially as `ubuntu` (OVH default), then use `adminclaw` after section 1.5.
 
@@ -336,6 +338,40 @@ sudo sysctl -p /etc/sysctl.d/99-security.conf
 
 ---
 
+## 2.9 Cloudflare Tunnel Setup
+
+Run on: **VPS-1**
+
+Install cloudflared and register the tunnel as a systemd service. The tunnel token must already be set in `openclaw-config.env`.
+
+```bash
+# Download and install cloudflared
+curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+sudo dpkg -i cloudflared.deb
+rm cloudflared.deb
+
+# Verify installation
+cloudflared --version
+
+# Install as systemd service using the tunnel token
+sudo cloudflared service install ${CF_TUNNEL_TOKEN}
+
+# Enable and start
+sudo systemctl enable cloudflared
+sudo systemctl start cloudflared
+
+# Check status
+sudo systemctl status cloudflared
+
+# Port 443 should already be closed (never opened in section 2.3)
+# Verify it's not in UFW just in case
+sudo ufw delete allow 443/tcp 2>/dev/null || true
+```
+
+> **Note:** The tunnel connects but has no public hostname yet. The domain is configured in post-deploy after Cloudflare Access is set up. See `docs/CLOUDFLARE-TUNNEL.md`.
+
+---
+
 ## Verification
 
 After completing all steps on VPS-1:
@@ -352,6 +388,9 @@ sudo systemctl status fail2ban
 
 # Verify kernel parameters
 sudo sysctl net.ipv4.tcp_syncookies
+
+# Verify cloudflared is running
+sudo systemctl status cloudflared
 ```
 
 ---

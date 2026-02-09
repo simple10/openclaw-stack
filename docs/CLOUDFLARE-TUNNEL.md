@@ -190,7 +190,40 @@ The domain is now routable — and protected by Cloudflare Access from the first
 
 ## Maintenance
 
-The cloudflare-tunnel.md playbook does not setup autoupdate for the cloudflare tunnel daemon.
-This is by design to avoid breaking changes.
+### Updating cloudflared
 
-To update the tunnel, ask claude to update it. There are instructions for claude in the playbook.
+The playbook does not set up auto-update for cloudflared. This is by design to avoid breaking changes.
+
+```bash
+curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+sudo dpkg -i cloudflared.deb
+rm cloudflared.deb
+sudo systemctl restart cloudflared
+```
+
+### Viewing Tunnel Metrics
+
+Cloudflare Dashboard → Zero Trust → Networks → Tunnels → (your tunnel) → Metrics
+
+### Changing Tunnel Configuration
+
+All routing config lives in the Cloudflare Dashboard. To change hostnames, origins, or add new routes:
+
+1. Go to **Cloudflare Dashboard** → **Zero Trust** → **Networks** → **Tunnels**
+2. Click your tunnel → **Configure**
+3. Edit the public hostname settings
+4. Changes take effect within seconds — no service restart needed
+
+### Rotating Tunnel Token
+
+If the token is compromised:
+
+1. Go to the tunnel in Cloudflare Dashboard
+2. Regenerate the token
+3. On VPS:
+   ```bash
+   sudo cloudflared service uninstall
+   sudo cloudflared service install <NEW_TOKEN>
+   sudo systemctl start cloudflared
+   ```
+4. Update `CF_TUNNEL_TOKEN` in `openclaw-config.env`

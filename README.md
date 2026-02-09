@@ -178,11 +178,8 @@ Cloudflare Tunnel is used for networking — no certificates needed, no ports ex
 2. Click **Create a tunnel** → Choose **Cloudflared**
 3. Name it (e.g., `openclaw`)
 4. Copy the **tunnel token** (long base64 string starting with `ey...`)
-5. Configure the public hostname:
-   - **Subdomain + Domain:** your `OPENCLAW_DOMAIN` value (e.g., `openclaw.example.com`)
-   - **Service:** `HTTP` → `localhost:18789`
-6. Save the tunnel
-7. Add the token to `openclaw-config.env`:
+5. **Skip** the public hostname configuration — save the tunnel without routes (the domain is connected later, after Cloudflare Access is set up)
+6. Add the token to `openclaw-config.env`:
 
    ```bash
    CF_TUNNEL_TOKEN=eyJhIjoiYWJj...
@@ -228,7 +225,7 @@ Claude runs the various [playbooks](/playbooks/) using values from openclaw-conf
    - Install Docker + Sysbox
    - Deploy OpenClaw gateway container
    - Set up Vector (ships container logs to Cloudflare)
-   - Configure Cloudflare Tunnel
+   - Install Cloudflare Tunnel service
    - Configure automated backups
    - Set up host alerter (Telegram notifications)
 
@@ -299,7 +296,6 @@ openclaw-vps/
     ├── 02-base-setup.md
     ├── 03-docker.md
     ├── 04-vps1-openclaw.md
-    ├── 05-cloudflare-tunnel.md
     ├── 06-backup.md
     ├── 07-verification.md
     └── 08-post-deploy.md

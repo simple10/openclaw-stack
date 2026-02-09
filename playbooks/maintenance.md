@@ -100,3 +100,7 @@ ssh -i ~/.ssh/ovh_openclaw_ed25519_new -p 222 adminclaw@<VPS1_IP> echo "OK"
 # 5. Update openclaw-config.env with new SSH_KEY_PATH
 # 6. Delete old private key
 ```
+
+#### Cloudflare Tunnel Token
+
+See [docs/CLOUDFLARE-TUNNEL.md](../docs/CLOUDFLARE-TUNNEL.md#rotating-tunnel-token) for rotation procedure.

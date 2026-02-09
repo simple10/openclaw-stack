@@ -6,6 +6,7 @@ Interactive guide for accessing OpenClaw and pairing your first device after dep
 
 After `07-verification.md` confirms all services are healthy, this playbook walks you through:
 
+- Configuring Cloudflare Access and connecting the domain
 - Retrieving the gateway access token
 - Opening the OpenClaw UI for the first time
 - Approving your first device pairing request
@@ -15,8 +16,54 @@ After `07-verification.md` confirms all services are healthy, this playbook walk
 
 - `07-verification.md` completed successfully
 - OpenClaw gateway running on VPS-1
-- Cloudflare Tunnel configured and active (05-cloudflare-tunnel.md)
+- Cloudflare Tunnel service running (02-base-setup.md section 2.9)
 - Browser available on your local machine
+
+---
+
+## 8.0 Connect Domain via Cloudflare Tunnel
+
+Check if the domain is already routing through the tunnel:
+
+```bash
+# Test if the domain resolves and responds
+curl -sI --connect-timeout 10 https://<OPENCLAW_DOMAIN><OPENCLAW_DOMAIN_PATH>/ 2>&1 | head -10
+```
+
+**If the domain is not reachable (connection refused, timeout, or DNS error):**
+
+The user needs to configure Cloudflare Access and add the published hostname route. Present:
+
+> "Your tunnel is running but the domain isn't connected yet. Before connecting it, you should set up Cloudflare Access so the domain is protected from the first request.
+>
+> Follow the steps in [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md):
+>
+> 1. **Configure Cloudflare Access** (Steps 1-3) — set up the application, policy, and identity provider
+> 2. **Connect your domain** (Step 4) — add the published hostname route in the tunnel config
+> 3. **Test** (Step 5) — verify the Access login page appears in an incognito window
+>
+> Let me know when you've completed these steps."
+
+Wait for the user to confirm before proceeding.
+
+**If the domain is reachable:** Check for Cloudflare Access headers:
+
+```bash
+# Check for CF-Access headers (indicates Access is configured)
+curl -sI --connect-timeout 10 https://<OPENCLAW_DOMAIN><OPENCLAW_DOMAIN_PATH>/ 2>&1 | grep -i 'cf-access\|cf-authorization'
+```
+
+If Access headers are present (or the response is a 302/403 redirect to the Access login page), Access is configured — proceed to section 8.1.
+
+If no Access headers and the response is 200 (domain accessible without auth), warn:
+
+> "Your domain is accessible without Cloudflare Access authentication. This means anyone with the URL can reach OpenClaw.
+>
+> Configure Cloudflare Access now — see [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md) (Steps 1-3).
+>
+> Let me know when done."
+
+Wait for the user to confirm before proceeding.
 
 ---
 

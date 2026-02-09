@@ -15,7 +15,7 @@ This playbook verifies:
 ## Prerequisites
 
 - All previous playbooks completed
-- 05-cloudflare-tunnel.md completed
+- Cloudflare Tunnel installed (02-base-setup.md section 2.9)
 - Workers deployed (01-workers.md)
 - VPS-1 rebooted after configuration
 
@@ -107,18 +107,25 @@ curl -s https://<AI_GATEWAY_WORKER_URL>/health
 
 ---
 
-## 7.4 Verify External Access (Cloudflare Tunnel)
+## 7.4 Verify Cloudflare Tunnel
 
 ```bash
-# On VPS-1, verify tunnel is running
+# Check tunnel service is running
 sudo systemctl status cloudflared
 
-# Test external access (from any machine)
-curl -s https://<OPENCLAW_DOMAIN><OPENCLAW_DOMAIN_PATH>/ | head -5
+# Check tunnel logs for errors
+sudo journalctl -u cloudflared --no-pager | tail -20
 
-# Verify direct IP access is blocked
+# Verify port 443 is closed
+sudo ufw status | grep 443 || echo "Port 443 not in UFW (correct)"
+
+# Verify direct IP access fails
 curl -sk --connect-timeout 5 https://<VPS1_IP>/ || echo "Direct access blocked (expected)"
 ```
+
+**Expected:** cloudflared active, no auth errors in logs, port 443 closed, direct IP blocked.
+
+> **Note:** External access via the domain (`curl https://<OPENCLAW_DOMAIN>`) is tested in `08-post-deploy.md` after the user configures Cloudflare Access and the published hostname route.
 
 ---
 
@@ -146,14 +153,15 @@ cat /etc/cron.d/openclaw-alerts
 - [ ] Only `adminclaw` user can SSH (AllowUsers directive)
 - [ ] UFW enabled with minimal rules (SSH only)
 - [ ] Fail2ban running
-- [ ] No WireGuard interface present
+- [ ] Cloudflare Tunnel running (cloudflared service active)
+- [ ] Port 443 closed
 
 ```bash
 # Verify on VPS-1
 sudo ufw status
 sudo systemctl status fail2ban
+sudo systemctl status cloudflared
 ss -tlnp | grep 222
-ip link show wg0 2>&1 | grep -q "does not exist" && echo "No WireGuard (correct)"
 ```
 
 ### VPS-1 Services
@@ -289,6 +297,23 @@ curl -s https://<LOG_WORKER_URL>/health
 ss -tlnp                          # List listening ports
 curl -v http://localhost:PORT/    # Test local connectivity
 sudo ufw status                   # Check firewall rules
+```
+
+### Tunnel Issues
+
+```bash
+# Check tunnel service and logs
+sudo systemctl status cloudflared
+sudo journalctl -u cloudflared --no-pager | tail -30
+
+# Check if DNS resolves to tunnel
+dig <OPENCLAW_DOMAIN>
+# Should show CNAME to <tunnel-id>.cfargotunnel.com
+
+# Token issues — reinstall service
+sudo cloudflared service uninstall
+sudo cloudflared service install ${CF_TUNNEL_TOKEN}
+sudo systemctl start cloudflared
 ```
 
 ### Service Not Starting After Reboot

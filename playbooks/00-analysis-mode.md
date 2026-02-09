@@ -54,7 +54,7 @@ If single playbook, ask which one.
 
 **For networking playbooks:**
 
-- Use the Verification section in `05-cloudflare-tunnel.md`
+- Use section 7.4 in `07-verification.md`
 
 **For optional features (`extras/`):**
 
