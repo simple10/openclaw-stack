@@ -209,11 +209,12 @@ Key parameters:
 - Routes `OPENCLAW_DOMAIN` -> `http://localhost:18789` (gateway)
 - `originRequest.noTLSVerify: true` (local HTTP, TLS at Cloudflare edge)
 
-**Config:** `/etc/cloudflared/config.yml`
-**Credentials:** `/etc/cloudflared/credentials.json` (chmod 600)
+**Management:** Token-based (remotely managed via Cloudflare Dashboard). No `config.yml`, `credentials.json`, or `cert.pem` on the VPS — all routing configuration lives in the Dashboard.
+
+**Installation:** `sudo cloudflared service install <CF_TUNNEL_TOKEN>`
 **Service:** `cloudflared` (systemd, enabled)
 
-**DNS routing:** `cloudflared tunnel route dns <tunnel-name> <domain>` creates CNAME in Cloudflare DNS
+**DNS routing:** Configured in Cloudflare Dashboard (public hostname settings), not via local CLI commands.
 
 **Security:** Port 443 must remain closed (`sudo ufw delete allow 443/tcp` if it was ever opened)
 
@@ -253,7 +254,7 @@ Key parameters:
 │   ├── docker-compose.yml       # Original from upstream
 │   ├── docker-compose.override.yml  # Our customizations
 │   ├── .env                     # Environment variables
-│   ├── vector.toml              # Vector log shipper configuration
+│   ├── vector.yaml              # Vector log shipper configuration
 │   ├── data/
 │   │   └── vector/              # Vector checkpoint/position data
 │   └── scripts/
@@ -490,7 +491,7 @@ printf 'FROM openclaw-sandbox-common:bookworm-slim\nUSER root\nRUN apt-get updat
 **Container name:** `vector`
 **Network:** `openclaw-gateway-net`
 
-**Config file:** `/home/openclaw/openclaw/vector.toml` (bind mounted to `/etc/vector/vector.toml:ro`)
+**Config file:** `/home/openclaw/openclaw/vector.yaml` (bind mounted to `/etc/vector/vector.yaml:ro`). YAML format is used because the Vector Alpine image defaults to `vector.yaml`, avoiding the need for a `command` override in compose.
 
 **Purpose:** Ships Docker container logs to the Cloudflare Log Receiver Worker. Replaces Promtail + Loki from the previous two-VPS architecture.
 
@@ -503,7 +504,7 @@ vector:
   restart: always
   volumes:
     - /var/run/docker.sock:/var/run/docker.sock:ro
-    - ./vector.toml:/etc/vector/vector.toml:ro
+    - ./vector.yaml:/etc/vector/vector.yaml:ro
     - ./data/vector:/var/lib/vector
   environment:
     - LOG_WORKER_URL=${LOG_WORKER_URL}
@@ -517,28 +518,31 @@ vector:
     - openclaw-gateway-net
 ```
 
-**Vector config (`vector.toml`):**
+**Vector config (`vector.yaml`):**
 
-```toml
+```yaml
 # Collect logs from all Docker containers
-[sources.docker_logs]
-type = "docker_logs"
+sources:
+  docker_logs:
+    type: docker_logs
 
 # Ship to Cloudflare Log Receiver Worker
-[sinks.cloudflare_worker]
-type = "http"
-inputs = ["docker_logs"]
-uri = "${LOG_WORKER_URL}"
-encoding.codec = "json"
-auth.strategy = "bearer"
-auth.token = "${LOG_WORKER_TOKEN}"
-
-[sinks.cloudflare_worker.batch]
-max_bytes = 262144    # 256KB per batch
-timeout_secs = 60     # Ship at least every 60s
-
-[sinks.cloudflare_worker.request]
-retry_max_duration_secs = 300   # Keep retrying for 5 min on failures
+sinks:
+  cloudflare_worker:
+    type: http
+    inputs:
+      - docker_logs
+    uri: "${LOG_WORKER_URL}"
+    encoding:
+      codec: json
+    auth:
+      strategy: bearer
+      token: "${LOG_WORKER_TOKEN}"
+    batch:
+      max_bytes: 262144    # 256KB per batch
+      timeout_secs: 60     # Ship at least every 60s
+    request:
+      retry_max_duration_secs: 300   # Keep retrying for 5 min on failures
 ```
 
 **Fields per event** (auto-included by `docker_logs` source):
