@@ -233,13 +233,20 @@ sudo docker exec --user node openclaw-gateway node dist/index.js security audit 
 
 **Expected:** 0 critical, 0 warnings. 1 info finding is normal. If the audit reports ECONNREFUSED on an unexpected port, check that `OPENCLAW_GATEWAY_PORT` in the container's `.env` is set to `18789` (port only, not `IP:port`).
 
-### Expected `openclaw doctor` Findings
+### OpenClaw Doctor (run on VPS)
 
-`openclaw doctor` will warn about `gateway.bind: "lan"`. This is expected and safe in our Docker deployment:
+Run OpenClaw's diagnostic checker inside the container.
 
-- **Why `lan` is required**: cloudflared runs as a systemd service on the host. Docker port-forwards its traffic through the bridge network (`172.30.0.1`), not loopback. `bind: loopback` would make the gateway unreachable.
-- **Why it's safe**: Docker daemon.json forces all port bindings to `127.0.0.1` (section 3.2 of `03-docker.md`), so gateway ports are never exposed to the public network. This provides equivalent security to loopback binding on a non-Docker install.
-- **Alternative considered**: Moving cloudflared inside the container was evaluated but rejected — it couples tunnel lifecycle to the gateway, prevents independent cloudflared crash recovery/updates, and adds entrypoint complexity.
+```bash
+sudo docker exec --user node openclaw-gateway node openclaw.mjs doctor --deep
+```
+
+**Expected warnings (both are safe to ignore):**
+
+1. **Not a git checkout** — the container runs from a built image, not a cloned repo. This is normal for Docker deployments.
+2. **Security warning: bound to `lan` (0.0.0.0)** — required for Docker deployments. cloudflared (systemd on host) connects via Docker bridge — traffic arrives from `172.30.0.1` on `eth0`, not loopback. `bind: loopback` would make the gateway unreachable. Actual network security is enforced by daemon.json localhost binding (section 3.2 of `03-docker.md`), so gateway ports are never exposed to the public network.
+
+**Alternative considered**: Moving cloudflared inside the container was evaluated but rejected — it couples tunnel lifecycle to the gateway, prevents independent cloudflared crash recovery/updates, and adds entrypoint complexity.
 
 ---
 
