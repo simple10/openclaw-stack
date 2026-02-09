@@ -25,6 +25,10 @@ For existing deployments, run `00-analysis-mode.md` first to verify current stat
 8. `07-verification.md` - VPS-1 + Workers
 9. `98-post-deploy.md` - First access & device pairing
 
+## Maintenance
+
+- `maintenance.md` - Token rotation schedules and procedures
+
 ## Meta Playbooks
 
 These playbooks guide Claude in extending the deployment:

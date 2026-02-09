@@ -164,6 +164,7 @@ ip link show wg0 2>&1 | grep -q "does not exist" && echo "No WireGuard (correct)
 - [ ] Backup cron job configured
 - [ ] Host alerter cron job configured
 - [ ] Container ports bound to localhost only (not 0.0.0.0)
+- [ ] Gateway pids_limit set
 
 ```bash
 sudo systemctl status sysbox
@@ -176,6 +177,10 @@ cat /etc/cron.d/openclaw-alerts
 # Docker bypasses UFW, so 0.0.0.0 binding exposes ports to the internet
 sudo ss -tlnp | grep -E '187(89|90)'
 # Expected: 127.0.0.1:18789 and 127.0.0.1:18790 (NOT 0.0.0.0)
+
+# Verify gateway has pids_limit set (prevents fork bombs)
+sudo docker inspect openclaw-gateway --format '{{.HostConfig.PidsLimit}}'
+# Expected: 512
 ```
 
 ### Cloudflare Workers

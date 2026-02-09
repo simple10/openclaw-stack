@@ -45,6 +45,9 @@ Sysbox enables running Docker-in-Docker securely for OpenClaw sandboxes.
 # Download Sysbox (check https://github.com/nestybox/sysbox/releases for latest version)
 wget https://downloads.nestybox.com/sysbox/releases/v0.6.4/sysbox-ce_0.6.4-0.linux_amd64.deb
 
+# Verify download integrity (hash from https://github.com/nestybox/sysbox/releases/tag/v0.6.4)
+echo "d034ddd364ee1f226b8b1ce7456ea8a12abc2eb661bdf42d3e603ed2dc741827  sysbox-ce_0.6.4-0.linux_amd64.deb" | sha256sum -c -
+
 # Install dependencies
 sudo apt install -y jq fuse
 
@@ -230,6 +233,9 @@ services:
         "--port",
         "18789",
       ]
+    # Process limit — prevents fork bombs from exhausting host PIDs.
+    # 512 (not 256) because gateway runs nested Docker with sandbox containers inside.
+    pids_limit: 512
     security_opt:
       - no-new-privileges:true
     environment:
@@ -748,6 +754,15 @@ if ! docker ps --format '{{.Names}}' | grep -q '^openclaw-gateway$'; then
   ALERTS="${ALERTS}🔴 openclaw-gateway container is NOT running\n"
 fi
 
+# Check backup freshness (warn if no backup in last 36 hours)
+BACKUP_DIR="/home/openclaw/.openclaw/backups"
+if [ -d "$BACKUP_DIR" ]; then
+  LATEST_BACKUP=$(find "$BACKUP_DIR" -name "openclaw_backup_*.tar.gz" -mmin -2160 | head -1)
+  if [ -z "$LATEST_BACKUP" ]; then
+    ALERTS="${ALERTS}⚠️ No backup in last 36 hours!\n"
+  fi
+fi
+
 # Send alert if any issues found
 if [ -n "$ALERTS" ]; then
   MESSAGE="🖥️ *${HOSTNAME} Alert*\n\n${ALERTS}"
@@ -883,20 +898,53 @@ The build script auto-patches the Dockerfile and restores the git working tree a
 
 ```bash
 #!/bin/bash
-# 1. Pull latest source
-sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && git pull origin main'
+# 1. Tag current state for rollback
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && git tag -f pre-update'
+docker tag openclaw:local "openclaw:rollback-$(date +%Y%m%d)" 2>/dev/null || true
 
-# 2. Rebuild with auto-patching
+# 2. Review changes before applying
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && git fetch origin main && git log --oneline HEAD..origin/main'
+# (review output, then proceed)
+
+# 3. Pull and rebuild
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && git pull origin main'
 sudo -u openclaw /home/openclaw/scripts/build-openclaw.sh
 
-# 3. Recreate containers with the new image
+# 4. Recreate containers with the new image
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'
 
-# 4. Verify new version
+# 5. Verify new version
 sudo docker exec --user node openclaw-gateway node dist/index.js --version
+curl -s http://localhost:18789/health
+
+# 6. Cleanup old rollback images (keep last 3)
+docker images --format '{{.Repository}}:{{.Tag}}' | grep 'openclaw:rollback-' | sort -r | tail -n +4 | xargs -r docker rmi
 ```
 
-> **Note:** Step 3 automatically stops the old container and starts a new one from the rebuilt image. Expect a brief gateway downtime during the restart.
+> **Note:** Step 4 automatically stops the old container and starts a new one from the rebuilt image. Expect a brief gateway downtime during the restart.
+
+### Rollback Procedure
+
+If an update causes issues, roll back to the previous known-good state:
+
+```bash
+#!/bin/bash
+# 1. Revert source to pre-update tag
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && git checkout pre-update'
+
+# 2. Restore the previous Docker image
+docker tag "openclaw:rollback-$(date +%Y%m%d)" openclaw:local
+
+# 3. Recreate containers with the old image
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'
+
+# 4. Verify
+sudo docker exec --user node openclaw-gateway node dist/index.js --version
+curl -s http://localhost:18789/health
+```
+
+> If the rollback date tag doesn't match today, list available rollback images with:
+> `docker images --format '{{.Repository}}:{{.Tag}}' | grep 'openclaw:rollback-'`
 
 ---
 

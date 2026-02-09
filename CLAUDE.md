@@ -24,6 +24,7 @@ All deployment steps are in modular playbooks under `playbooks/`:
 | `05-cloudflare-tunnel.md` | Cloudflare Tunnel setup |
 | `06-backup.md` | Backup scripts and cron jobs |
 | `07-verification.md` | Testing and verification |
+| `maintenance.md` | Token rotation schedules and procedures |
 | `98-post-deploy.md` | First access & device pairing |
 | `99-new-feature-planning.md` | Process for planning new features |
 | `99-new-feature-implementation.md` | Process for implementing planned features |
