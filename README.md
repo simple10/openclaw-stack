@@ -310,6 +310,7 @@ openclaw-vps/
 - <https://github.com/knostic/openclaw-telemetry/>
 - <https://github.com/knostic/openclaw-shield>
 - <https://www.knostic.ai/blog/why-we-built-openclaw-shield-securing-ai-agents-from-themselves>
+- <https://gist.github.com/simple10/7a91c7471fb543bf0a75341cb2367622>
 
 ## Related Apps & Tools
 

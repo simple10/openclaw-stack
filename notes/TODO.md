@@ -2,7 +2,12 @@
 
 AGENTS: IGNORE THIS TODO LIST - for development only
 
-- [ ] Add verification or post-deploy step to run `node openclaw.mjs security audit --deep` on openclaw-gateway
+- [ ] Update Cloudflare Tunnel doc
+  - See existing claude UI chat about "Cloudflare Tunnel"
+
+- [ ] Verify if the health cron in log worker can reach the VPS over the tunnel, if not, remove from README
+
+- [x] Add verification or post-deploy step to run `node openclaw.mjs security audit --deep` on openclaw-gateway
 
 ## Completed (this branch)
 

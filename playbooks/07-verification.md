@@ -241,12 +241,16 @@ Run OpenClaw's diagnostic checker inside the container.
 sudo docker exec --user node openclaw-gateway node openclaw.mjs doctor --deep
 ```
 
-**Expected warnings (both are safe to ignore):**
+**Expected:** Only finding should be the Security warning about `lan` binding. No State integrity or Sandbox warnings.
 
-1. **Not a git checkout** — the container runs from a built image, not a cloned repo. This is normal for Docker deployments.
-2. **Security warning: bound to `lan` (0.0.0.0)** — required for Docker deployments. cloudflared (systemd on host) connects via Docker bridge — traffic arrives from `172.30.0.1` on `eth0`, not loopback. `bind: loopback` would make the gateway unreachable. Actual network security is enforced by daemon.json localhost binding (section 3.2 of `03-docker.md`), so gateway ports are never exposed to the public network.
+**Expected warning (safe to ignore):**
 
-**Alternative considered**: Moving cloudflared inside the container was evaluated but rejected — it couples tunnel lifecycle to the gateway, prevents independent cloudflared crash recovery/updates, and adds entrypoint complexity.
+- **Security: Gateway bound to "lan" (0.0.0.0)** — required for Docker deployments. cloudflared (systemd on host) connects via Docker bridge — traffic arrives from `172.30.0.1` on `eth0`, not loopback. `bind: loopback` would make the gateway unreachable. Actual network security is enforced by daemon.json localhost binding (section 3.2 of `03-docker.md`), so gateway ports are never exposed to the public network.
+
+**If you see other warnings:**
+
+- **State integrity: missing transcripts** — stale session entries from heartbeat. Clear with: `sudo docker exec --user node openclaw-gateway bash -c 'echo {} > /home/node/.openclaw/agents/main/sessions/sessions.json'`
+- **Sandbox: base image missing** — the common sandbox build failed (known upstream bug). Restart the gateway — the entrypoint has a fallback that rebuilds with `USER root`. See `extras/sandbox-and-browser.md` troubleshooting.
 
 ---
 

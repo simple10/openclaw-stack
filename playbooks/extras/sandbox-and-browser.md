@@ -191,9 +191,21 @@ if command -v dockerd > /dev/null 2>&1; then
         echo "[entrypoint] Common sandbox image not found, building..."
         if [ -f /app/scripts/sandbox-common-setup.sh ]; then
           /app/scripts/sandbox-common-setup.sh
+        fi
+        # Verify the build actually succeeded — upstream sandbox-common-setup.sh has a
+        # known bug where it doesn't add USER root before apt-get. The base image sets
+        # USER sandbox, so apt-get fails with "Permission denied" and the build silently
+        # produces no image (swallowed by set +e above).
+        if docker image inspect openclaw-sandbox-common:bookworm-slim > /dev/null 2>&1; then
           echo "[entrypoint] Common sandbox image built successfully"
         else
-          echo "[entrypoint] WARNING: sandbox-common-setup.sh not found"
+          echo "[entrypoint] WARNING: upstream script failed, rebuilding with USER root fix..."
+          printf 'FROM openclaw-sandbox:bookworm-slim\nUSER root\nENV DEBIAN_FRONTEND=noninteractive\nRUN apt-get update && apt-get install -y --no-install-recommends curl wget jq coreutils grep nodejs npm python3 git ca-certificates unzip build-essential file && rm -rf /var/lib/apt/lists/*\nRUN npm install -g pnpm\nUSER 1000\n' | docker build -t openclaw-sandbox-common:bookworm-slim -
+          if docker image inspect openclaw-sandbox-common:bookworm-slim > /dev/null 2>&1; then
+            echo "[entrypoint] Common sandbox image built (manual fallback)"
+          else
+            echo "[entrypoint] ERROR: Common sandbox image build failed"
+          fi
         fi
       else
         echo "[entrypoint] Common sandbox image already exists"
@@ -495,6 +507,23 @@ sudo docker exec openclaw-gateway ls -la /app/scripts/sandbox-*.sh
 sudo docker exec openclaw-gateway /app/scripts/sandbox-common-setup.sh
 sudo docker exec openclaw-gateway /app/scripts/sandbox-browser-setup.sh
 ```
+
+### Common Sandbox Build Fails with "Permission denied"
+
+**Known upstream bug**: `sandbox-common-setup.sh` doesn't add `USER root` before `apt-get` in its Dockerfile heredoc. The base image `openclaw-sandbox:bookworm-slim` sets `USER sandbox`, so `apt-get update` fails with `Permission denied` on `/var/lib/apt/lists/partial`.
+
+The entrypoint handles this automatically with a fallback that rebuilds with `USER root`. Check the logs for:
+```
+[entrypoint] WARNING: upstream script failed, rebuilding with USER root fix...
+[entrypoint] Common sandbox image built (manual fallback)
+```
+
+If the fallback also fails, rebuild manually:
+```bash
+sudo docker exec openclaw-gateway bash -c "printf 'FROM openclaw-sandbox:bookworm-slim\nUSER root\nENV DEBIAN_FRONTEND=noninteractive\nRUN apt-get update && apt-get install -y --no-install-recommends curl wget jq coreutils grep nodejs npm python3 git ca-certificates unzip build-essential file && rm -rf /var/lib/apt/lists/*\nRUN npm install -g pnpm\nUSER 1000\n' | docker build -t openclaw-sandbox-common:bookworm-slim -"
+```
+
+**Note:** The fallback omits golang-go, rustc, cargo, bun, and homebrew (which the upstream script includes) to keep the build fast and reliable. These are rarely needed by agents. If needed, rebuild using the upstream script after fixing the `USER root` issue in a future OpenClaw release.
 
 ### Gateway Image Too Large
 
