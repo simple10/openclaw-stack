@@ -21,7 +21,7 @@
 
   "vars": {
     // Comma-separated log levels to output to console (changeable without redeploy via dashboard)
-    "LOGGABLE_LEVELS": "warn,error,fatal,panic"
+    "LOGGABLE_LEVELS": "info,warn,error,fatal,panic"
     // Secrets (set via `wrangler secret put`):
     // AUTH_TOKEN — token Vector uses to authenticate to this worker
   }

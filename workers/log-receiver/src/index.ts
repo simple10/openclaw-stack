@@ -191,7 +191,7 @@ async function handleLogs(request: Request, env: Env): Promise<Response> {
     .join(' ')
   console.debug({
     _summary: true,
-    message: `[BATCH SUMMARY] logged:${logged} filtered:${filtered} total:${total} >> ${levelParts}`,
+    message: `[BATCH] logged:${logged} filtered:${filtered} total:${total} > ${levelParts}`,
     total,
     logged,
     filtered,
