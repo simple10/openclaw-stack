@@ -320,37 +320,9 @@ Vector Alpine image defaults to `vector.yaml`, so we use YAML format to avoid ne
 
 ```bash
 #!/bin/bash
+# SOURCE: deploy/vector.yaml → /home/openclaw/openclaw/vector.yaml
 sudo -u openclaw tee /home/openclaw/openclaw/vector.yaml << 'EOF'
-# Vector configuration — ships Docker container logs to Cloudflare Log Receiver Worker
-# https://vector.dev/docs/
-
-sources:
-  docker_logs:
-    type: docker_logs
-
-transforms:
-  enrich:
-    type: remap
-    inputs:
-      - docker_logs
-    source: '.vps_ip = "${VPS1_IP}"'
-
-sinks:
-  cloudflare_worker:
-    type: http
-    inputs:
-      - enrich
-    uri: "${LOG_WORKER_URL}"
-    encoding:
-      codec: json
-    auth:
-      strategy: bearer
-      token: "${LOG_WORKER_TOKEN}"
-    batch:
-      max_bytes: 262144    # 256KB per batch
-      timeout_secs: 60     # Ship at least every 60s
-    request:
-      retry_max_duration_secs: 300   # Keep retrying for 5 min on failures
+# <<< deploy/vector.yaml >>>
 EOF
 
 # Create data directory for Vector state
@@ -841,69 +813,9 @@ Install a host monitoring script that sends alerts via Telegram when disk, memor
 
 ```bash
 #!/bin/bash
-# Create host alert script
+# SOURCE: deploy/host-alert.sh → /home/openclaw/scripts/host-alert.sh
 sudo tee /home/openclaw/scripts/host-alert.sh << 'SCRIPTEOF'
-#!/bin/bash
-# Host alerter — checks disk, memory, CPU and sends Telegram alerts
-set -euo pipefail
-
-# Source config for Telegram credentials
-source /home/openclaw/openclaw/.env 2>/dev/null || true
-
-TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
-TELEGRAM_CHAT_ID="${TELEGRAM_CHAT_ID:-}"
-
-if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
-  exit 0  # Silently skip if Telegram not configured
-fi
-
-HOSTNAME=$(hostname)
-ALERTS=""
-
-# Check disk usage (warn at 85%)
-DISK_USAGE=$(df / --output=pcent | tail -1 | tr -d ' %')
-if [ "$DISK_USAGE" -ge 85 ]; then
-  ALERTS="${ALERTS}⚠️ Disk usage: ${DISK_USAGE}%\n"
-fi
-
-# Check memory usage (warn at 90%)
-MEM_TOTAL=$(free -m | awk '/^Mem:/{print $2}')
-MEM_USED=$(free -m | awk '/^Mem:/{print $3}')
-MEM_PCT=$((MEM_USED * 100 / MEM_TOTAL))
-if [ "$MEM_PCT" -ge 90 ]; then
-  ALERTS="${ALERTS}⚠️ Memory usage: ${MEM_PCT}% (${MEM_USED}/${MEM_TOTAL} MB)\n"
-fi
-
-# Check 5-min load average vs CPU count
-CPU_COUNT=$(nproc)
-LOAD_AVG=$(awk '{print $2}' /proc/loadavg)
-LOAD_INT=$(echo "$LOAD_AVG" | awk -F. '{print $1}')
-if [ "$LOAD_INT" -ge "$CPU_COUNT" ]; then
-  ALERTS="${ALERTS}⚠️ Load average: ${LOAD_AVG} (CPUs: ${CPU_COUNT})\n"
-fi
-
-# Check if gateway container is running
-if ! docker ps --format '{{.Names}}' | grep -q '^openclaw-gateway$'; then
-  ALERTS="${ALERTS}🔴 openclaw-gateway container is NOT running\n"
-fi
-
-# Check backup freshness (warn if no backup in last 36 hours)
-BACKUP_DIR="/home/openclaw/.openclaw/backups"
-if [ -d "$BACKUP_DIR" ]; then
-  LATEST_BACKUP=$(find "$BACKUP_DIR" -name "openclaw_backup_*.tar.gz" -mmin -2160 | head -1)
-  if [ -z "$LATEST_BACKUP" ]; then
-    ALERTS="${ALERTS}⚠️ No backup in last 36 hours!\n"
-  fi
-fi
-
-# Send alert if any issues found
-if [ -n "$ALERTS" ]; then
-  MESSAGE="🖥️ *${HOSTNAME} Alert*\n\n${ALERTS}"
-  curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-    -d chat_id="${TELEGRAM_CHAT_ID}" \
-    -d text="$(echo -e "$MESSAGE")" \
-    -d parse_mode="Markdown" > /dev/null 2>&1
-fi
+# <<< deploy/host-alert.sh >>>
 SCRIPTEOF
 
 sudo chmod +x /home/openclaw/scripts/host-alert.sh
