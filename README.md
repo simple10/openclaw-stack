@@ -358,6 +358,8 @@ openclaw-vps/
 
 ## Resources
 
+- <https://deepwiki.com/openclaw/openclaw>
+- <https://openclaw.dog/docs/concepts/multi-agent/>
 - <https://github.com/VoltAgent/awesome-openclaw-skills>
 - <https://github.com/lekt9/openclaw-foundry>
 - <https://gist.github.com/simple10/50b9d5fdaf0a12162c2a682c1f7e2391>
