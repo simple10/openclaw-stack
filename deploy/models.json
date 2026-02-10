@@ -1,0 +1,10 @@
+{
+  "providers": {
+    "anthropic": {
+      "baseUrl": "{{AI_GATEWAY_WORKER_URL}}"
+    },
+    "openai": {
+      "baseUrl": "{{AI_GATEWAY_WORKER_URL}}/v1"
+    }
+  }
+}

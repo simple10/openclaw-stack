@@ -187,126 +187,9 @@ The OpenClaw repo includes a docker-compose.yml. Create an override file to add 
 
 ```bash
 #!/bin/bash
+# SOURCE: deploy/docker-compose.override.yml → /home/openclaw/openclaw/docker-compose.override.yml
 sudo -u openclaw tee /home/openclaw/openclaw/docker-compose.override.yml << 'EOF'
-services:
-  openclaw-gateway:
-    # Image built by scripts/build-openclaw.sh (not by docker compose build)
-    image: openclaw:local
-    container_name: openclaw-gateway
-    runtime: sysbox-runc
-
-    # read_only: false required for Docker-in-Docker — Sysbox auto-provisions
-    # /var/lib/docker and /var/lib/containerd as writable mounts, but they inherit
-    # the read_only flag. Sysbox user namespace isolation provides equivalent security.
-    read_only: false
-    tmpfs:
-      - /tmp:size=1G,mode=1777
-      - /var/tmp:size=200M,mode=1777
-      - /run:size=100M,mode=755
-      - /var/log:size=100M,mode=755
-
-    # Run as root inside container so entrypoint can start dockerd
-    # Sysbox maps root (uid 0) to unprivileged user on host via user namespace
-    # Entrypoint drops to node user via gosu before starting gateway
-    user: "0:0"
-
-    deploy:
-      resources:
-        limits:
-          cpus: "4"
-          memory: 8G
-          # Process limit — prevents fork bombs from exhausting host PIDs.
-          # 512 (not 256) because gateway runs nested Docker with sandbox containers inside.
-          pids: 512
-        reservations:
-          cpus: "1"
-          memory: 2G
-    volumes:
-      # Entrypoint script: lock cleanup, start dockerd, sandbox bootstrap, gosu drop to node (from 4.8c)
-      - ./scripts/entrypoint-gateway.sh:/app/scripts/entrypoint-gateway.sh:ro
-      # Claude Code sandbox credentials (isolated from gateway creds, shared with sandboxes via openclaw.json binds)
-      - /home/openclaw/.claude-sandbox:/home/node/.claude-sandbox
-      # Persist nested Docker images across restarts (Sysbox auto-provisions ephemeral storage by default)
-      - ./data/docker:/var/lib/docker
-    # Entrypoint handles pre-start tasks before exec-ing the command
-    entrypoint: ["/app/scripts/entrypoint-gateway.sh"]
-    # Full gateway command (entrypoint passes it through via exec "$@")
-    command:
-      [
-        "node",
-        "dist/index.js",
-        "gateway",
-        "--allow-unconfigured",
-        "--bind",
-        "lan",      # Required for cloudflared to reach gateway in Docker — loopback won't receive bridge-forwarded traffic
-        "--port",
-        "18789",
-      ]
-    security_opt:
-      - no-new-privileges:true
-    environment:
-      - NODE_ENV=production
-      # AI Gateway: route all LLM providers through the Worker.
-      # All API keys -> AUTH_TOKEN, Anthropic/OpenAI base URLs -> Worker URL.
-      # Providers the Worker doesn't handle yet will fail at the Worker (404),
-      # preventing requests from leaking to default provider endpoints.
-      - ANTHROPIC_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
-      - ANTHROPIC_BASE_URL=${AI_GATEWAY_WORKER_URL}
-      - OPENAI_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
-      - OPENAI_BASE_URL=${AI_GATEWAY_WORKER_URL}
-      # These providers are not yet supported by the ai-gateway proxy worker
-      # - GOOGLE_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
-      # - XAI_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
-      # - GROQ_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
-      # - CEREBRAS_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
-      # - MISTRAL_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
-      # - OPENROUTER_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
-      - TZ=UTC
-    networks:
-      - openclaw-gateway-net
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:18789/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 300s  # Extended: first boot builds 3 sandbox images inside nested Docker
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "5"
-
-  openclaw-cli:
-    # Same image as gateway, built by scripts/build-openclaw.sh
-    image: openclaw:local
-    runtime: sysbox-runc
-    networks:
-      - openclaw-gateway-net
-
-  vector:
-    image: timberio/vector:0.43.1-alpine
-    container_name: vector
-    restart: always
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./vector.yaml:/etc/vector/vector.yaml:ro
-      - ./data/vector:/var/lib/vector
-    environment:
-      - LOG_WORKER_URL=${LOG_WORKER_URL}
-      - LOG_WORKER_TOKEN=${LOG_WORKER_TOKEN}
-      - VPS1_IP=${VPS1_IP}
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: 128M
-    networks:
-      - openclaw-gateway-net
-
-networks:
-  openclaw-gateway-net:
-    external: true
+# <<< deploy/docker-compose.override.yml >>>
 EOF
 ```
 
@@ -355,100 +238,10 @@ sudo -u openclaw mkdir -p /home/openclaw/openclaw/data/vector
 # Read the gateway token generated in section 4.5
 GATEWAY_TOKEN=$(sudo grep OPENCLAW_GATEWAY_TOKEN /home/openclaw/openclaw/.env | cut -d= -f2)
 
-sudo tee /home/openclaw/.openclaw/openclaw.json << JSONEOF
-{
-  "commands": {
-    "restart": true
-  },
-  "gateway": {
-    "bind": "lan",
-    "mode": "local",
-    "auth": {
-      "mode": "token",
-      "token": "${GATEWAY_TOKEN}"
-    },
-    "remote": {
-      "token": "${GATEWAY_TOKEN}"
-    },
-    "trustedProxies": ["172.30.0.1"],
-    "controlUi": {
-      "basePath": "<OPENCLAW_DOMAIN_PATH>"
-    }
-  },
-  "agents": {
-    "defaults": {
-      "sandbox": {
-        "mode": "all",
-        "scope": "agent",
-        "docker": {
-          "image": "openclaw-sandbox:bookworm-slim",
-          "containerPrefix": "openclaw-sbx-",
-          "workdir": "/workspace",
-          "readOnlyRoot": true,
-          "tmpfs": ["/tmp", "/var/tmp", "/run"],
-          "network": "none",
-          "user": "1000:1000",
-          "capDrop": ["ALL"],
-          "env": { "LANG": "C.UTF-8" },
-          "pidsLimit": 256,
-          "memory": "1g",
-          "memorySwap": "2g",
-          "cpus": 1
-        },
-        "browser": {
-          "enabled": true,
-          "image": "openclaw-sandbox-browser:bookworm-slim",
-          "containerPrefix": "openclaw-sbx-browser-",
-          "cdpPort": 9222,
-          "vncPort": 5900,
-          "noVncPort": 6080,
-          "headless": false,
-          "enableNoVnc": true,
-          "autoStart": true,
-          "autoStartTimeoutMs": 12000
-        },
-        "prune": {
-          "idleHours": 168,
-          "maxAgeDays": 60
-        }
-      }
-    },
-    "list": [
-      {
-        "id": "main",
-        "default": true,
-        "subagents": {
-          "allowAgents": ["code"]
-        }
-      },
-      {
-        "id": "code",
-        "name": "Code Agent",
-        "sandbox": {
-          "docker": {
-            "image": "openclaw-sandbox-claude:bookworm-slim",
-            "tmpfs": ["/tmp", "/var/tmp", "/run", "/home/linuxbrew:uid=1000,gid=1000"],
-            "network": "bridge",
-            "memory": "2g",
-            "memorySwap": "4g",
-            "cpus": 2,
-            "binds": [
-              "/home/node/.claude-sandbox:/home/linuxbrew/.claude"
-            ]
-          }
-        }
-      }
-    ]
-  },
-  "tools": {
-    "sandbox": {
-      "tools": {
-        "allow": ["exec", "process", "read", "write", "edit", "apply_patch", "browser", "sessions_list", "sessions_history", "sessions_send", "sessions_spawn", "session_status"],
-        "deny": ["canvas", "nodes", "cron", "discord", "gateway"]
-      }
-    }
-  }
-}
+# SOURCE: deploy/openclaw.json (template) → /home/openclaw/.openclaw/openclaw.json
+# VARS: GATEWAY_TOKEN (from .env on VPS), OPENCLAW_DOMAIN_PATH (from openclaw-config.env)
+sudo tee /home/openclaw/.openclaw/openclaw.json << 'JSONEOF'
+# <<< deploy/openclaw.json (template) >>>
 JSONEOF
 
 # Ensure container (uid 1000) can read/write, and not world-readable
@@ -470,17 +263,11 @@ Create the agent model configuration to route API calls through the AI Gateway p
 # entries (with hardcoded api.anthropic.com) take precedence.
 
 sudo mkdir -p /home/openclaw/.openclaw/agents/main/agent
+
+# SOURCE: deploy/models.json (template) → /home/openclaw/.openclaw/agents/main/agent/models.json
+# VARS: AI_GATEWAY_WORKER_URL (from openclaw-config.env)
 sudo tee /home/openclaw/.openclaw/agents/main/agent/models.json << 'JSONEOF'
-{
-  "providers": {
-    "anthropic": {
-      "baseUrl": "<AI_GATEWAY_WORKER_URL>"
-    },
-    "openai": {
-      "baseUrl": "<AI_GATEWAY_WORKER_URL>/v1"
-    }
-  }
-}
+# <<< deploy/models.json (template) >>>
 JSONEOF
 
 sudo chown -R 1000:1000 /home/openclaw/.openclaw/agents/main
@@ -492,17 +279,11 @@ Create the same model configuration for the code agent:
 ```bash
 #!/bin/bash
 sudo mkdir -p /home/openclaw/.openclaw/agents/code/agent
+
+# SOURCE: deploy/models.json (template) → /home/openclaw/.openclaw/agents/code/agent/models.json
+# VARS: AI_GATEWAY_WORKER_URL (from openclaw-config.env)
 sudo tee /home/openclaw/.openclaw/agents/code/agent/models.json << 'JSONEOF'
-{
-  "providers": {
-    "anthropic": {
-      "baseUrl": "<AI_GATEWAY_WORKER_URL>"
-    },
-    "openai": {
-      "baseUrl": "<AI_GATEWAY_WORKER_URL>/v1"
-    }
-  }
-}
+# <<< deploy/models.json (template) >>>
 JSONEOF
 
 sudo chown -R 1000:1000 /home/openclaw/.openclaw/agents/code

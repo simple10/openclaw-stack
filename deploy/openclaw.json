@@ -1,0 +1,93 @@
+{
+  "commands": {
+    "restart": true
+  },
+  "gateway": {
+    "bind": "lan",
+    "mode": "local",
+    "auth": {
+      "mode": "token",
+      "token": "{{GATEWAY_TOKEN}}"
+    },
+    "remote": {
+      "token": "{{GATEWAY_TOKEN}}"
+    },
+    "trustedProxies": ["172.30.0.1"],
+    "controlUi": {
+      "basePath": "{{OPENCLAW_DOMAIN_PATH}}"
+    }
+  },
+  "agents": {
+    "defaults": {
+      "sandbox": {
+        "mode": "all",
+        "scope": "agent",
+        "docker": {
+          "image": "openclaw-sandbox:bookworm-slim",
+          "containerPrefix": "openclaw-sbx-",
+          "workdir": "/workspace",
+          "readOnlyRoot": true,
+          "tmpfs": ["/tmp", "/var/tmp", "/run"],
+          "network": "none",
+          "user": "1000:1000",
+          "capDrop": ["ALL"],
+          "env": { "LANG": "C.UTF-8" },
+          "pidsLimit": 256,
+          "memory": "1g",
+          "memorySwap": "2g",
+          "cpus": 1
+        },
+        "browser": {
+          "enabled": true,
+          "image": "openclaw-sandbox-browser:bookworm-slim",
+          "containerPrefix": "openclaw-sbx-browser-",
+          "cdpPort": 9222,
+          "vncPort": 5900,
+          "noVncPort": 6080,
+          "headless": false,
+          "enableNoVnc": true,
+          "autoStart": true,
+          "autoStartTimeoutMs": 12000
+        },
+        "prune": {
+          "idleHours": 168,
+          "maxAgeDays": 60
+        }
+      }
+    },
+    "list": [
+      {
+        "id": "main",
+        "default": true,
+        "subagents": {
+          "allowAgents": ["code"]
+        }
+      },
+      {
+        "id": "code",
+        "name": "Code Agent",
+        "sandbox": {
+          "docker": {
+            "image": "openclaw-sandbox-claude:bookworm-slim",
+            "tmpfs": ["/tmp", "/var/tmp", "/run", "/home/linuxbrew:uid=1000,gid=1000"],
+            "network": "bridge",
+            "memory": "2g",
+            "memorySwap": "4g",
+            "cpus": 2,
+            "binds": [
+              "/home/node/.claude-sandbox:/home/linuxbrew/.claude"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "tools": {
+    "sandbox": {
+      "tools": {
+        "allow": ["exec", "process", "read", "write", "edit", "apply_patch", "browser", "sessions_list", "sessions_history", "sessions_send", "sessions_spawn", "session_status"],
+        "deny": ["canvas", "nodes", "cron", "discord", "gateway"]
+      }
+    }
+  }
+}

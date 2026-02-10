@@ -1,0 +1,119 @@
+services:
+  openclaw-gateway:
+    # Image built by scripts/build-openclaw.sh (not by docker compose build)
+    image: openclaw:local
+    container_name: openclaw-gateway
+    runtime: sysbox-runc
+
+    # read_only: false required for Docker-in-Docker — Sysbox auto-provisions
+    # /var/lib/docker and /var/lib/containerd as writable mounts, but they inherit
+    # the read_only flag. Sysbox user namespace isolation provides equivalent security.
+    read_only: false
+    tmpfs:
+      - /tmp:size=1G,mode=1777
+      - /var/tmp:size=200M,mode=1777
+      - /run:size=100M,mode=755
+      - /var/log:size=100M,mode=755
+
+    # Run as root inside container so entrypoint can start dockerd
+    # Sysbox maps root (uid 0) to unprivileged user on host via user namespace
+    # Entrypoint drops to node user via gosu before starting gateway
+    user: "0:0"
+
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 8G
+          # Process limit — prevents fork bombs from exhausting host PIDs.
+          # 512 (not 256) because gateway runs nested Docker with sandbox containers inside.
+          pids: 512
+        reservations:
+          cpus: "1"
+          memory: 2G
+    volumes:
+      # Entrypoint script: lock cleanup, start dockerd, sandbox bootstrap, gosu drop to node (from 4.8c)
+      - ./scripts/entrypoint-gateway.sh:/app/scripts/entrypoint-gateway.sh:ro
+      # Claude Code sandbox credentials (isolated from gateway creds, shared with sandboxes via openclaw.json binds)
+      - /home/openclaw/.claude-sandbox:/home/node/.claude-sandbox
+      # Persist nested Docker images across restarts (Sysbox auto-provisions ephemeral storage by default)
+      - ./data/docker:/var/lib/docker
+    # Entrypoint handles pre-start tasks before exec-ing the command
+    entrypoint: ["/app/scripts/entrypoint-gateway.sh"]
+    # Full gateway command (entrypoint passes it through via exec "$@")
+    command:
+      [
+        "node",
+        "dist/index.js",
+        "gateway",
+        "--allow-unconfigured",
+        "--bind",
+        "lan",      # Required for cloudflared to reach gateway in Docker — loopback won't receive bridge-forwarded traffic
+        "--port",
+        "18789",
+      ]
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - NODE_ENV=production
+      # AI Gateway: route all LLM providers through the Worker.
+      # All API keys -> AUTH_TOKEN, Anthropic/OpenAI base URLs -> Worker URL.
+      # Providers the Worker doesn't handle yet will fail at the Worker (404),
+      # preventing requests from leaking to default provider endpoints.
+      - ANTHROPIC_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
+      - ANTHROPIC_BASE_URL=${AI_GATEWAY_WORKER_URL}
+      - OPENAI_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
+      - OPENAI_BASE_URL=${AI_GATEWAY_WORKER_URL}
+      # These providers are not yet supported by the ai-gateway proxy worker
+      # - GOOGLE_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
+      # - XAI_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
+      # - GROQ_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
+      # - CEREBRAS_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
+      # - MISTRAL_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
+      # - OPENROUTER_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TZ=UTC
+    networks:
+      - openclaw-gateway-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:18789/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 300s  # Extended: first boot builds 3 sandbox images inside nested Docker
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  openclaw-cli:
+    # Same image as gateway, built by scripts/build-openclaw.sh
+    image: openclaw:local
+    runtime: sysbox-runc
+    networks:
+      - openclaw-gateway-net
+
+  vector:
+    image: timberio/vector:0.43.1-alpine
+    container_name: vector
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./vector.yaml:/etc/vector/vector.yaml:ro
+      - ./data/vector:/var/lib/vector
+    environment:
+      - LOG_WORKER_URL=${LOG_WORKER_URL}
+      - LOG_WORKER_TOKEN=${LOG_WORKER_TOKEN}
+      - VPS1_IP=${VPS1_IP}
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+    networks:
+      - openclaw-gateway-net
+
+networks:
+  openclaw-gateway-net:
+    external: true
