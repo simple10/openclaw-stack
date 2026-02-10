@@ -238,7 +238,7 @@ services:
         "gateway",
         "--allow-unconfigured",
         "--bind",
-        "lan",      # Required for Docker — loopback won't receive bridge-forwarded traffic
+        "lan",      # Required for cloudflared to reach gateway in Docker — loopback won't receive bridge-forwarded traffic
         "--port",
         "18789",
       ]
@@ -254,12 +254,13 @@ services:
       - ANTHROPIC_BASE_URL=${AI_GATEWAY_WORKER_URL}
       - OPENAI_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
       - OPENAI_BASE_URL=${AI_GATEWAY_WORKER_URL}
-      - GOOGLE_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
-      - XAI_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
-      - GROQ_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
-      - CEREBRAS_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
-      - MISTRAL_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
-      - OPENROUTER_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
+      # These providers are not yet supported by the ai-gateway proxy worker
+      # - GOOGLE_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
+      # - XAI_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
+      # - GROQ_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
+      # - CEREBRAS_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
+      # - MISTRAL_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
+      # - OPENROUTER_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - TZ=UTC
     networks:
@@ -452,6 +453,37 @@ JSONEOF
 # Ensure container (uid 1000) can read/write, and not world-readable
 sudo chown 1000:1000 /home/openclaw/.openclaw/openclaw.json
 sudo chmod 600 /home/openclaw/.openclaw/openclaw.json
+```
+
+Create the agent model configuration to route API calls through the AI Gateway proxy:
+
+```bash
+#!/bin/bash
+# IMPORTANT: The embedded agent reads models.json from the agent directory,
+# NOT from openclaw.json. The built-in "anthropic" provider ignores the
+# ANTHROPIC_BASE_URL env var — this file is the only way to override the base URL.
+#
+# The format must be "override-only" (baseUrl without a models array).
+# If you include a "models" array, the registry creates new model entries
+# instead of overriding the built-in anthropic models, and the built-in
+# entries (with hardcoded api.anthropic.com) take precedence.
+
+sudo mkdir -p /home/openclaw/.openclaw/agents/main/agent
+sudo tee /home/openclaw/.openclaw/agents/main/agent/models.json << 'JSONEOF'
+{
+  "providers": {
+    "anthropic": {
+      "baseUrl": "<AI_GATEWAY_WORKER_URL>"
+    },
+    "openai": {
+      "baseUrl": "<AI_GATEWAY_WORKER_URL>/v1"
+    }
+  }
+}
+JSONEOF
+
+sudo chown -R 1000:1000 /home/openclaw/.openclaw/agents/main
+sudo chmod 600 /home/openclaw/.openclaw/agents/main/agent/models.json
 ```
 
 ---
