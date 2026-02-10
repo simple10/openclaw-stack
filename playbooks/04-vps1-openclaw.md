@@ -366,9 +366,17 @@ sudo -u openclaw mkdir -p /home/openclaw/openclaw/data/vector
 # bind: "lan" required (Docker bridge traffic, not loopback). openclaw doctor warning is expected.
 # trustedProxies: exact IPs only, CIDR ranges NOT supported.
 # Device pairing: tunnel users need CLI approval — see 08-post-deploy.md.
+# gateway.auth.token + gateway.remote.token: must match OPENCLAW_GATEWAY_TOKEN from .env (section 4.5).
+#   - auth.token: the gateway uses this for WebSocket auth (CLI flag --token overrides if set)
+#   - remote.token: the CLI reads this to authenticate when connecting to the gateway
+#   - Without remote.token, `openclaw doctor`, `openclaw devices list`, and `openclaw security audit --deep`
+#     all fail with "gateway token mismatch".
 # See REQUIREMENTS.md § 3.7 for full rationale.
 
-sudo tee /home/openclaw/.openclaw/openclaw.json << 'JSONEOF'
+# Read the gateway token generated in section 4.5
+GATEWAY_TOKEN=$(sudo grep OPENCLAW_GATEWAY_TOKEN /home/openclaw/openclaw/.env | cut -d= -f2)
+
+sudo tee /home/openclaw/.openclaw/openclaw.json << JSONEOF
 {
   "commands": {
     "restart": true
@@ -376,6 +384,13 @@ sudo tee /home/openclaw/.openclaw/openclaw.json << 'JSONEOF'
   "gateway": {
     "bind": "lan",
     "mode": "local",
+    "auth": {
+      "mode": "token",
+      "token": "${GATEWAY_TOKEN}"
+    },
+    "remote": {
+      "token": "${GATEWAY_TOKEN}"
+    },
     "trustedProxies": ["172.30.0.1"],
     "controlUi": {
       "basePath": "<OPENCLAW_DOMAIN_PATH>"
