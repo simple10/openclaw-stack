@@ -56,28 +56,10 @@ If single playbook, ask which one.
 
 - Use section 7.4 in `07-verification.md`
 
-**For optional features (`extras/`):**
-
-- Use the Verification section in each specific playbook
-- Only check extras that show signs of being installed
-
 **For single playbook verification:**
 
 - Base playbooks 01-06: Use relevant sections from `07-verification.md`
 - All others: Use the playbook's own Verification section
-
-### 3. Detect Optional Features
-
-Check for signs of optional features:
-
-```bash
-# Example: Check if rich sandbox image exists (sandbox-and-browser)
-docker images | grep openclaw-sandbox-common
-
-# Add detection commands for each extras/ playbook as they're created
-```
-
-Only check for optional features that show signs of being installed.
 
 ---
 

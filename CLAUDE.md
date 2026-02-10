@@ -26,14 +26,6 @@ All deployment steps are in modular playbooks under `playbooks/`:
 | `maintenance.md` | Token rotation schedules and procedures |
 | `08-post-deploy.md` | First access & device pairing |
 
-Optional features are in `playbooks/extras/`:
-
-| Playbook | Description |
-|----------|-------------|
-| `extras/sandbox-and-browser.md` | Rich sandbox, browser, gateway packages, Claude Code CLI |
-
-See `extras/README.md` for details.
-
 See [playbooks/README.md](playbooks/README.md) for detailed playbook documentation.
 
 ---
@@ -111,8 +103,8 @@ chat session or update openclaw-config.env.
 
 Ask: **New deployment** (fresh VPS) or **Existing deployment** (already configured)?
 
-- **New deployment:** Present playbook selection — core (02-04, 06-07, workers auto-deployed in step 0) plus optional extras (`extras/sandbox-and-browser.md`). Confirm VPS IP, domain, and selected playbooks before proceeding.
-- **Existing deployment:** Ask: **Analyze** (`00-analysis-mode.md`), **Test** (`07-verification.md`), or **Modify** (select extras or describe custom changes). If "something else," use plan mode.
+- **New deployment:** Confirm VPS IP, domain, and proceed with core playbooks (02-04, 06-07, workers auto-deployed in step 0).
+- **Existing deployment:** Ask: **Analyze** (`00-analysis-mode.md`), **Test** (`07-verification.md`), or **Modify** (describe custom changes). If "something else," use plan mode.
 
 ---
 

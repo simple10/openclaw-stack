@@ -263,7 +263,7 @@ openclaw doctor --deep
 **If you see other warnings:**
 
 - **State integrity: missing transcripts** — stale session entries from heartbeat. Clear with: `sudo docker exec --user node openclaw-gateway bash -c 'echo {} > /home/node/.openclaw/agents/main/sessions/sessions.json'`
-- **Sandbox: base image missing** — the common sandbox build failed (known upstream bug). Restart the gateway — the entrypoint has a fallback that rebuilds with `USER root`. See `extras/sandbox-and-browser.md` troubleshooting.
+- **Sandbox: base image missing** — the common sandbox build failed (known upstream bug). Restart the gateway — the entrypoint has a fallback that rebuilds with `USER root`. See `04-vps1-openclaw.md` Troubleshooting.
 
 ---
 

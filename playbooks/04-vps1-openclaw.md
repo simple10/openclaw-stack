@@ -610,7 +610,7 @@ if command -v dockerd > /dev/null 2>&1; then
       # Build common sandbox image if missing (includes Node.js, git, common tools)
       # Known issue: upstream sandbox-common-setup.sh doesn't add USER root before
       # apt-get. The base image sets USER sandbox, so this build may fail silently.
-      # See extras/sandbox-and-browser.md troubleshooting for the manual fallback.
+      # See Troubleshooting section below for the manual fallback.
       if ! docker image inspect openclaw-sandbox-common:bookworm-slim > /dev/null 2>&1; then
         echo "[entrypoint] Common sandbox image not found, building..."
         if [ -f /app/scripts/sandbox-common-setup.sh ]; then

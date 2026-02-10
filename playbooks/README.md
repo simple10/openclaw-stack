@@ -27,7 +27,3 @@ For existing deployments, run `00-analysis-mode.md` first to verify current stat
 ## Maintenance
 
 - `maintenance.md` - Token rotation schedules and procedures
-
-## Optional Features
-
-The `extras/` directory contains optional playbooks that enhance the deployment but are not required for core functionality. See `extras/README.md` for details.

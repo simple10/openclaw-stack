@@ -21,7 +21,7 @@ the playbooks as designed.
 
 ### Claude guides you through whole process
 
-1. Asks you for any missing config values and optional extras
+1. Asks you for any missing config values
 2. Auto repairs any issues encountered with your setup
 3. Walks you through openclaw device pairing
 4. Runs comprehensive verification and security tests
