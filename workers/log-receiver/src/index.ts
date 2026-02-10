@@ -1,7 +1,6 @@
 import { validateAuth } from './auth'
 import { handlePreflight, addCorsHeaders } from './cors'
 import { jsonError } from './errors'
-import type { Env } from './types'
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -28,7 +27,7 @@ export default {
         return addCorsHeaders(jsonError(authError, 401))
       }
 
-      return addCorsHeaders(await handleLogs(request))
+      return addCorsHeaders(await handleLogs(request, env))
     }
 
     return addCorsHeaders(jsonError('Not found', 404))
@@ -42,8 +41,8 @@ const PRUNED_FIELDS = ['container_id', 'source_type', 'label', 'image']
 // for request metadata, headers, and the summary line)
 const BYTE_BUDGET = 128 * 1024
 
-// Levels worth logging to console — everything else is filtered out
-const LOGGABLE_LEVELS = new Set(['warn', 'error', 'fatal', 'panic'])
+// Default levels if LOGGABLE_LEVELS env var is missing or empty
+const DEFAULT_LOGGABLE_LEVELS = 'warn,error,fatal,panic'
 
 const LEVEL_PATTERNS: Array<[RegExp, string]> = [
   [/\b(?:panic|fatal)\b/i, 'error'],
@@ -52,6 +51,23 @@ const LEVEL_PATTERNS: Array<[RegExp, string]> = [
   [/\bdebug\b/i, 'debug'],
   [/\btrace\b/i, 'debug'],
 ]
+
+/** Map detected level to the appropriate console method. */
+function consoleForLevel(level: string): (...args: unknown[]) => void {
+  switch (level) {
+    case 'error':
+    case 'fatal':
+    case 'panic':
+      return console.error
+    case 'warn':
+      return console.warn
+    case 'debug':
+    case 'trace':
+      return console.debug
+    default:
+      return console.log
+  }
+}
 
 /**
  * Detect log level from an entry.
@@ -87,7 +103,7 @@ function detectLevel(entry: Record<string, unknown>): string {
  * console output via real-time Logs dashboard and Logpush. A summary line is
  * always emitted with counts so filtered entries remain visible in aggregate.
  */
-async function handleLogs(request: Request): Promise<Response> {
+async function handleLogs(request: Request, env: Env): Promise<Response> {
   const body = await request.text()
   if (!body.trim()) {
     return jsonError('Empty request body', 400)
@@ -110,6 +126,10 @@ async function handleLogs(request: Request): Promise<Response> {
     return jsonError('Invalid JSON batch', 400)
   }
 
+  const loggableLevels = new Set(
+    (env.LOGGABLE_LEVELS || DEFAULT_LOGGABLE_LEVELS).split(',').map((s) => s.trim())
+  )
+
   let total = 0
   let logged = 0
   let filtered = 0
@@ -123,7 +143,7 @@ async function handleLogs(request: Request): Promise<Response> {
     const level = detectLevel(entry)
     levels[level] = (levels[level] ?? 0) + 1
 
-    if (!LOGGABLE_LEVELS.has(level)) {
+    if (!loggableLevels.has(level)) {
       filtered++
       continue
     }
@@ -133,16 +153,34 @@ async function handleLogs(request: Request): Promise<Response> {
       delete entry[field]
     }
 
-    const output = JSON.stringify(entry)
+    // Hoist inner JSON message — OpenClaw emits JSON-formatted log lines, so
+    // entry.message may be '{"message":"actual text",...}'. Extracting .message
+    // gives the Cloudflare dashboard a clean primary text to display.
+    if (
+      typeof entry.message === 'string' &&
+      entry.message.startsWith('{') &&
+      entry.message.includes('"message":')
+    ) {
+      try {
+        const inner = JSON.parse(entry.message) as Record<string, unknown>
+        if (typeof inner.message === 'string') {
+          entry.message = inner.message
+        }
+      } catch {
+        // Not valid JSON — keep original message
+      }
+    }
 
-    // Enforce byte budget to avoid Cloudflare truncation
-    if (bytesUsed + output.length > BYTE_BUDGET) {
+    // Estimate size for byte budget, but pass the object to console so
+    // Cloudflare Workers Logs extracts fields (especially `message`) natively.
+    const estimatedSize = JSON.stringify(entry).length
+    if (bytesUsed + estimatedSize > BYTE_BUDGET) {
       droppedByBudget++
       continue
     }
 
-    console.log(output)
-    bytesUsed += output.length
+    consoleForLevel(level)(entry)
+    bytesUsed += estimatedSize
     logged++
   }
 
@@ -151,9 +189,9 @@ async function handleLogs(request: Request): Promise<Response> {
   const levelParts = Object.entries(levels)
     .map(([l, n]) => `${l}=${n}`)
     .join(' ')
-  console.log({
+  console.debug({
     _summary: true,
-    message: `[SUMMARY] batch: ${total} entries, ${logged} logged, ${filtered} filtered | ${levelParts}`,
+    message: `[BATCH SUMMARY] logged:${logged} filtered:${filtered} total:${total} >> ${levelParts}`,
     total,
     logged,
     filtered,

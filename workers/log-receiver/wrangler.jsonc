@@ -6,15 +6,23 @@
 
   // Workers Logs: enables console.log in the worker
   "observability": {
-    "enabled": true
+    "enabled": true,
+    "logs": {
+      // Disable automatic per-request invocation entries — we only want
+      // the explicit console.* output from our log processing code.
+      "invocation_logs": false
+    }
   },
 
   // Smart placement for reduced latency
   "placement": {
     "mode": "smart"
+  },
+
+  "vars": {
+    // Comma-separated log levels to output to console (changeable without redeploy via dashboard)
+    "LOGGABLE_LEVELS": "warn,error,fatal,panic"
+    // Secrets (set via `wrangler secret put`):
+    // AUTH_TOKEN — token Vector uses to authenticate to this worker
   }
-  // "vars": {
-  // Secrets (set via `wrangler secret put`):
-  // AUTH_TOKEN — token Vector uses to authenticate to this worker
-  // }
 }
