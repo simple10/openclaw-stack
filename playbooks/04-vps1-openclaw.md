@@ -610,6 +610,18 @@ if [ ! -L /usr/local/bin/openclaw ]; then
   echo "[entrypoint] Created /usr/local/bin/openclaw symlink"
 fi
 
+# ── 1f. Configure npm global prefix for skill installs ────────────
+# Gateway runs as node (uid 1000) after gosu drops privileges.
+# npm install -g (used by skills.install) needs a writable global prefix.
+# Default /usr/local/lib/node_modules is owned by root — redirect to user dir.
+npm_global="/home/node/.npm-global"
+mkdir -p "$npm_global"
+chown 1000:1000 "$npm_global"
+echo "prefix=$npm_global" >> /home/node/.npmrc
+# Add to PATH so globally installed binaries are found
+export PATH="$npm_global/bin:$PATH"
+echo "[entrypoint] npm global prefix set to $npm_global"
+
 # ── 2. Start nested Docker daemon (Sysbox provides isolation) ───────
 # /var/lib/docker is a persistent bind mount from host (./data/docker),
 # so sandbox images survive container restarts (no ~5min rebuild).
