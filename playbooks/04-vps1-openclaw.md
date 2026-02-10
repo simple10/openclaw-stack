@@ -241,7 +241,7 @@ sudo -u openclaw mkdir -p /home/openclaw/openclaw/data/vector
 GATEWAY_TOKEN=$(sudo grep OPENCLAW_GATEWAY_TOKEN /home/openclaw/openclaw/.env | cut -d= -f2)
 
 # SOURCE: deploy/openclaw.json (template) → /home/openclaw/.openclaw/openclaw.json
-# VARS: GATEWAY_TOKEN (from .env on VPS), OPENCLAW_DOMAIN_PATH (from openclaw-config.env)
+# VARS: GATEWAY_TOKEN (from .env on VPS), OPENCLAW_DOMAIN_PATH, AI_GATEWAY_WORKER_URL, AI_GATEWAY_AUTH_TOKEN (from openclaw-config.env)
 sudo tee /home/openclaw/.openclaw/openclaw.json << 'JSONEOF'
 # <<< deploy/openclaw.json (template) >>>
 JSONEOF
