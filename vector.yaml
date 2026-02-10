@@ -14,12 +14,35 @@ transforms:
       - docker_logs
     source: '.vps_ip = "${VPS1_IP}"'
 
+  # Detect log level from message text so the worker can filter cheaply by field
+  tag_level:
+    type: remap
+    inputs:
+      - enrich
+    source: |-
+      msg = downcase(string!(.message))
+      if match(msg, r'\b(panic|fatal)\b') {
+        .level = "error"
+      } else if match(msg, r'\berr(or)?\b') {
+        .level = "error"
+      } else if match(msg, r'\bwarn(ing)?\b') {
+        .level = "warn"
+      } else if match(msg, r'\bdebug\b') {
+        .level = "debug"
+      } else if match(msg, r'\btrace\b') {
+        .level = "debug"
+      } else if .stream == "stderr" {
+        .level = "warn"
+      } else {
+        .level = "info"
+      }
+
 # Ship to Cloudflare Log Receiver Worker
 sinks:
   cloudflare_worker:
     type: http
     inputs:
-      - enrich
+      - tag_level
     uri: "${LOG_WORKER_URL}"
     encoding:
       codec: json
