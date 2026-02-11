@@ -20,8 +20,6 @@ packages:
   - npm
   - rustc
   - cargo
-  - ffmpeg
-  - imagemagick
   - unzip
   - pkg-config
   - libasound2-dev
@@ -29,15 +27,15 @@ packages:
   - file
 
 # Tools installed via custom scripts. Each tool:
-#   install  — shell command run as root in sandbox-common (optional; omit if bins come from apt)
+#   apt      — apt package name; all apt tools are batched into one layer (optional)
+#   install  — shell command run as root in sandbox-common (optional)
 #   version  — substituted as ${VERSION} in install script (optional)
 #   bins     — binary names this tool provides (default: [tool name])
 #
 # Every binary listed in bins gets auto-shimmed on the gateway.
-# Tools without install are "capability declarations" — their bins come from apt
-# but need explicit names for gateway shimming (e.g. imagemagick -> convert).
 tools:
   golang:
+    # Install latest version of go
     install: >-
       GO_VER=$(curl -sL https://go.dev/VERSION?m=text | head -1) &&
       curl -sfL https://go.dev/dl/$GO_VER.linux-amd64.tar.gz | tar xz -C /usr/local &&
@@ -54,8 +52,89 @@ tools:
     install: npm install -g @anthropic-ai/claude-code
     bins: [claude]
 
+  # --- Skills: apt tools ---
+
   ffmpeg:
+    apt: ffmpeg
     bins: [ffmpeg, ffprobe]
 
   imagemagick:
+    apt: imagemagick
     bins: [convert, identify, mogrify]
+
+  tmux:
+    apt: tmux
+    bins: [tmux]
+
+  ripgrep:
+    apt: ripgrep
+    bins: [rg]
+
+  # --- Skills: Go tools (use GOBIN to install to BIN_DIR) ---
+
+  blogwatcher:
+    install: GOBIN=${BIN_DIR} go install github.com/Hyaxia/blogwatcher/cmd/blogwatcher@latest
+
+  wacli:
+    install: GOBIN=${BIN_DIR} go install github.com/steipete/wacli/cmd/wacli@latest
+
+  ordercli:
+    install: GOBIN=${BIN_DIR} go install github.com/steipete/ordercli/cmd/ordercli@latest
+
+  # --- Skills: npm tools ---
+
+  clawhub:
+    install: npm install -g clawhub
+
+  oracle:
+    install: npm install -g @steipete/oracle
+
+  mcporter:
+    install: npm install -g mcporter
+
+  # --- Skills: brew tools ---
+  # Brew refuses to run as root. Install via su to linuxbrew user,
+  # then symlink binaries to BIN_DIR for gateway shim + PATH availability.
+
+  gh:
+    install: >-
+      su -s /bin/bash linuxbrew -c 'HOMEBREW_NO_AUTO_UPDATE=1 /home/linuxbrew/.linuxbrew/bin/brew install gh'
+      && ln -sf /home/linuxbrew/.linuxbrew/bin/gh ${BIN_DIR}/
+
+  himalaya:
+    install: >-
+      su -s /bin/bash linuxbrew -c 'HOMEBREW_NO_AUTO_UPDATE=1 /home/linuxbrew/.linuxbrew/bin/brew install himalaya'
+      && ln -sf /home/linuxbrew/.linuxbrew/bin/himalaya ${BIN_DIR}/
+
+  summarize:
+    install: >-
+      su -s /bin/bash linuxbrew -c 'HOMEBREW_NO_AUTO_UPDATE=1 /home/linuxbrew/.linuxbrew/bin/brew install steipete/tap/summarize'
+      && ln -sf /home/linuxbrew/.linuxbrew/bin/summarize ${BIN_DIR}/
+
+  gemini-cli:
+    install: >-
+      su -s /bin/bash linuxbrew -c 'HOMEBREW_NO_AUTO_UPDATE=1 /home/linuxbrew/.linuxbrew/bin/brew install gemini-cli'
+      && ln -sf /home/linuxbrew/.linuxbrew/bin/gemini ${BIN_DIR}/
+    bins: [gemini]
+
+  sag:
+    install: >-
+      su -s /bin/bash linuxbrew -c 'HOMEBREW_NO_AUTO_UPDATE=1 /home/linuxbrew/.linuxbrew/bin/brew install steipete/tap/sag'
+      && ln -sf /home/linuxbrew/.linuxbrew/bin/sag ${BIN_DIR}/
+
+  goplaces:
+    install: >-
+      su -s /bin/bash linuxbrew -c 'HOMEBREW_NO_AUTO_UPDATE=1 /home/linuxbrew/.linuxbrew/bin/brew install steipete/tap/goplaces'
+      && ln -sf /home/linuxbrew/.linuxbrew/bin/goplaces ${BIN_DIR}/
+
+  # --- Skills: uv + Python tools ---
+  # uv installed via brew; nano-pdf via uv tool install (must come after uv).
+
+  uv:
+    install: >-
+      su -s /bin/bash linuxbrew -c 'HOMEBREW_NO_AUTO_UPDATE=1 /home/linuxbrew/.linuxbrew/bin/brew install uv'
+      && ln -sf /home/linuxbrew/.linuxbrew/bin/uv /home/linuxbrew/.linuxbrew/bin/uvx ${BIN_DIR}/
+    bins: [uv, uvx]
+
+  nano-pdf:
+    install: UV_TOOL_BIN_DIR=${BIN_DIR} UV_TOOL_DIR=/opt/uv-tools uv tool install nano-pdf

@@ -121,6 +121,8 @@ while (i < allLines.length) {
         }
       } else if (key === 'version') {
         result.tools[currentTool].version = val.replace(/^["']|["']$/g, '');
+      } else if (key === 'apt') {
+        result.tools[currentTool].apt = val.replace(/^["']|["']$/g, '');
       }
     }
   }

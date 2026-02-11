@@ -265,32 +265,30 @@ build_common() {
 
   if [ -n "$toolkit_json" ]; then
     local tool_installs install_count
-    tool_installs=$(echo "$toolkit_json" | node -e "
+    local bin_dir="/usr/local/bin"
+    local install_cmds
+    install_cmds=$(echo "$toolkit_json" | node -e "
       process.stdin.on('data', d => {
         const t = JSON.parse(d).tools;
+        const aptPkgs = [];
         const installs = [];
         for (const [name, cfg] of Object.entries(t)) {
+          if (cfg.apt) aptPkgs.push(cfg.apt);
           if (cfg.install) installs.push({ name, install: cfg.install, version: cfg.version || '' });
         }
-        console.log(JSON.stringify(installs));
+        if (aptPkgs.length > 0) {
+          console.log('RUN apt-get update && apt-get install -y --no-install-recommends ' + aptPkgs.join(' ') + ' && rm -rf /var/lib/apt/lists/*');
+        }
+        for (const t of installs) {
+          let cmd = t.install;
+          if (t.version) cmd = cmd.replaceAll('\${VERSION}', t.version);
+          cmd = cmd.replaceAll('\${BIN_DIR}', '$bin_dir');
+          console.log('RUN ' + cmd);
+        }
       });
     ")
-    install_count=$(echo "$tool_installs" | node -e "process.stdin.on('data',d=>console.log(JSON.parse(d).length))")
-    if [ "$install_count" -gt 0 ]; then
+    if [ -n "$install_cmds" ]; then
       has_tool_installs=true
-      local bin_dir="/usr/local/bin"
-      local install_cmds
-      install_cmds=$(echo "$tool_installs" | node -e "
-        process.stdin.on('data', d => {
-          const installs = JSON.parse(d);
-          for (const t of installs) {
-            let cmd = t.install;
-            if (t.version) cmd = cmd.replaceAll('\${VERSION}', t.version);
-            cmd = cmd.replaceAll('\${BIN_DIR}', '$bin_dir');
-            console.log('RUN ' + cmd);
-          }
-        });
-      ")
       tool_dockerfile="${tool_dockerfile}ENV BIN_DIR=${bin_dir}\n${install_cmds}\n"
     fi
   fi
