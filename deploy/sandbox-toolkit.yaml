@@ -1,0 +1,55 @@
+# Sandbox Toolkit Configuration
+# Single source of truth for all sandbox capabilities.
+# Entrypoint reads this to: install apt packages, run custom tool installs,
+# and auto-generate gateway shims for all declared binaries.
+#
+# Adding a new tool = add entry here + rebuild sandbox images.
+
+# Apt packages installed in sandbox-common image.
+# These are system-level dependencies — compilers, libraries, CLI tools.
+packages:
+  - curl
+  - wget
+  - jq
+  - coreutils
+  - grep
+  - git
+  - ca-certificates
+  - python3
+  - nodejs
+  - npm
+  - golang-go
+  - rustc
+  - cargo
+  - ffmpeg
+  - imagemagick
+  - unzip
+  - pkg-config
+  - libasound2-dev
+  - build-essential
+  - file
+
+# Tools installed via custom scripts. Each tool:
+#   install  — shell command run as root in sandbox-common (optional; omit if bins come from apt)
+#   version  — substituted as ${VERSION} in install script (optional)
+#   bins     — binary names this tool provides (default: [tool name])
+#
+# Every binary listed in bins gets auto-shimmed on the gateway.
+# Tools without install are "capability declarations" — their bins come from apt
+# but need explicit names for gateway shimming (e.g. imagemagick -> convert).
+tools:
+  gifgrep:
+    version: "0.2.1"
+    install: >-
+      curl -sfL https://github.com/steipete/gifgrep/releases/download/v${VERSION}/gifgrep_${VERSION}_linux_amd64.tar.gz
+      | tar xz -C ${BIN_DIR} gifgrep
+
+  claude-code:
+    install: npm install -g @anthropic-ai/claude-code
+    bins: [claude]
+
+  ffmpeg:
+    bins: [ffmpeg, ffprobe]
+
+  imagemagick:
+    bins: [convert, identify, mogrify]

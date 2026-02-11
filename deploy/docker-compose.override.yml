@@ -43,6 +43,9 @@ services:
       - ./deploy/plugins:/app/deploy/plugins:ro
       # Managed hooks: entrypoint copies these to ~/.openclaw/hooks/
       - ./deploy/hooks:/app/deploy/hooks:ro
+      # Sandbox toolkit config: entrypoint reads this for packages, tool installs, and shim generation
+      - ./deploy/sandbox-toolkit.yaml:/app/deploy/sandbox-toolkit.yaml:ro
+      - ./deploy/parse-toolkit.mjs:/app/deploy/parse-toolkit.mjs:ro
     # Entrypoint handles pre-start tasks before exec-ing the command
     entrypoint: ["/app/scripts/entrypoint-gateway.sh"]
     # Full gateway command (entrypoint passes it through via exec "$@")

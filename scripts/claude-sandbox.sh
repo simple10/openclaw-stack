@@ -37,4 +37,4 @@ ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" -t "${SSH_USER}@${VPS1_IP}" \
     --tmpfs /home/linuxbrew:uid=1000,gid=1000 \
     --tmpfs /tmp \
     -u 1000:1000 \
-    openclaw-sandbox-claude:bookworm-slim claude"
+    openclaw-sandbox-common:bookworm-slim claude"

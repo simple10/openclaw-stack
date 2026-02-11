@@ -312,9 +312,8 @@ Runs as root inside container (Sysbox isolation). Performs pre-start tasks in or
 5. **Start nested Docker daemon** — `dockerd --host=unix:///var/run/docker.sock --storage-driver=overlay2 --log-level=warn`, waits up to 30 seconds for `docker info` to succeed
 6. **Build sandbox images** (only if dockerd is ready):
    - `openclaw-sandbox` — Base sandbox (from `/app/sandbox/Dockerfile`)
-   - `openclaw-sandbox-common:bookworm-slim` — Node.js, git, dev tools
+   - `openclaw-sandbox-common:bookworm-slim` — Node.js, git, dev tools + custom tools from `sandbox-toolkit.yaml` (gifgrep, Claude Code CLI, ffmpeg, imagemagick)
    - `openclaw-sandbox-browser:bookworm-slim` — Chromium + noVNC
-   - `openclaw-sandbox-claude:bookworm-slim` — Common + ffmpeg + imagemagick + Claude Code CLI (layered image)
 7. **Privilege drop** — `exec gosu node "$@"` drops from root to node (uid 1000). `gosu` doesn't spawn a subshell (preserves PID 1 signal handling). Full gateway command passed as arguments from compose override.
 
 ### 3.6 Build Process (`scripts/build-openclaw.sh`)
@@ -367,20 +366,22 @@ See `04-vps1-openclaw.md` § 4.8 for the full `openclaw.json` content.
 
 ### 3.8 Sandbox Images
 
-Four images built during first boot by the entrypoint script:
+Three images built during first boot by the entrypoint script:
 
 | Image | Base | Contents | Size |
 |-------|------|----------|------|
 | `openclaw-sandbox` | Upstream Dockerfile | Minimal sandbox (base) | ~150MB |
-| `openclaw-sandbox-common:bookworm-slim` | Custom script | Node.js, git, dev tools | ~500MB |
+| `openclaw-sandbox-common:bookworm-slim` | Custom script | Node.js, git, dev tools + custom tools from `sandbox-toolkit.yaml` | ~700MB |
 | `openclaw-sandbox-browser:bookworm-slim` | Custom script | Chromium + noVNC | ~800MB |
-| `openclaw-sandbox-claude:bookworm-slim` | Layered on common | Common + ffmpeg + imagemagick + Claude Code CLI | ~700MB |
 
-**Claude sandbox build command:**
+**Config-driven sandbox toolkit** (`deploy/sandbox-toolkit.yaml`):
 
-```bash
-printf 'FROM openclaw-sandbox-common:bookworm-slim\nUSER root\nRUN apt-get update && apt-get install -y --no-install-recommends ffmpeg imagemagick && rm -rf /var/lib/apt/lists/*\nRUN npm install -g @anthropic-ai/claude-code\nUSER 1000\n' | docker build -t openclaw-sandbox-claude:bookworm-slim -
-```
+All sandbox capabilities (apt packages, custom tool installs, binary declarations) are declared in a single YAML config. The entrypoint reads this config via `deploy/parse-toolkit.mjs` to:
+1. Pass apt packages to `sandbox-common-setup.sh` via `PACKAGES` env var
+2. Layer custom tool installs (gifgrep, claude-code, etc.) on top of sandbox-common
+3. Auto-generate gateway shims in `/opt/skill-bins/` for all declared binaries
+
+Adding a new tool = edit `sandbox-toolkit.yaml` + rebuild sandbox images.
 
 **Critical constraints:**
 

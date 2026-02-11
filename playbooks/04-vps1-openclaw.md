@@ -229,13 +229,14 @@ sudo -u openclaw mkdir -p /home/openclaw/openclaw/data/vector
 #     all fail with "gateway token mismatch".
 # See REQUIREMENTS.md § 3.7 for full rationale.
 #
-# Tiered sandbox architecture:
+# Tiered sandbox architecture (config-driven via deploy/sandbox-toolkit.yaml):
 #   defaults → base sandbox (openclaw-sandbox:bookworm-slim), no network — lightweight for main agent
-#   "skills" agent → common sandbox (openclaw-sandbox-common:bookworm-slim), bridge network — runs skill binaries (gifgrep, etc.)
-#   "code" agent → claude sandbox (openclaw-sandbox-claude:bookworm-slim), bridge network, Claude Code CLI
+#   "skills" agent → common sandbox (openclaw-sandbox-common:bookworm-slim), bridge network — runs skill binaries
+#   "code" agent → common sandbox (openclaw-sandbox-common:bookworm-slim), bridge network, Claude Code CLI
+#   All tools (gifgrep, claude-code, ffmpeg, etc.) are installed in sandbox-common via sandbox-toolkit.yaml.
 #   Main agent delegates to skills agent for skills needing network (gifgrep, weather, etc.)
 #   Main agent delegates to code agent via sessions_spawn for coding tasks.
-#   /opt/skill-bins is bind-mounted read-only into all sandboxes (see entrypoint §1g).
+#   /opt/skill-bins is auto-shimmed from sandbox-toolkit.yaml (see entrypoint §1g).
 
 # Read the gateway token generated in section 4.5
 GATEWAY_TOKEN=$(sudo grep OPENCLAW_GATEWAY_TOKEN /home/openclaw/openclaw/.env | cut -d= -f2)
@@ -554,9 +555,9 @@ timeout 600 bash -c 'until sudo docker logs openclaw-gateway 2>&1 | grep -q "Exe
 echo "=== Checking sandbox images ==="
 FAILED=0
 
-# 1. Check all 4 images exist
+# 1. Check all 3 images exist (claude sandbox removed — tools are in common via sandbox-toolkit.yaml)
 for img in openclaw-sandbox:bookworm-slim openclaw-sandbox-common:bookworm-slim \
-           openclaw-sandbox-browser:bookworm-slim openclaw-sandbox-claude:bookworm-slim; do
+           openclaw-sandbox-browser:bookworm-slim; do
   if sudo docker exec openclaw-gateway docker image inspect "$img" > /dev/null 2>&1; then
     echo "  $img: EXISTS"
   else
@@ -565,8 +566,8 @@ for img in openclaw-sandbox:bookworm-slim openclaw-sandbox-common:bookworm-slim 
   fi
 done
 
-# 2. Security check: verify USER is 1000 (not root) on common and claude images
-for img in openclaw-sandbox-common:bookworm-slim openclaw-sandbox-claude:bookworm-slim; do
+# 2. Security check: verify USER is 1000 (not root) on common image
+for img in openclaw-sandbox-common:bookworm-slim; do
   USER=$(sudo docker exec openclaw-gateway docker image inspect "$img" 2>/dev/null \
     | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['Config']['User'])" 2>/dev/null)
   if [ "$USER" = "1000" ]; then
@@ -577,23 +578,12 @@ for img in openclaw-sandbox-common:bookworm-slim openclaw-sandbox-claude:bookwor
   fi
 done
 
-# 3. Test key binaries in common sandbox
-# ffmpeg + imagemagick are in common (via PACKAGES override), not claude
-for bin in go rustc bun brew node npm pnpm git curl wget jq ffmpeg convert; do
+# 3. Test key binaries in common sandbox (all tools from sandbox-toolkit.yaml)
+for bin in go rustc bun brew node npm pnpm git curl wget jq ffmpeg convert claude gifgrep; do
   if sudo docker exec openclaw-gateway docker run --rm openclaw-sandbox-common:bookworm-slim which "$bin" > /dev/null 2>&1; then
     echo "  common/$bin: OK"
   else
     echo "  common/$bin: MISSING"
-    FAILED=1
-  fi
-done
-
-# 4. Test claude sandbox (should inherit common tools + add Claude Code CLI)
-for bin in claude ffmpeg node; do
-  if sudo docker exec openclaw-gateway docker run --rm openclaw-sandbox-claude:bookworm-slim which "$bin" > /dev/null 2>&1; then
-    echo "  claude/$bin: OK"
-  else
-    echo "  claude/$bin: MISSING"
     FAILED=1
   fi
 done
@@ -610,7 +600,7 @@ if [ "$FAILED" -eq 1 ]; then
 fi
 ```
 
-**Expected:** All images exist, USER is 1000, all binaries present. If verification fails, check entrypoint logs for ERROR messages.
+**Expected:** All 3 images exist (base, common, browser), USER is 1000 on common, all binaries present including custom tools from `sandbox-toolkit.yaml` (claude, gifgrep). If verification fails, check entrypoint logs for ERROR messages.
 
 ---
 

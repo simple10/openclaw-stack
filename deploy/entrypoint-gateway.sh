@@ -67,27 +67,36 @@ echo "prefix=$npm_global" >> /home/node/.npmrc
 export PATH="$npm_global/bin:$PATH"
 echo "[entrypoint] npm global prefix set to $npm_global"
 
-# ── 1g. Install skill binaries for sandbox availability ──────────
+# ── 1g. Auto-generate gateway shims from sandbox-toolkit.yaml ─────
 # Skills check bins on the gateway (load-time) AND inside the sandbox (runtime).
 # /opt/skill-bins is bind-mounted read-only into all sandboxes, making
 # gateway-installed binaries available without network or image rebuilds.
+# Shims satisfy the gateway preflight check; real binaries live in sandbox images.
 mkdir -p /opt/skill-bins
 
-# Coding CLI shims — coding-agent skill requires anyBins: ["claude","codex","opencode","pi"].
-# Real CLIs live in the claude sandbox image. Shims satisfy the gateway preflight check.
-for cli in claude codex opencode pi; do
-  if [ ! -f "/opt/skill-bins/$cli" ]; then
-    printf '#!/bin/sh\necho "ERROR: $0 is a shim — run inside sandbox" >&2\nexit 1\n' \
-      > "/opt/skill-bins/$cli"
-    chmod +x "/opt/skill-bins/$cli"
-  fi
-done
+TOOLKIT_CONFIG="/app/deploy/sandbox-toolkit.yaml"
+TOOLKIT_PARSER="/app/deploy/parse-toolkit.mjs"
+
+if [ -f "$TOOLKIT_CONFIG" ] && [ -f "$TOOLKIT_PARSER" ]; then
+  TOOLKIT_JSON=$(node "$TOOLKIT_PARSER" "$TOOLKIT_CONFIG")
+
+  # Generate a shim for each declared binary
+  for bin in $(echo "$TOOLKIT_JSON" | node -e "process.stdin.on('data',d=>console.log(JSON.parse(d).allBins.join(' ')))"); do
+    if [ ! -f "/opt/skill-bins/$bin" ]; then
+      printf '#!/bin/sh\necho "ERROR: $0 is a shim — run inside sandbox" >&2\nexit 1\n' \
+        > "/opt/skill-bins/$bin"
+      chmod +x "/opt/skill-bins/$bin"
+    fi
+  done
+  echo "[entrypoint] Auto-shimmed $(ls /opt/skill-bins | wc -l) binaries from sandbox-toolkit.yaml"
+else
+  echo "[entrypoint] WARNING: sandbox-toolkit.yaml or parser not found, skipping shim generation"
+fi
 
 # Add to gateway PATH for load-time skill checks
 if ! echo "$PATH" | grep -q '/opt/skill-bins'; then
   export PATH="/opt/skill-bins:$PATH"
 fi
-echo "[entrypoint] Skill binaries ready ($(ls /opt/skill-bins | wc -l) items)"
 
 # ── 1h. Deploy plugins to global extensions dir ────────────────────
 # Plugins from deploy/plugins/ are copied to ~/.openclaw/extensions/
@@ -197,30 +206,89 @@ if command -v dockerd > /dev/null 2>&1; then
       # Upstream sandbox-common-setup.sh has a bug: the generated Dockerfile inherits
       # USER sandbox from the base image and runs apt-get without switching to root.
       # Fix: build a rooted intermediate image and pass it via BASE_IMAGE env var.
+      # Packages and custom tool installs are read from sandbox-toolkit.yaml.
       if ! docker image inspect openclaw-sandbox-common:bookworm-slim > /dev/null 2>&1; then
         echo "[entrypoint] Common sandbox image not found, building..."
         if [ -f /app/scripts/sandbox-common-setup.sh ]; then
+          # Read packages from sandbox-toolkit.yaml (falls back to minimal set)
+          TOOLKIT_PACKAGES=""
+          if [ -n "${TOOLKIT_JSON:-}" ]; then
+            TOOLKIT_PACKAGES=$(echo "$TOOLKIT_JSON" | node -e "process.stdin.on('data',d=>console.log(JSON.parse(d).packages.join(' ')))")
+          fi
+          if [ -z "$TOOLKIT_PACKAGES" ]; then
+            echo "[entrypoint] WARNING: No toolkit config, using fallback package list"
+            TOOLKIT_PACKAGES="curl wget jq coreutils grep nodejs npm python3 git ca-certificates golang-go rustc cargo unzip pkg-config libasound2-dev build-essential file ffmpeg imagemagick"
+          fi
+
           # Step 1: Build rooted intermediate from base image
           printf 'FROM openclaw-sandbox:bookworm-slim\nUSER root\n' \
             | docker build -t openclaw-sandbox-base-root:bookworm-slim -
           if ! docker image inspect openclaw-sandbox-base-root:bookworm-slim > /dev/null 2>&1; then
             echo "[entrypoint] ERROR: Failed to build rooted intermediate image"
           else
-            # Step 2: Run upstream script with BASE_IMAGE override + extra packages
+            # Step 2: Run upstream script with BASE_IMAGE override + config-driven packages
             BASE_IMAGE=openclaw-sandbox-base-root:bookworm-slim \
-            PACKAGES="curl wget jq coreutils grep nodejs npm python3 git ca-certificates golang-go rustc cargo unzip pkg-config libasound2-dev build-essential file ffmpeg imagemagick" \
+            PACKAGES="$TOOLKIT_PACKAGES" \
             /app/scripts/sandbox-common-setup.sh || true
 
             # Step 3: Verify and fix USER to 1000 for security
             if docker image inspect openclaw-sandbox-common:bookworm-slim > /dev/null 2>&1; then
-              printf 'FROM openclaw-sandbox-common:bookworm-slim\nUSER 1000\n' \
-                | docker build -t openclaw-sandbox-common:bookworm-slim -
-              echo "[entrypoint] Common sandbox image built successfully"
+              # Step 4: Layer custom tool installs from sandbox-toolkit.yaml
+              # Generate a Dockerfile that installs each tool with an install script
+              TOOL_DOCKERFILE="FROM openclaw-sandbox-common:bookworm-slim\nUSER root\n"
+              HAS_TOOL_INSTALLS=false
+              if [ -n "${TOOLKIT_JSON:-}" ]; then
+                # Extract tool install commands as JSON array of {name, install, version}
+                TOOL_INSTALLS=$(echo "$TOOLKIT_JSON" | node -e "
+                  process.stdin.on('data', d => {
+                    const t = JSON.parse(d).tools;
+                    const installs = [];
+                    for (const [name, cfg] of Object.entries(t)) {
+                      if (cfg.install) installs.push({ name, install: cfg.install, version: cfg.version || '' });
+                    }
+                    console.log(JSON.stringify(installs));
+                  });
+                ")
+                # Process each tool install
+                INSTALL_COUNT=$(echo "$TOOL_INSTALLS" | node -e "process.stdin.on('data',d=>console.log(JSON.parse(d).length))")
+                if [ "$INSTALL_COUNT" -gt 0 ]; then
+                  HAS_TOOL_INSTALLS=true
+                  BIN_DIR="/usr/local/bin"
+                  INSTALL_CMDS=$(echo "$TOOL_INSTALLS" | node -e "
+                    process.stdin.on('data', d => {
+                      const installs = JSON.parse(d);
+                      for (const t of installs) {
+                        let cmd = t.install;
+                        if (t.version) cmd = cmd.replaceAll('\${VERSION}', t.version);
+                        cmd = cmd.replaceAll('\${BIN_DIR}', '$BIN_DIR');
+                        console.log('RUN ' + cmd);
+                      }
+                    });
+                  ")
+                  TOOL_DOCKERFILE="${TOOL_DOCKERFILE}ENV BIN_DIR=${BIN_DIR}\n${INSTALL_CMDS}\n"
+                fi
+              fi
+              TOOL_DOCKERFILE="${TOOL_DOCKERFILE}USER 1000\n"
+
+              if [ "$HAS_TOOL_INSTALLS" = true ]; then
+                echo "[entrypoint] Installing custom tools into sandbox-common..."
+                printf "%b" "$TOOL_DOCKERFILE" \
+                  | docker build -t openclaw-sandbox-common:bookworm-slim -
+              else
+                printf 'FROM openclaw-sandbox-common:bookworm-slim\nUSER 1000\n' \
+                  | docker build -t openclaw-sandbox-common:bookworm-slim -
+              fi
+
+              if docker image inspect openclaw-sandbox-common:bookworm-slim > /dev/null 2>&1; then
+                echo "[entrypoint] Common sandbox image built successfully"
+              else
+                echo "[entrypoint] ERROR: Common sandbox image build failed"
+              fi
             else
               echo "[entrypoint] ERROR: Common sandbox image build failed — upstream script did not produce image"
             fi
 
-            # Step 4: Cleanup intermediate image
+            # Cleanup intermediate image
             docker rmi openclaw-sandbox-base-root:bookworm-slim > /dev/null 2>&1 || true
           fi
         else
@@ -245,25 +313,6 @@ if command -v dockerd > /dev/null 2>&1; then
         fi
       else
         echo "[entrypoint] Browser sandbox image already exists"
-      fi
-
-      # Build claude sandbox image if missing (layered on common with Claude Code CLI)
-      # ffmpeg + imagemagick are already in common via PACKAGES override above
-      if ! docker image inspect openclaw-sandbox-claude:bookworm-slim > /dev/null 2>&1; then
-        if docker image inspect openclaw-sandbox-common:bookworm-slim > /dev/null 2>&1; then
-          echo "[entrypoint] Claude sandbox image not found, building..."
-          printf 'FROM openclaw-sandbox-common:bookworm-slim\nUSER root\nRUN npm install -g @anthropic-ai/claude-code\nUSER 1000\n' \
-            | docker build -t openclaw-sandbox-claude:bookworm-slim -
-          if docker image inspect openclaw-sandbox-claude:bookworm-slim > /dev/null 2>&1; then
-            echo "[entrypoint] Claude sandbox image built successfully"
-          else
-            echo "[entrypoint] ERROR: Claude sandbox image build failed"
-          fi
-        else
-          echo "[entrypoint] WARNING: Skipping claude sandbox — common image not available"
-        fi
-      else
-        echo "[entrypoint] Claude sandbox image already exists"
       fi
     )
   fi
