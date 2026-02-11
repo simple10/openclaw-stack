@@ -124,6 +124,29 @@ else
   echo "[entrypoint] No plugins to deploy"
 fi
 
+# ── 1i. Deploy managed hooks ──────────────────────────────────────
+# Hooks from deploy/hooks/ are copied to ~/.openclaw/hooks/ where the
+# gateway discovers them. Each hook dir contains HOOK.md + handler.js.
+# Hook entries must also be enabled in openclaw.json (hooks.internal.entries).
+hooks_dir="/home/node/.openclaw/hooks"
+deploy_hooks="/app/deploy/hooks"
+if [ -d "$deploy_hooks" ]; then
+  mkdir -p "$hooks_dir"
+  for hook_dir in "$deploy_hooks"/*/; do
+    hook_name=$(basename "$hook_dir")
+    target="$hooks_dir/$hook_name"
+    if [ ! -d "$target" ] || [ "$deploy_hooks/$hook_name/handler.js" -nt "$target/handler.js" ]; then
+      rm -rf "$target"
+      cp -r "$deploy_hooks/$hook_name" "$target"
+      echo "[entrypoint] Deployed hook: $hook_name"
+    fi
+  done
+  chown -R 1000:1000 "$hooks_dir"
+  echo "[entrypoint] Hooks ready"
+else
+  echo "[entrypoint] No hooks to deploy"
+fi
+
 # ── 2. Start nested Docker daemon (Sysbox provides isolation) ───────
 # /var/lib/docker is a persistent bind mount from host (./data/docker),
 # so sandbox images survive container restarts (no ~5min rebuild).

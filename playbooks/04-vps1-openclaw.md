@@ -477,6 +477,31 @@ sudo logrotate -d /etc/logrotate.d/openclaw
 
 ---
 
+## 4.8h Deploy Managed Hooks
+
+Custom managed hooks live in `deploy/hooks/<name>/` (HOOK.md + handler.js). The entrypoint copies them to `~/.openclaw/hooks/` on boot, and `openclaw.json` enables them via `hooks.internal.entries`.
+
+SCP hooks to the VPS:
+
+```bash
+#!/bin/bash
+# Create deploy/hooks directory on VPS
+sudo -u openclaw mkdir -p /home/openclaw/openclaw/deploy/hooks
+
+# Copy hooks from local repo
+# Run from local machine:
+scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r deploy/hooks/* ${SSH_USER}@${VPS1_IP}:/tmp/deploy-hooks/
+
+# Move into place with correct ownership
+sudo cp -r /tmp/deploy-hooks/* /home/openclaw/openclaw/deploy/hooks/
+sudo chown -R openclaw:openclaw /home/openclaw/openclaw/deploy/hooks/
+rm -rf /tmp/deploy-hooks
+```
+
+To add a new hook: create `deploy/hooks/<name>/` with HOOK.md + handler.js, add an entry to `openclaw.json` under `hooks.internal.entries`, SCP to VPS, restart.
+
+---
+
 ## 4.9 Build and Start OpenClaw
 
 ```bash

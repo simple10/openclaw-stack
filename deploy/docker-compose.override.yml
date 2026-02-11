@@ -41,6 +41,8 @@ services:
       # Plugins: entrypoint copies these to ~/.openclaw/extensions/ where
       # the gateway discovers them (e.g. skill-router for auto-delegation)
       - ./deploy/plugins:/app/deploy/plugins:ro
+      # Managed hooks: entrypoint copies these to ~/.openclaw/hooks/
+      - ./deploy/hooks:/app/deploy/hooks:ro
     # Entrypoint handles pre-start tasks before exec-ing the command
     entrypoint: ["/app/scripts/entrypoint-gateway.sh"]
     # Full gateway command (entrypoint passes it through via exec "$@")
