@@ -26,7 +26,8 @@
       "enabled": true,
       "entries": {
         "session-memory": { "enabled": true },
-        "command-logger": { "enabled": true }
+        "command-logger": { "enabled": true },
+        "debug-logger": { "enabled": true }
       }
     }
   },
