@@ -121,6 +121,23 @@
       }
     ]
   },
+  "plugins": {
+    "enabled": true,
+    "entries": {
+      "skill-router": {
+        "enabled": true,
+        "config": {
+          "rules": [
+            {
+              "agent": "main",
+              "delegateTo": "skills",
+              "skills": ["gifgrep"]
+            }
+          ]
+        }
+      }
+    }
+  },
   "tools": {
     "sandbox": {
       "tools": {

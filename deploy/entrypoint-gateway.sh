@@ -73,6 +73,7 @@ echo "[entrypoint] npm global prefix set to $npm_global"
 # gateway-installed binaries available without network or image rebuilds.
 mkdir -p /opt/skill-bins
 
+# TODO: remove this after testing new plugin; gifgrep & other skills should be installed via OpenClaw, not hardcoded here
 # gifgrep — GIF search skill
 if [ ! -f /opt/skill-bins/gifgrep ]; then
   echo "[entrypoint] Installing gifgrep..."
@@ -97,6 +98,31 @@ if ! echo "$PATH" | grep -q '/opt/skill-bins'; then
   export PATH="/opt/skill-bins:$PATH"
 fi
 echo "[entrypoint] Skill binaries ready ($(ls /opt/skill-bins | wc -l) items)"
+
+# ── 1h. Deploy plugins to global extensions dir ────────────────────
+# Plugins from deploy/plugins/ are copied to ~/.openclaw/extensions/
+# where the gateway discovers them automatically.
+# The skill-router plugin replaces per-skill SKILL.md overrides — it rewrites
+# skill descriptions in the system prompt based on config rules in openclaw.json.
+global_extensions="/home/node/.openclaw/extensions"
+deploy_plugins="/app/deploy/plugins"
+if [ -d "$deploy_plugins" ]; then
+  mkdir -p "$global_extensions"
+  for plugin_dir in "$deploy_plugins"/*/; do
+    plugin_name=$(basename "$plugin_dir")
+    target="$global_extensions/$plugin_name"
+    # Copy if new or source is newer
+    if [ ! -d "$target" ] || [ "$deploy_plugins/$plugin_name/index.js" -nt "$target/index.js" ]; then
+      rm -rf "$target"
+      cp -r "$deploy_plugins/$plugin_name" "$target"
+      echo "[entrypoint] Deployed plugin: $plugin_name"
+    fi
+  done
+  chown -R 1000:1000 "$global_extensions"
+  echo "[entrypoint] Plugins ready"
+else
+  echo "[entrypoint] No plugins to deploy"
+fi
 
 # ── 2. Start nested Docker daemon (Sysbox provides isolation) ───────
 # /var/lib/docker is a persistent bind mount from host (./data/docker),

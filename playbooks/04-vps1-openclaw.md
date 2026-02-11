@@ -312,11 +312,12 @@ sudo chmod 600 /home/openclaw/.openclaw/agents/skills/agent/models.json
 
 ## 4.8a Install Build Script and Patches
 
-Instead of maintaining a forked Dockerfile, we patch the upstream Dockerfile in-place before building. Each patch auto-skips when already applied.
+Instead of maintaining a forked Dockerfile, we patch upstream source files in-place before building. Each patch auto-skips when already applied.
 
-One patch is applied:
+Two patches are applied:
 
-- Docker + gosu: installs `docker.io` and `gosu` for nested Docker (sandbox isolation via Sysbox)
+1. **Dockerfile**: installs `docker.io` and `gosu` for nested Docker (sandbox isolation via Sysbox)
+2. **attempt.ts**: enables `systemPrompt` in the `before_agent_start` hook result (needed by skill-router plugin)
 
 ```bash
 #!/bin/bash
@@ -404,6 +405,56 @@ openclaw doctor --deep
 openclaw security audit --deep
 openclaw devices list
 ```
+
+---
+
+## 4.8f Deploy Skill Router Plugin
+
+Network-requiring skills (gifgrep, etc.) fail in the main agent's sandbox (`network: "none"`). The skills agent has bridge network access but doesn't receive slash commands — the main agent does.
+
+**Solution:** The skill-router plugin intercepts the `before_agent_start` hook and rewrites skill descriptions in the system prompt based on routing rules in `openclaw.json`. The main agent sees delegation instructions; the skills agent sees original descriptions and executes directly.
+
+How it works:
+
+1. Plugin lives in `deploy/plugins/skill-router/` (bind-mounted read-only into the container)
+2. Entrypoint section 1h copies plugins to `~/.openclaw/extensions/` where the gateway discovers them
+3. On agent start, the plugin matches skill names against configured rules and rewrites `<description>` tags
+4. Routing rules are configured in `openclaw.json` under `plugins.entries.skill-router.config.rules`
+
+SCP the plugin to the VPS:
+
+```bash
+#!/bin/bash
+# Create deploy/plugins directory on VPS
+sudo -u openclaw mkdir -p /home/openclaw/openclaw/deploy/plugins
+
+# Copy plugins from local repo
+# Run from local machine:
+scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r deploy/plugins/* ${SSH_USER}@${VPS1_IP}:/tmp/deploy-plugins/
+
+# Move into place with correct ownership
+sudo cp -r /tmp/deploy-plugins/* /home/openclaw/openclaw/deploy/plugins/
+sudo chown -R openclaw:openclaw /home/openclaw/openclaw/deploy/plugins/
+rm -rf /tmp/deploy-plugins
+```
+
+To add a new delegated skill, append the skill name to the `skills` array in `openclaw.json`:
+
+```json
+{
+  "plugins": {
+    "entries": {
+      "skill-router": {
+        "config": {
+          "rules": [{ "agent": "main", "delegateTo": "skills", "skills": ["gifgrep", "new-skill"] }]
+        }
+      }
+    }
+  }
+}
+```
+
+No new files needed — just update the config and restart the gateway.
 
 ---
 
