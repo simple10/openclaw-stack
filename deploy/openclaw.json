@@ -21,6 +21,15 @@
     "consoleStyle": "json",
     "redactSensitive": "tools"
   },
+  "hooks": {
+    "internal": {
+      "enabled": true,
+      "entries": {
+        "session-memory": { "enabled": true },
+        "command-logger": { "enabled": true }
+      }
+    }
+  },
   "agents": {
     "defaults": {
       "sandbox": {
