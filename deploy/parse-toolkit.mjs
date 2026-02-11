@@ -3,8 +3,9 @@
 // No external dependencies — uses a minimal inline parser for our simple YAML subset.
 //
 // Usage:
-//   node parse-toolkit.mjs <path-to-yaml>
-//   node parse-toolkit.mjs                  # defaults to /app/deploy/sandbox-toolkit.yaml
+//   node parse-toolkit.mjs <path-to-yaml>           # JSON output (default)
+//   node parse-toolkit.mjs <path-to-yaml> --strip   # comment-stripped, normalized YAML
+//   node parse-toolkit.mjs --strip                   # strip mode with default path
 //
 // Output (JSON):
 // {
@@ -20,8 +21,23 @@
 
 import { readFileSync } from 'node:fs';
 
-const yamlPath = process.argv[2] || '/app/deploy/sandbox-toolkit.yaml';
+const args = process.argv.slice(2);
+const stripMode = args.includes('--strip');
+const yamlPath = args.find(a => a !== '--strip') || '/app/deploy/sandbox-toolkit.yaml';
 const raw = readFileSync(yamlPath, 'utf8');
+
+// --strip mode: output comment-stripped, whitespace-normalized content for config comparison.
+// Removes comment lines, blank lines, and trailing whitespace. Used by rebuild-sandboxes.sh
+// for config change detection and image labels.
+if (stripMode) {
+  const stripped = raw
+    .split('\n')
+    .filter(line => !/^\s*#/.test(line) && !/^\s*$/.test(line))
+    .map(line => line.replace(/\s+$/, ''))
+    .join('\n');
+  process.stdout.write(stripped);
+  process.exit(0);
+}
 
 // Keep all lines (including blanks) for folded scalar handling, strip comments
 const allLines = raw.split('\n');

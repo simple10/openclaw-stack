@@ -593,6 +593,24 @@ if sudo docker exec openclaw-gateway docker images | grep -q base-root; then
   echo "  WARNING: intermediate base-root image not cleaned up"
 fi
 
+# 6. Check image age (staleness)
+echo ""
+echo "=== Image age ==="
+for img in openclaw-sandbox-common:bookworm-slim openclaw-sandbox-browser:bookworm-slim; do
+  BUILD_DATE=$(sudo docker exec openclaw-gateway docker image inspect "$img" \
+    --format '{{index .Config.Labels "openclaw.build-date"}}' 2>/dev/null)
+  if [ -n "$BUILD_DATE" ] && [ "$BUILD_DATE" != "<no value>" ]; then
+    AGE_DAYS=$(( ( $(date +%s) - $(date -d "$BUILD_DATE" +%s 2>/dev/null || echo 0) ) / 86400 ))
+    if [ "$AGE_DAYS" -gt 30 ]; then
+      echo "  $img: ${AGE_DAYS} days old — consider running scripts/update-sandboxes.sh"
+    else
+      echo "  $img: ${AGE_DAYS} days old (OK)"
+    fi
+  else
+    echo "  $img: no build-date label (pre-label image)"
+  fi
+done
+
 if [ "$FAILED" -eq 1 ]; then
   echo ""
   echo "SANDBOX VERIFICATION FAILED — check entrypoint logs:"
@@ -600,7 +618,7 @@ if [ "$FAILED" -eq 1 ]; then
 fi
 ```
 
-**Expected:** All 3 images exist (base, common, browser), USER is 1000 on common, all binaries present including custom tools from `sandbox-toolkit.yaml` (claude, gifgrep). If verification fails, check entrypoint logs for ERROR messages.
+**Expected:** All 3 images exist (base, common, browser), USER is 1000 on common, all binaries present including custom tools from `sandbox-toolkit.yaml` (claude, gifgrep). Images should have `openclaw.build-date` labels and be less than 30 days old. If verification fails, check entrypoint logs for ERROR messages.
 
 ---
 

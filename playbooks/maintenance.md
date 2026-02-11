@@ -104,3 +104,42 @@ ssh -i ~/.ssh/ovh_openclaw_ed25519_new -p 222 adminclaw@<VPS1_IP> echo "OK"
 #### Cloudflare Tunnel Token
 
 See [docs/CLOUDFLARE-TUNNEL.md](../docs/CLOUDFLARE-TUNNEL.md#rotating-tunnel-token) for rotation procedure.
+
+## Image Updates
+
+### Sandbox Images
+
+Sandbox images (base, common, browser) persist across gateway restarts in `./data/docker`. The entrypoint auto-rebuilds when:
+- An image is **missing** (first boot or after manual removal)
+- **`sandbox-toolkit.yaml` changes** — config is embedded as a Docker label; entrypoint compares current config against the label and rebuilds on mismatch
+
+For manual updates (security patches, new apt packages):
+
+```bash
+# From local machine — rebuilds common + base if needed
+scripts/update-sandboxes.sh
+
+# Also rebuild browser sandbox
+scripts/update-sandboxes.sh --all
+
+# Preview what would be rebuilt
+scripts/update-sandboxes.sh --dry-run
+```
+
+No gateway restart needed — builds happen inside the running container's nested Docker. New sandbox containers launched by agents automatically use the rebuilt images.
+
+**When to run:**
+- Monthly, for security patches (apt package updates)
+- When entrypoint logs a staleness warning (images > 30 days old)
+- After editing `sandbox-toolkit.yaml` — auto-detected on next gateway restart, but `update-sandboxes.sh` applies immediately without restart
+
+### OpenClaw Gateway
+
+Update the gateway to the latest upstream version:
+
+```bash
+# From local machine — pulls upstream, rebuilds image, recreates container
+scripts/update-openclaw.sh
+```
+
+Brief downtime (~5-10s) during container swap. The script waits for the health check to pass before reporting success.

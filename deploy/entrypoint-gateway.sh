@@ -163,8 +163,9 @@ fi
 # ── 2. Start nested Docker daemon (Sysbox provides isolation) ───────
 # /var/lib/docker is a persistent bind mount from host (./data/docker),
 # so sandbox images survive container restarts (no ~5min rebuild).
-# TODO: verify sandbox image checksums on startup and rebuild if tampered,
-# to mitigate poisoned-image persistence risk.
+# rebuild-sandboxes.sh handles: config change detection (auto-rebuild when
+# sandbox-toolkit.yaml changes), integrity verification (digest comparison),
+# and staleness warnings (>30 days).
 if command -v dockerd > /dev/null 2>&1; then
   if ! docker info > /dev/null 2>&1; then
     echo "[entrypoint] Starting nested Docker daemon..."
@@ -198,136 +199,7 @@ if command -v dockerd > /dev/null 2>&1; then
     # Missing images will surface during deployment verification or when agents run.
     (
       set +e
-
-      # Build default sandbox image if missing
-      if ! docker image inspect openclaw-sandbox:bookworm-slim > /dev/null 2>&1; then
-        echo "[entrypoint] Base sandbox image not found, building..."
-        if [ -f /app/Dockerfile.sandbox ]; then
-          cd /app && scripts/sandbox-setup.sh
-          if docker image inspect openclaw-sandbox:bookworm-slim > /dev/null 2>&1; then
-            echo "[entrypoint] Sandbox image built successfully"
-          else
-            echo "[entrypoint] ERROR: Sandbox image build failed"
-          fi
-        else
-          echo "[entrypoint] WARNING: /app/Dockerfile.sandbox not found"
-        fi
-      else
-        echo "[entrypoint] Sandbox image already exists"
-      fi
-
-      # Build common sandbox image if missing (includes Node.js, git, common tools)
-      # Upstream sandbox-common-setup.sh has a bug: the generated Dockerfile inherits
-      # USER sandbox from the base image and runs apt-get without switching to root.
-      # Fix: build a rooted intermediate image and pass it via BASE_IMAGE env var.
-      # Packages and custom tool installs are read from sandbox-toolkit.yaml.
-      if ! docker image inspect openclaw-sandbox-common:bookworm-slim > /dev/null 2>&1; then
-        echo "[entrypoint] Common sandbox image not found, building..."
-        if [ -f /app/scripts/sandbox-common-setup.sh ]; then
-          # Read packages from sandbox-toolkit.yaml (falls back to minimal set)
-          TOOLKIT_PACKAGES=""
-          if [ -n "${TOOLKIT_JSON:-}" ]; then
-            TOOLKIT_PACKAGES=$(echo "$TOOLKIT_JSON" | node -e "process.stdin.on('data',d=>console.log(JSON.parse(d).packages.join(' ')))")
-          fi
-          if [ -z "$TOOLKIT_PACKAGES" ]; then
-            echo "[entrypoint] WARNING: No toolkit config, using fallback package list"
-            TOOLKIT_PACKAGES="curl wget jq coreutils grep nodejs npm python3 git ca-certificates golang-go rustc cargo unzip pkg-config libasound2-dev build-essential file ffmpeg imagemagick"
-          fi
-
-          # Step 1: Build rooted intermediate from base image
-          printf 'FROM openclaw-sandbox:bookworm-slim\nUSER root\n' \
-            | docker build -t openclaw-sandbox-base-root:bookworm-slim -
-          if ! docker image inspect openclaw-sandbox-base-root:bookworm-slim > /dev/null 2>&1; then
-            echo "[entrypoint] ERROR: Failed to build rooted intermediate image"
-          else
-            # Step 2: Run upstream script with BASE_IMAGE override + config-driven packages
-            BASE_IMAGE=openclaw-sandbox-base-root:bookworm-slim \
-            PACKAGES="$TOOLKIT_PACKAGES" \
-            /app/scripts/sandbox-common-setup.sh || true
-
-            # Step 3: Verify and fix USER to 1000 for security
-            if docker image inspect openclaw-sandbox-common:bookworm-slim > /dev/null 2>&1; then
-              # Step 4: Layer custom tool installs from sandbox-toolkit.yaml
-              # Generate a Dockerfile that installs each tool with an install script
-              TOOL_DOCKERFILE="FROM openclaw-sandbox-common:bookworm-slim\nUSER root\n"
-              HAS_TOOL_INSTALLS=false
-              if [ -n "${TOOLKIT_JSON:-}" ]; then
-                # Extract tool install commands as JSON array of {name, install, version}
-                TOOL_INSTALLS=$(echo "$TOOLKIT_JSON" | node -e "
-                  process.stdin.on('data', d => {
-                    const t = JSON.parse(d).tools;
-                    const installs = [];
-                    for (const [name, cfg] of Object.entries(t)) {
-                      if (cfg.install) installs.push({ name, install: cfg.install, version: cfg.version || '' });
-                    }
-                    console.log(JSON.stringify(installs));
-                  });
-                ")
-                # Process each tool install
-                INSTALL_COUNT=$(echo "$TOOL_INSTALLS" | node -e "process.stdin.on('data',d=>console.log(JSON.parse(d).length))")
-                if [ "$INSTALL_COUNT" -gt 0 ]; then
-                  HAS_TOOL_INSTALLS=true
-                  BIN_DIR="/usr/local/bin"
-                  INSTALL_CMDS=$(echo "$TOOL_INSTALLS" | node -e "
-                    process.stdin.on('data', d => {
-                      const installs = JSON.parse(d);
-                      for (const t of installs) {
-                        let cmd = t.install;
-                        if (t.version) cmd = cmd.replaceAll('\${VERSION}', t.version);
-                        cmd = cmd.replaceAll('\${BIN_DIR}', '$BIN_DIR');
-                        console.log('RUN ' + cmd);
-                      }
-                    });
-                  ")
-                  TOOL_DOCKERFILE="${TOOL_DOCKERFILE}ENV BIN_DIR=${BIN_DIR}\n${INSTALL_CMDS}\n"
-                fi
-              fi
-              TOOL_DOCKERFILE="${TOOL_DOCKERFILE}USER 1000\n"
-
-              if [ "$HAS_TOOL_INSTALLS" = true ]; then
-                echo "[entrypoint] Installing custom tools into sandbox-common..."
-                printf "%b" "$TOOL_DOCKERFILE" \
-                  | docker build -t openclaw-sandbox-common:bookworm-slim -
-              else
-                printf 'FROM openclaw-sandbox-common:bookworm-slim\nUSER 1000\n' \
-                  | docker build -t openclaw-sandbox-common:bookworm-slim -
-              fi
-
-              if docker image inspect openclaw-sandbox-common:bookworm-slim > /dev/null 2>&1; then
-                echo "[entrypoint] Common sandbox image built successfully"
-              else
-                echo "[entrypoint] ERROR: Common sandbox image build failed"
-              fi
-            else
-              echo "[entrypoint] ERROR: Common sandbox image build failed — upstream script did not produce image"
-            fi
-
-            # Cleanup intermediate image
-            docker rmi openclaw-sandbox-base-root:bookworm-slim > /dev/null 2>&1 || true
-          fi
-        else
-          echo "[entrypoint] WARNING: sandbox-common-setup.sh not found"
-        fi
-      else
-        echo "[entrypoint] Common sandbox image already exists"
-      fi
-
-      # Build browser sandbox image if missing (includes Chromium, noVNC)
-      if ! docker image inspect openclaw-sandbox-browser:bookworm-slim > /dev/null 2>&1; then
-        echo "[entrypoint] Browser sandbox image not found, building..."
-        if [ -f /app/scripts/sandbox-browser-setup.sh ]; then
-          /app/scripts/sandbox-browser-setup.sh
-          if docker image inspect openclaw-sandbox-browser:bookworm-slim > /dev/null 2>&1; then
-            echo "[entrypoint] Browser sandbox image built successfully"
-          else
-            echo "[entrypoint] ERROR: Browser sandbox image build failed"
-          fi
-        else
-          echo "[entrypoint] WARNING: sandbox-browser-setup.sh not found"
-        fi
-      else
-        echo "[entrypoint] Browser sandbox image already exists"
-      fi
+      /app/deploy/rebuild-sandboxes.sh
     )
   fi
 else
