@@ -293,7 +293,8 @@ Key parameters:
 | `no-new-privileges` | `true` | Prevent escalation. gosu drops privileges (doesn't gain) |
 | `start_period` | `300s` | First boot builds 4 sandbox images (3-5 minutes) |
 | `cpus` | `4` (limit), `1` (reservation) | Resource bounds |
-| `memory` | `8G` (limit), `2G` (reservation) | Resource bounds |
+| `memory` | `9G` (limit), `2G` (reservation) | Resource bounds. Outer ceiling for gateway + all nested sandbox containers (cgroup hierarchy) |
+| `pids` | `1024` | Raised from 512 — nested Docker runs gateway + dockerd + agent sandboxes + browser sandboxes concurrently |
 
 See `04-vps1-openclaw.md` § 4.6 for the full `docker-compose.override.yml`.
 

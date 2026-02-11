@@ -49,10 +49,10 @@
             "LANG": "C.UTF-8",
             "PATH": "/opt/skill-bins:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
           },
-          "pidsLimit": 256,
-          "memory": "1g",
-          "memorySwap": "2g",
-          "cpus": 1,
+          "pidsLimit": 512,
+          "memory": "4g",
+          "memorySwap": "6g",
+          "cpus": 2,
           "binds": [
             "/opt/skill-bins:/opt/skill-bins:ro"
           ]
@@ -96,8 +96,9 @@
               "/home/linuxbrew:uid=1000,gid=1000"
             ],
             "network": "bridge",
-            "memory": "2g",
-            "memorySwap": "4g",
+            "pidsLimit": 512,
+            "memory": "3g",
+            "memorySwap": "5g",
             "cpus": 2,
             "binds": [
               "/home/node/.claude-sandbox:/home/linuxbrew/.claude",
@@ -113,9 +114,10 @@
           "docker": {
             "image": "openclaw-sandbox-common:bookworm-slim",
             "network": "bridge",
-            "memory": "1g",
-            "memorySwap": "2g",
-            "cpus": 1
+            "pidsLimit": 256,
+            "memory": "2g",
+            "memorySwap": "4g",
+            "cpus": 2
           }
         }
       }

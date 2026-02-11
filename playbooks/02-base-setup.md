@@ -224,6 +224,37 @@ sudo ufw status
 
 ---
 
+## 2.5 Swap Configuration
+
+Run on: **VPS-1**
+
+Create a swap file so Docker containers can use swap-backed memory (`memorySwap` limits).
+Without host swap, Docker's `--memory-swap` effectively equals `--memory` (no spill to disk).
+
+```bash
+#!/bin/bash
+# Create 8G swap file — sized to cover peak sandbox memory spill
+# (sandbox memorySwap limits total ~19G across all containers, but
+# concurrent peak is much lower; 8G provides comfortable headroom)
+sudo fallocate -l 8G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+
+# Persist across reboots
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
+# Low swappiness: prefer RAM, only swap under pressure
+sudo sysctl vm.swappiness=10
+echo 'vm.swappiness=10' | sudo tee /etc/sysctl.d/99-swap.conf
+
+# Verify
+swapon --show
+free -h
+```
+
+---
+
 ## 2.6 Fail2ban Configuration
 
 Run on: **VPS-1**

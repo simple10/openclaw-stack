@@ -24,10 +24,10 @@ services:
       resources:
         limits:
           cpus: "4"
-          memory: 8G
+          memory: 9G
           # Process limit — prevents fork bombs from exhausting host PIDs.
-          # 512 (not 256) because gateway runs nested Docker with sandbox containers inside.
-          pids: 512
+          # Raised for nested Docker: gateway + agent sandboxes + browser sandboxes.
+          pids: 1024
         reservations:
           cpus: "1"
           memory: 2G
