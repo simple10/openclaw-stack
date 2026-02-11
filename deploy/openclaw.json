@@ -80,6 +80,11 @@
       {
         "id": "main",
         "default": true,
+        "sandbox": {
+          "docker": {
+            "network": "bridge"
+          }
+        },
         "subagents": {
           "allowAgents": ["code", "skills"]
         }
