@@ -73,16 +73,6 @@ echo "[entrypoint] npm global prefix set to $npm_global"
 # gateway-installed binaries available without network or image rebuilds.
 mkdir -p /opt/skill-bins
 
-# TODO: remove this after testing new plugin; gifgrep & other skills should be installed via OpenClaw, not hardcoded here
-# gifgrep — GIF search skill
-if [ ! -f /opt/skill-bins/gifgrep ]; then
-  echo "[entrypoint] Installing gifgrep..."
-  curl -sfL https://github.com/steipete/gifgrep/releases/download/v0.2.1/gifgrep_0.2.1_linux_amd64.tar.gz \
-    | tar xz -C /opt/skill-bins gifgrep 2>/dev/null \
-    && echo "[entrypoint] gifgrep installed" \
-    || echo "[entrypoint] WARNING: gifgrep install failed (non-fatal)"
-fi
-
 # Coding CLI shims — coding-agent skill requires anyBins: ["claude","codex","opencode","pi"].
 # Real CLIs live in the claude sandbox image. Shims satisfy the gateway preflight check.
 for cli in claude codex opencode pi; do
