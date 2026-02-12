@@ -55,6 +55,7 @@
           "cpus": 2,
           "binds": [
             "/opt/skill-bins:/opt/skill-bins:ro",
+            "/app/docs:/workspace/docs:ro",
             "/app/docs:/app/docs:ro"
           ]
         },
