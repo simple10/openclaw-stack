@@ -362,6 +362,8 @@ openclaw-vps/
 ## Skills, Plugins & Tools
 
 - <https://github.com/lekt9/unbrowse-openclaw> - autogenerates API skills from browser sessions
+- <https://github.com/jovanSAPFIONEER/Network-AI>
+- <https://docs.openclaw.ai/prose>
 
 ## Resources
 
