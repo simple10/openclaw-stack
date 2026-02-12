@@ -199,6 +199,7 @@ const CSS = `
     .status.up { background: #4caf50; }
     .status.down { background: #f44336; }
     .note { color: #888; font-size: 0.85em; margin-top: 16px; }
+    .dl { font-size: 1.2em; padding: 2px 6px; }
 `;
 
 function htmlPage(title, body) {
@@ -289,8 +290,8 @@ function mediaDirectoryPage(dirPath, urlPath) {
 
   const prefix = urlPath.endsWith('/') ? urlPath : urlPath + '/';
   const rows = [
-    ...dirs.map(e => `<tr><td>&#128193; <a href="${prefix}${e.name}/">${e.name}/</a></td><td>&mdash;</td></tr>`),
-    ...files.map(e => `<tr><td>&#128196; <a href="${prefix}${e.name}">${e.name}</a></td><td>${formatSize(e.size)}</td></tr>`),
+    ...dirs.map(e => `<tr><td>&#128193; <a href="${prefix}${e.name}/">${e.name}/</a></td><td>&mdash;</td><td></td></tr>`),
+    ...files.map(e => `<tr><td>&#128196; <a href="${prefix}${e.name}">${e.name}</a></td><td>${formatSize(e.size)}</td><td><a href="${prefix}${e.name}" download class="dl">&#8681;</a></td></tr>`),
   ];
 
   const mediaRoot = BP + '/media';
@@ -300,7 +301,7 @@ function mediaDirectoryPage(dirPath, urlPath) {
      ${rows.length === 0
        ? '<p class="empty">No files yet. Media files appear here when agents capture screenshots or download files.</p>'
        : `<table>
-       <thead><tr><th>Name</th><th>Size</th></tr></thead>
+       <thead><tr><th>Name</th><th>Size</th><th></th></tr></thead>
        <tbody>${rows.join('\n')}</tbody>
      </table>`}`;
 
