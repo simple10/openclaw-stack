@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Runs a new interactive sandbox container inside the gateway's nested Docker.
 # The container is automatically removed on exit (--rm).
+#
+# Mirrors agents.defaults.sandbox.docker from openclaw.json with overrides
+# suitable for interactive use (network=bridge, no readOnlyRoot).
 
 set -euo pipefail
 
@@ -20,13 +23,18 @@ printf '\033[32mStarting sandbox container (%s) \033[0m\n' "$IMAGE"
 ssh -t -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
   "sudo docker exec -it openclaw-gateway docker run --rm -it \
     --user 1000:1000 \
+    --cap-drop ALL \
     --network bridge \
-    --memory 2g \
+    --memory 4g \
+    --memory-swap 6g \
     --cpus 2 \
+    --pids-limit 512 \
     --tmpfs /tmp --tmpfs /var/tmp --tmpfs /run \
     --tmpfs /home/linuxbrew:uid=1000,gid=1000 \
     -v /opt/skill-bins:/opt/skill-bins:ro \
+    -v /app/docs:/workspace/docs:ro \
+    -v /app/docs:/app/docs:ro \
     -e LANG=C.UTF-8 \
-    -e PATH=/opt/skill-bins:/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    -e PATH=/opt/skill-bins:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     -w /workspace \
     $IMAGE bash"
