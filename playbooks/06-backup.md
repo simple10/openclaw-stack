@@ -5,6 +5,7 @@ Configure automated backups for OpenClaw on VPS-1.
 ## Overview
 
 This playbook configures:
+
 - Backup script for OpenClaw configuration and data
 - Automated daily backups via cron
 - 30-day retention policy

@@ -110,6 +110,7 @@ See [docs/CLOUDFLARE-TUNNEL.md](../docs/CLOUDFLARE-TUNNEL.md#rotating-tunnel-tok
 ### Sandbox Images
 
 Sandbox images (base, common, browser) persist across gateway restarts in `./data/docker`. The entrypoint auto-rebuilds when:
+
 - An image is **missing** (first boot or after manual removal)
 - **`sandbox-toolkit.yaml` changes** — config is embedded as a Docker label; entrypoint compares current config against the label and rebuilds on mismatch
 
@@ -129,6 +130,7 @@ scripts/update-sandboxes.sh --dry-run
 No gateway restart needed — builds happen inside the running container's nested Docker. New sandbox containers launched by agents automatically use the rebuilt images.
 
 **When to run:**
+
 - Monthly, for security patches (apt package updates)
 - When entrypoint logs a staleness warning (images > 30 days old)
 - After editing `sandbox-toolkit.yaml` — auto-detected on next gateway restart, but `update-sandboxes.sh` applies immediately without restart

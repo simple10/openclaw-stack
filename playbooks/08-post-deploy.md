@@ -174,6 +174,7 @@ If the device shows as approved but the browser still can't connect, ask the use
 ## 8.5 Reference: Device Management
 
 **CLI commands** (from local machine via SSH):
+
 ```bash
 openclaw devices list                    # List pending/approved
 openclaw devices approve <requestId>     # Approve a device
@@ -184,6 +185,7 @@ openclaw devices approve <requestId>     # Approve a device
 **Notes:** Pending requests expire after 5 minutes. The browser auto-retries, creating new requests. Refresh the page if a request expired.
 
 **Re-pairing the CLI** (if device identity is lost):
+
 ```bash
 GATEWAY_TOKEN=$(sudo grep OPENCLAW_GATEWAY_TOKEN /home/openclaw/openclaw/.env | cut -d= -f2)
 sudo docker exec --user node openclaw-gateway \

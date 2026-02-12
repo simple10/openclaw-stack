@@ -5,6 +5,7 @@ Base system configuration for VPS-1.
 ## Overview
 
 This playbook configures:
+
 - System updates and essential packages
 - Two-user security model (adminclaw + openclaw)
 - UFW firewall
@@ -21,14 +22,17 @@ This playbook configures:
 - VPS IP known and reachable
 
 > **Note (VPS re-installs):** If reusing an IP from a previous deployment, clear the stale SSH host key first:
+>
 > ```bash
 > ssh-keygen -R <VPS1_IP>
 > ```
+>
 > Then connect and accept the new host key when prompted.
 
 ## Variables
 
 From `../openclaw-config.env`:
+
 - `VPS1_IP` - Public IP of VPS-1
 - `SSH_KEY_PATH` - Path to SSH private key
 - `SSH_USER` - Initial SSH user (ubuntu)
@@ -122,6 +126,7 @@ echo "========================================="
 ```
 
 **Workflow after setup:**
+
 ```bash
 # SSH as admin user
 ssh -p 222 adminclaw@<VPS1_IP>
@@ -452,6 +457,7 @@ sudo systemctl restart ssh
 ### Locked Out of SSH
 
 If you can't SSH in:
+
 1. Use OVH console/VNC access
 2. Login as adminclaw (or root if still available)
 3. Check `/etc/ssh/sshd_config.d/hardening.conf` for errors
@@ -460,5 +466,6 @@ If you can't SSH in:
 ### UsePAM Error
 
 If authentication fails:
+
 - Ensure `UsePAM yes` is set (not `no`)
 - Ubuntu requires PAM for proper user authentication
