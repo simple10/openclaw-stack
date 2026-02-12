@@ -31,6 +31,8 @@ services:
         reservations:
           cpus: "1"
           memory: 2G
+    ports:
+      - "127.0.0.1:6090:6090"  # noVNC reverse proxy — browser sandbox viewing via CF tunnel
     volumes:
       # Entrypoint script: lock cleanup, start dockerd, sandbox bootstrap, gosu drop to node (from 4.8c)
       - ./scripts/entrypoint-gateway.sh:/app/scripts/entrypoint-gateway.sh:ro
@@ -48,6 +50,8 @@ services:
       - ./deploy/parse-toolkit.mjs:/app/deploy/parse-toolkit.mjs:ro
       # Sandbox builder: extracted build logic called by entrypoint and update-sandboxes.sh
       - ./deploy/rebuild-sandboxes.sh:/app/deploy/rebuild-sandboxes.sh:ro
+      # noVNC reverse proxy: routes browser sandbox UIs through a fixed port
+      - ./deploy/novnc-proxy.mjs:/app/deploy/novnc-proxy.mjs:ro
     # Entrypoint handles pre-start tasks before exec-ing the command
     entrypoint: ["/app/scripts/entrypoint-gateway.sh"]
     # Full gateway command (entrypoint passes it through via exec "$@")

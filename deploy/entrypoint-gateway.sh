@@ -206,6 +206,15 @@ else
   echo "[entrypoint] Docker not installed, skipping sandbox bootstrap"
 fi
 
+# ── 2b. Start noVNC reverse proxy ────────────────────────────────────
+# Exposes browser sandbox noVNC UIs on a fixed port. Reads browsers.json
+# dynamically to discover sandbox browser containers and their mapped ports.
+NOVNC_PROXY="/app/deploy/novnc-proxy.mjs"
+if [ -f "$NOVNC_PROXY" ]; then
+  node "$NOVNC_PROXY" &
+  echo "[entrypoint] noVNC proxy started on port 6090"
+fi
+
 # ── 3. Drop privileges and exec gateway ─────────────────────────────
 # gosu drops from root to node user without spawning a subshell,
 # preserving PID structure for proper signal handling via tini
