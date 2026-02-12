@@ -20,6 +20,12 @@ This playbook configures:
 - SSH key configured and accessible
 - VPS IP known and reachable
 
+> **Note (VPS re-installs):** If reusing an IP from a previous deployment, clear the stale SSH host key first:
+> ```bash
+> ssh-keygen -R <VPS1_IP>
+> ```
+> Then connect and accept the new host key when prompted.
+
 ## Variables
 
 From `../openclaw-config.env`:
