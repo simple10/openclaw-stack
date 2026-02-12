@@ -44,6 +44,8 @@ After deployment, claude can be used to make any changes or manage your VPS with
    — cron-based alerts for disk, memory, and CPU via Telegram
 - **Automated backups**
    — scheduled backup scripts with cron
+- **Browser viewing**
+   — view and control agent browser sessions remotely via [noVNC proxy](docs/BROWSER-VNC.md)
 - **Ongoing management**
    — use Claude Code for day-to-day VPS operations after deploy
 
@@ -289,6 +291,7 @@ openclaw-vps/
 │   ├── ai-gateway/           # Cloudflare AI Gateway proxy worker
 │   └── log-receiver/         # Cloudflare log receiver worker
 ├── docs/
+│   ├── BROWSER-VNC.md        # Browser VNC access via noVNC proxy
 │   ├── CLOUDFLARE-TUNNEL.md  # Cloudflare Tunnel reference
 │   └── TESTING.md            # Testing instructions
 └── playbooks/                # Deployment playbooks (for Claude)

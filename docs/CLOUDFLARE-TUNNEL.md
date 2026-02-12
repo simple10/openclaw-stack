@@ -177,7 +177,20 @@ Now that Access is configured, add the public hostname route to make the domain 
 | **Service Type** | `HTTP` |
 | **URL** | `localhost:18789` |
 
-4. Save
+1. Save
+
+#### Browser VNC Access (Optional)
+
+To view/control agent browser sessions remotely, add a second public hostname:
+
+| Field | Value |
+|-------|-------|
+| **Subdomain** | `openclaw-browser` (or your choice) |
+| **Domain** | Select your domain |
+| **Service Type** | `HTTP` |
+| **URL** | `localhost:6090` |
+
+See [BROWSER-VNC.md](BROWSER-VNC.md) for details.
 
 The domain is now routable — and protected by Cloudflare Access from the first request.
 
@@ -221,9 +234,11 @@ If the token is compromised:
 1. Go to the tunnel in Cloudflare Dashboard
 2. Regenerate the token
 3. On VPS:
+
    ```bash
    sudo cloudflared service uninstall
    sudo cloudflared service install <NEW_TOKEN>
    sudo systemctl start cloudflared
    ```
+
 4. Update `CF_TUNNEL_TOKEN` in `openclaw-config.env`
