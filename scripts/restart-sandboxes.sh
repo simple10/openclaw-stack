@@ -24,19 +24,22 @@ source "$CONFIG_FILE"
 
 ALL=false
 DRY_RUN=false
+FORCE=false
 
 for arg in "$@"; do
   case "$arg" in
     --all)     ALL=true ;;
     --dry-run) DRY_RUN=true ;;
+    --force|-f) FORCE=true ;;
     --help|-h)
-      echo "Usage: $(basename "$0") [--all] [--dry-run]"
+      echo "Usage: $(basename "$0") [--all] [--force] [--dry-run]"
       echo ""
       echo "Remove sandbox containers so OpenClaw recreates them from current images."
       echo "Containers are recreated automatically on the next agent request."
       echo ""
       echo "Options:"
       echo "  --all       Also restart browser sandbox containers"
+      echo "  --force     Skip confirmation prompt"
       echo "  --dry-run   Show what would be removed without executing"
       exit 0
       ;;
@@ -98,9 +101,30 @@ if [ "$DRY_RUN" = true ]; then
   exit 0
 fi
 
+if [ "$FORCE" = false ]; then
+  printf 'Remove these containers? They will be recreated on next use. [y/N] '
+  read -r CONFIRM
+  if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
+    echo "Cancelled."
+    exit 0
+  fi
+fi
+
+# Graceful stop (SIGTERM + 10s grace period) before removal.
+printf '\033[33mStopping sandbox containers...\033[0m\n'
+ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+  "sudo docker exec $GATEWAY docker stop $NAMES" 2>/dev/null || true
+
+# Use 'openclaw sandbox recreate' to remove containers AND clean the internal
+# sandbox registry. Raw 'docker rm' leaves stale registry entries — OpenClaw
+# thinks the containers still exist and tries to start them instead of creating new ones.
+RECREATE_FLAGS="--all --force"
+if [ "$ALL" = false ]; then
+  RECREATE_FLAGS="--force"
+fi
 printf '\033[33mRemoving sandbox containers...\033[0m\n'
 ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
-  "sudo docker exec $GATEWAY docker rm -f $NAMES"
+  "sudo docker exec --user node $GATEWAY openclaw sandbox recreate $RECREATE_FLAGS"
 
 echo ""
 printf '\033[32mDone. Removed %s sandbox container(s).\033[0m\n' "$COUNT"

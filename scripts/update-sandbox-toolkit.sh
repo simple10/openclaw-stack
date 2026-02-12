@@ -188,9 +188,9 @@ echo ""
 printf 'Restart sandbox containers to use the new images? [y/N] '
 read -r RESTART_ANSWER
 if [[ "$RESTART_ANSWER" =~ ^[Yy]$ ]]; then
-  RESTART_FLAGS=""
+  RESTART_FLAGS="--force"
   if [ "$ALL" = true ]; then
-    RESTART_FLAGS="--all"
+    RESTART_FLAGS="$RESTART_FLAGS --all"
   fi
   "$SCRIPT_DIR/restart-sandboxes.sh" $RESTART_FLAGS
 else

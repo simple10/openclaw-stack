@@ -144,25 +144,39 @@ for c in data.get('containers', []):
 " 2>/dev/null || true
 }
 
-# If no sandbox exists, trigger creation via agent ping
+# If no sandbox exists, trigger creation via agent message
 if [[ "$CONTAINER_STATUS" == "none" ]]; then
   printf '\033[33mNo sandbox for agent "%s" — triggering creation...\033[0m\n' "$AGENT"
 
-  # Send a ping to the agent. This triggers the agent loop, which creates
-  # the sandbox container as a side effect (sandbox.mode = "all").
-  gw_exec "openclaw agent --agent $AGENT --message ping --timeout 30" >/dev/null 2>&1 &
+  # Send a message to the agent to trigger sandbox creation.
+  # The agent loop creates the sandbox container at attempt start (sandbox.mode = "all").
+  # Stdout suppressed (agent response not needed); stderr preserved so errors are visible.
+  ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+    "sudo docker exec --user node $GATEWAY openclaw agent --agent $AGENT --message ping --timeout 60" \
+    >/dev/null &
   AGENT_PID=$!
 
   # Poll for the sandbox container to appear
   ELAPSED=0
   while [[ $ELAPSED -lt $MAX_WAIT ]]; do
-    sleep 2
-    ELAPSED=$((ELAPSED + 2))
+    sleep 3
+    ELAPSED=$((ELAPSED + 3))
+
+    # Check if the agent command already exited with an error
+    if ! kill -0 "$AGENT_PID" 2>/dev/null; then
+      wait "$AGENT_PID" 2>/dev/null
+      AGENT_EXIT=$?
+      if [[ $AGENT_EXIT -ne 0 ]]; then
+        printf '\n\033[31mAgent command failed (exit %d). Check gateway logs.\033[0m\n' "$AGENT_EXIT" >&2
+        exit 1
+      fi
+    fi
+
     RESULT=$(find_sandbox "$AGENT")
     if [[ -n "$RESULT" ]]; then
       CONTAINER_NAME=$(echo "$RESULT" | cut -f1)
       CONTAINER_STATUS=$(echo "$RESULT" | cut -f2)
-      printf '\033[32mSandbox appeared after %ds\033[0m\n' "$ELAPSED"
+      printf '\n\033[32mSandbox appeared after %ds\033[0m\n' "$ELAPSED"
       break
     fi
     printf '  waiting... (%ds/%ds)\r' "$ELAPSED" "$MAX_WAIT"
@@ -174,17 +188,60 @@ if [[ "$CONTAINER_STATUS" == "none" ]]; then
 
   if [[ "$CONTAINER_STATUS" == "none" ]]; then
     echo "" >&2
-    echo "Timed out waiting for sandbox to appear after ${MAX_WAIT}s." >&2
+    printf '\033[31mTimed out waiting for sandbox to appear after %ds.\033[0m\n' "$MAX_WAIT" >&2
+    echo "Try: openclaw agent --agent $AGENT --message ping --timeout 60" >&2
     echo "Check gateway logs: openclaw logs --follow" >&2
     exit 1
   fi
 fi
 
-# Start container if stopped
-if [[ "$CONTAINER_STATUS" != "running" ]]; then
+# Start container if stopped — if it fails (stale registry entry), trigger recreation
+if [[ "$CONTAINER_STATUS" == "stopped" ]]; then
   printf '\033[33mContainer %s is stopped — starting...\033[0m\n' "$CONTAINER_NAME"
-  ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
-    "sudo docker exec $GATEWAY docker start $CONTAINER_NAME" >/dev/null
+  if ! ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+    "sudo docker exec $GATEWAY docker start $CONTAINER_NAME" >/dev/null 2>&1; then
+    # Container was removed but registry still had an entry (e.g. after restart-sandboxes.sh).
+    # Clean the stale entry and trigger fresh sandbox creation via agent message.
+    printf '\033[33mContainer no longer exists — cleaning stale entry and recreating...\033[0m\n'
+    ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+      "sudo docker exec --user node $GATEWAY openclaw sandbox recreate --all --force" >/dev/null 2>&1 || true
+
+    ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+      "sudo docker exec --user node $GATEWAY openclaw agent --agent $AGENT --message ping --timeout 60" \
+      >/dev/null &
+    AGENT_PID=$!
+
+    ELAPSED=0
+    while [[ $ELAPSED -lt $MAX_WAIT ]]; do
+      sleep 3
+      ELAPSED=$((ELAPSED + 3))
+      if ! kill -0 "$AGENT_PID" 2>/dev/null; then
+        wait "$AGENT_PID" 2>/dev/null
+        AGENT_EXIT=$?
+        if [[ $AGENT_EXIT -ne 0 ]]; then
+          printf '\n\033[31mAgent command failed (exit %d). Check gateway logs.\033[0m\n' "$AGENT_EXIT" >&2
+          exit 1
+        fi
+      fi
+      RESULT=$(find_sandbox "$AGENT")
+      if [[ -n "$RESULT" ]]; then
+        CONTAINER_NAME=$(echo "$RESULT" | cut -f1)
+        CONTAINER_STATUS=$(echo "$RESULT" | cut -f2)
+        printf '\n\033[32mSandbox recreated after %ds\033[0m\n' "$ELAPSED"
+        break
+      fi
+      printf '  waiting... (%ds/%ds)\r' "$ELAPSED" "$MAX_WAIT"
+    done
+
+    kill "$AGENT_PID" 2>/dev/null || true
+    wait "$AGENT_PID" 2>/dev/null || true
+
+    if [[ -z "$CONTAINER_NAME" ]] || [[ "$CONTAINER_STATUS" == "none" ]]; then
+      echo "" >&2
+      printf '\033[31mTimed out waiting for sandbox after %ds.\033[0m\n' "$MAX_WAIT" >&2
+      exit 1
+    fi
+  fi
 fi
 
 printf '\033[32mExec into %s (%s agent)\033[0m\n' "$CONTAINER_NAME" "$AGENT"
