@@ -2,10 +2,6 @@
 
 AGENTS: IGNORE THIS TODO LIST - for development only
 
-- [ ] Add docs/ to sandbox agents, system prompt references docs/ to assist users with openclaw: <https://docs.openclaw.ai/concepts/system-prompt>
-
-- [x] Add log rotation: <https://github.com/openclaw/openclaw/blob/main/src/hooks/bundled/command-logger/HOOK.md>
-
 - [ ] Mess around with the config in the UI then check the openclaw.json
   - Use the changes to update 04 playbook - e.g.
 
@@ -16,34 +12,22 @@ AGENTS: IGNORE THIS TODO LIST - for development only
   },
   ```
 
-- [ ] Cleanup entrypoint-gateway.sh after plugin & skills system is finalized; keep minimal
-
-- [ ] Add /app/docs to the default sandbox so the agent has openclaw references
-
-- [ ] Modify log worker to use console.log/warn/error to highlight the logs in cloudflare dashboard
-
-- [x] Fix the agents default sandbox to use the base sandbox with no net, but keep browser section
-  - [x] Add agents for code -> claude-sandbox
-  - [ ] Build -> common-sandbox
-
-- [ ] Set OPENAI_BASE_URL and ANTHROPIC_BASE_URL in sandbox env so sdk's pick up the urls
-
-- [ ] Test out using base url overrides in openclaw.json instead of in agents.json
-  - Current fix may work, but it doesn't seem robust
-  - Maybe default to openrouter style syntax and then update the proxy to support it
-
 - [ ] Verify if the health cron in log worker can reach the VPS over the tunnel, if not, remove from README
 
 - [ ] Add seccompProfile, apparmorProfile to sandbox configs in openclaw.json
   - See <https://github.com/openclaw/openclaw/blob/main/src/agents/sandbox/types.docker.ts>
 
-- [x] Make sure CLI pairing happens during deploy - cli requires device pairing or openclaw commands will fail
+## Completed (this branch)
 
+- [x] Add docs/ to sandbox agents, system prompt references docs/ to assist users with openclaw: <https://docs.openclaw.ai/concepts/system-prompt>
+
+- [x] Set OPENAI_BASE_URL and ANTHROPIC_BASE_URL in sandbox env so sdk's pick up the urls
+- [x] Modify log worker to use console.log/warn/error to highlight the logs in cloudflare dashboard
+- [x] Make sure CLI pairing happens during deploy - cli requires device pairing or openclaw commands will fail
 - [x] Add verification or post-deploy step to run `node openclaw.mjs security audit --deep` on openclaw-gateway
 - [x] Update Cloudflare Tunnel doc
   - See existing claude UI chat about "Cloudflare Tunnel"
-
-## Completed (this branch)
+- [x] Add log rotation: <https://github.com/openclaw/openclaw/blob/main/src/hooks/bundled/command-logger/HOOK.md>
 
 - [x] Create branch otel-v1 and push to github — saves a snapshot of the OTEL work
 - [x] Create Log Receiver Worker (workers/log-receiver/)
