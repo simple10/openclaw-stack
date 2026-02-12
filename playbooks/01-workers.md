@@ -30,14 +30,14 @@ From `../openclaw-config.env`:
 
 The AI Gateway Worker proxies LLM API requests through Cloudflare AI Gateway, providing usage analytics without exposing real API keys on the VPS.
 
-### Setup
+### Setup AI Gateway Worker
 
 ```bash
 cd workers/ai-gateway
 npm install
 ```
 
-### Check for Existing Deployment
+### Check for Existing AI Gateway Worker Deployment
 
 Before deploying, check if the worker is already live. If `AI_GATEWAY_WORKER_URL` in `openclaw-config.env` is not a placeholder (no angle brackets), curl its health endpoint:
 
@@ -52,7 +52,7 @@ curl -s https://<AI_GATEWAY_WORKER_URL>/health
 
 Read `CF_AI_GATEWAY_ID` from `wrangler.jsonc` (currently `"ai-gateway"`). Ask the user to confirm it matches their upstream Cloudflare AI Gateway (Dashboard -> AI -> AI Gateway).
 
-### Configure Secrets
+### Configure AI Gateway Worker Secrets
 
 #### 1. ACCOUNT_ID
 
@@ -64,7 +64,7 @@ npx wrangler whoami
 echo "<account-id>" | npx wrangler secret put ACCOUNT_ID
 ```
 
-> **Multiple Cloudflare accounts:** If `wrangler whoami` lists more than one account, wrangler commands will fail with _"More than one account available but unable to select one in non-interactive mode."_ Fix by adding `"account_id": "<id>"` to `wrangler.jsonc`, or by setting `export CLOUDFLARE_ACCOUNT_ID=<id>` before running wrangler commands. Use the account ID that matches your Workers subscription.
+> **Multiple Cloudflare accounts:** ONLY if `wrangler whoami` lists more than one account, wrangler commands will fail with _"More than one account available but unable to select one in non-interactive mode."_ Fix by adding `"account_id": "<id>"` to `wrangler.jsonc`, or by setting `export CLOUDFLARE_ACCOUNT_ID=<id>` before running wrangler commands. Use the account ID that matches your Workers subscription.
 
 #### 2. AUTH_TOKEN
 
@@ -92,7 +92,7 @@ npx wrangler secret put CF_AI_GATEWAY_TOKEN
 # (user enters value interactively)
 ```
 
-### Deploy
+### Deploy AI Gateway Worker
 
 ```bash
 npm run deploy
@@ -107,32 +107,20 @@ curl -s https://<worker-url>/health
 # Expected: {"status":"ok"}
 ```
 
-### Configure Provider API Keys
-
-> **After verifying the worker is healthy**, add your real LLM provider API keys via the Cloudflare Dashboard (Workers & Pages -> ai-gateway-proxy -> Settings -> Variables and Secrets) or via wrangler:
->
-> ```bash
-> cd workers/ai-gateway
-> npx wrangler secret put ANTHROPIC_API_KEY
-> npx wrangler secret put OPENAI_API_KEY  # if using OpenAI models
-> ```
->
-> These keys are stored only in Cloudflare and never touch the VPS. They are not set during automated deployment — configure them yourself when ready.
-
 ---
 
 ## 1.2 Deploy Log Receiver Worker
 
 The Log Receiver Worker receives batched log events from Vector and `console.log()`s them. Cloudflare captures Worker console output via real-time Logs dashboard and Logpush.
 
-### Setup
+### Setup Log Receiver
 
 ```bash
 cd workers/log-receiver
 npm install
 ```
 
-### Check for Existing Deployment
+### Check for Existing Log Receiver Deployment
 
 Before deploying, check if the worker is already live. If `LOG_WORKER_URL` in `openclaw-config.env` is not a placeholder (no angle brackets), curl its health endpoint:
 
@@ -144,7 +132,7 @@ curl -s https://<LOG_WORKER_BASE_URL>/health
 - **If healthy (`{"status":"ok"}`):** The worker is already deployed. Warn the user: re-deploying will overwrite secrets. Ask to confirm before continuing.
 - **If unhealthy or URL is a placeholder:** Proceed with fresh deployment.
 
-### Configure Secrets
+### Configure Log Worker Secrets
 
 If `LOG_WORKER_TOKEN` in `openclaw-config.env` still contains a placeholder (angle brackets), auto-generate a random token:
 
@@ -160,7 +148,7 @@ If `LOG_WORKER_TOKEN` already has a real value, use that value instead:
 echo "<existing-token>" | npx wrangler secret put AUTH_TOKEN
 ```
 
-### Deploy
+### Deploy Log Worker
 
 ```bash
 npm run deploy
@@ -202,23 +190,6 @@ curl -X POST https://<worker-url>/logs \
 
 ---
 
-## 1.3 Configure Cloudflare Health Check
-
-Set up uptime monitoring for the gateway.
-
-1. Go to **Cloudflare Dashboard** -> **Traffic** -> **Health Checks**
-2. Click **Create**
-3. Configure:
-   - **Name:** OpenClaw Gateway
-   - **URL:** `https://<OPENCLAW_DOMAIN>/health`
-   - **Frequency:** Every 5 minutes
-   - **Notification:** Email (and/or webhook)
-4. Save
-
-This monitors gateway reachability through the Cloudflare Tunnel.
-
----
-
 ## Troubleshooting
 
 ### Worker Not Deploying
@@ -254,4 +225,3 @@ curl -X POST <LOG_WORKER_URL> \
 1. Verify the Gateway ID in `wrangler.jsonc` matches the Cloudflare AI Gateway
 2. Check that requests are going through the Worker (not directly to Anthropic)
 3. Check Worker logs for errors: Dashboard -> Workers -> ai-gateway-proxy -> Logs
-
