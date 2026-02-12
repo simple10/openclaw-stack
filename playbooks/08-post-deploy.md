@@ -21,9 +21,23 @@ After `07-verification.md` confirms all services are healthy, this playbook walk
 
 ---
 
-## 8.0 Connect Domain via Cloudflare Tunnel
+## 8.0 Connect Gateway Domain via Cloudflare Tunnel
 
-Check if the domain is already routing through the tunnel:
+### Check if OPENCLAW_DOMAIN has a placeholder
+
+Read `OPENCLAW_DOMAIN` from `openclaw-config.env`. If it still contains `<example>` or other angle-bracket placeholders:
+
+> "Your gateway domain isn't configured yet. You need to:
+>
+> 1. **Decide on your domain** (e.g., `openclaw.yourdomain.com`)
+> 2. **Configure Cloudflare Access** — see [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md) (Steps 1-3)
+> 3. **Add a public hostname** to your tunnel pointing to `localhost:18789`
+>
+> Once done, tell me your domain (e.g., `openclaw.mydomain.com`) and I'll update the config."
+
+Wait for the user to provide the domain. Update `OPENCLAW_DOMAIN` in `openclaw-config.env`, then continue.
+
+### Verify domain connectivity
 
 ```bash
 # Test if the domain resolves and responds
@@ -53,7 +67,7 @@ Wait for the user to confirm before proceeding.
 curl -sI --connect-timeout 10 https://<OPENCLAW_DOMAIN><OPENCLAW_DOMAIN_PATH>/ 2>&1 | grep -i 'cf-access\|cf-authorization'
 ```
 
-If Access headers are present (or the response is a 302/403 redirect to the Access login page), Access is configured — proceed to section 8.1.
+If Access headers are present (or the response is a 302/403 redirect to the Access login page), Access is configured — proceed to section 8.0b.
 
 If no Access headers and the response is 200 (domain accessible without auth), warn:
 
@@ -64,6 +78,62 @@ If no Access headers and the response is 200 (domain accessible without auth), w
 > Let me know when done."
 
 Wait for the user to confirm before proceeding.
+
+---
+
+## 8.0b Connect Browser VNC via Cloudflare Tunnel
+
+### Check if OPENCLAW_BROWSER_PUBLIC_URL has a placeholder
+
+Read `OPENCLAW_BROWSER_PUBLIC_URL` from `openclaw-config.env`. If it contains `<example>` or other angle-bracket placeholders:
+
+> "Your browser VNC URL isn't configured yet. You need to:
+>
+> 1. **Decide on your browser URL** — either:
+>    - A subpath on your main domain (e.g., `openclaw.yourdomain.com/browser`)
+>    - A separate subdomain (e.g., `browser-openclaw.yourdomain.com`)
+> 2. **Add a public hostname** (or path) in your Cloudflare Tunnel pointing to `http://localhost:6090`
+> 3. **Protect it with Cloudflare Access** (same Access application or a new one)
+>
+> Tell me the full browser URL and I'll update the config."
+
+Wait for the user to provide the URL. Then:
+
+1. Update `OPENCLAW_BROWSER_PUBLIC_URL` in `openclaw-config.env`
+2. Parse the path component:
+   - `openclaw.example.com/browser` → `NOVNC_BASE_PATH=/browser`
+   - `browser-openclaw.example.com` → `NOVNC_BASE_PATH=` (empty)
+3. Update `NOVNC_BASE_PATH` in the `.env` file on VPS:
+
+```bash
+# Update NOVNC_BASE_PATH in .env on VPS
+ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
+  "sudo sed -i 's|^NOVNC_BASE_PATH=.*|NOVNC_BASE_PATH=<extracted-path>|' /home/openclaw/openclaw/.env"
+```
+
+4. Restart the gateway to pick up the new base path:
+
+```bash
+ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
+  "sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart openclaw-gateway'"
+```
+
+### Verify browser VNC access
+
+```bash
+# Test browser VNC URL
+curl -sI --connect-timeout 10 https://<OPENCLAW_BROWSER_PUBLIC_URL>/ 2>&1 | head -10
+```
+
+**Expected:** A 302/403 response (Cloudflare Access login page) or 200 if already authenticated.
+
+```bash
+# Internal check: verify novnc-proxy is running with the correct base path
+ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
+  "sudo docker logs openclaw-gateway 2>&1 | grep 'novnc-proxy'"
+```
+
+**Expected:** Log line showing `[novnc-proxy] Listening on port 6090, base path: /browser` (or similar, matching the configured path).
 
 ---
 

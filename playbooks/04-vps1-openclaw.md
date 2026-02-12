@@ -33,6 +33,7 @@ From `../openclaw-config.env`:
 - `TELEGRAM_CHAT_ID` - Optional (required for host alerter)
 - `DISCORD_BOT_TOKEN` - Optional
 - `OPENCLAW_DOMAIN_PATH` - URL subpath for the gateway UI (default: `/_openclaw`)
+- `OPENCLAW_BROWSER_PUBLIC_URL` - Public URL for browser VNC access (used to derive `NOVNC_BASE_PATH`)
 
 ---
 
@@ -164,6 +165,16 @@ EOF
 # Generate gateway token
 GATEWAY_TOKEN=$(openssl rand -hex 32)
 
+# Parse OPENCLAW_BROWSER_PUBLIC_URL to extract path component for noVNC proxy
+# "openclaw.example.com/browser" → "/browser"
+# "browser-openclaw.example.com" → "" (no subpath)
+# Still has placeholder (<example>) → "" (set during post-deploy)
+BROWSER_URL="${OPENCLAW_BROWSER_PUBLIC_URL}"
+NOVNC_BASE_PATH=""
+if [[ "$BROWSER_URL" != *"<"* ]] && [[ "$BROWSER_URL" == */* ]]; then
+  NOVNC_BASE_PATH="/${BROWSER_URL#*/}"  # everything after first /
+fi
+
 sudo -u openclaw tee /home/openclaw/openclaw/.env << EOF
 # Gateway authentication
 OPENCLAW_GATEWAY_TOKEN=${GATEWAY_TOKEN}
@@ -181,6 +192,10 @@ DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:-}
 LOG_WORKER_URL=${LOG_WORKER_URL}
 LOG_WORKER_TOKEN=${LOG_WORKER_TOKEN}
 VPS1_IP=${VPS1_IP}
+
+# noVNC proxy base path — derived from OPENCLAW_BROWSER_PUBLIC_URL path component
+# Empty = proxy serves at root (e.g., browser on a separate subdomain)
+NOVNC_BASE_PATH=${NOVNC_BASE_PATH}
 
 # Docker compose variables (required by repo's docker-compose.yml)
 OPENCLAW_CONFIG_DIR=/home/openclaw/.openclaw
@@ -203,6 +218,9 @@ echo ""
 echo "========================================="
 echo "Generated Credentials (save these):"
 echo "  Gateway Token: ${GATEWAY_TOKEN}"
+if [ -n "${NOVNC_BASE_PATH}" ]; then
+  echo "  noVNC Base Path: ${NOVNC_BASE_PATH}"
+fi
 echo "========================================="
 ```
 

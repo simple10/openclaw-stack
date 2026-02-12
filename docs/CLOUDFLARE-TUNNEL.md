@@ -181,16 +181,34 @@ Now that Access is configured, add the public hostname route to make the domain 
 
 #### Browser VNC Access (Optional)
 
-To view/control agent browser sessions remotely, add a second public hostname:
+To view/control agent browser sessions remotely, add a route pointing to the noVNC proxy. Two options:
+
+**Option A: Separate subdomain**
 
 | Field | Value |
 |-------|-------|
-| **Subdomain** | `openclaw-browser` (or your choice) |
+| **Subdomain** | `browser-openclaw` (or your choice) |
 | **Domain** | Select your domain |
 | **Service Type** | `HTTP` |
 | **URL** | `localhost:6090` |
 
-See [BROWSER-VNC.md](BROWSER-VNC.md) for details.
+Then set `OPENCLAW_BROWSER_PUBLIC_URL=browser-openclaw.yourdomain.com` in `openclaw-config.env`.
+
+**Option B: Subpath on the same domain**
+
+| Field | Value |
+|-------|-------|
+| **Subdomain** | `openclaw` (same as gateway) |
+| **Domain** | Select your domain |
+| **Path** | `/browser` |
+| **Service Type** | `HTTP` |
+| **URL** | `localhost:6090` |
+
+Then set `OPENCLAW_BROWSER_PUBLIC_URL=openclaw.yourdomain.com/browser` in `openclaw-config.env`.
+
+The path component of `OPENCLAW_BROWSER_PUBLIC_URL` is automatically extracted and configured as `NOVNC_BASE_PATH` — the noVNC proxy uses this to strip/add the path prefix so URLs work correctly through the tunnel.
+
+See [BROWSER-VNC.md](BROWSER-VNC.md) for details on URL routing and base path behavior.
 
 The domain is now routable — and protected by Cloudflare Access from the first request.
 

@@ -37,25 +37,41 @@ The gateway tracks browser containers in `~/.openclaw/sandbox/browsers.json`:
 
 The proxy reads this file on every request (no caching needed — the file is tiny). New entries appear when agents spawn browser containers for the first time.
 
+## URL Configuration
+
+The browser VNC URL is configured via `OPENCLAW_BROWSER_PUBLIC_URL` in `openclaw-config.env`. Two formats are supported:
+
+| Format | Example | `NOVNC_BASE_PATH` |
+|--------|---------|-------------------|
+| **Subpath on main domain** | `openclaw.example.com/browser` | `/browser` |
+| **Separate subdomain** | `browser-openclaw.example.com` | *(empty)* |
+
+The path component (if any) is automatically extracted during deployment and passed to the noVNC proxy as `NOVNC_BASE_PATH`. The proxy strips this prefix from incoming requests and includes it in all generated URLs.
+
 ## URL Routing
 
-| URL | Behavior |
+All paths below are relative to `NOVNC_BASE_PATH` (empty = root):
+
+| URL (without base path) | Behavior |
 |-----|----------|
 | `/` | Index page listing active browser sessions with live status |
-| `/<agent-id>/` | Redirects to `/<agent-id>/vnc.html?path=<agent-id>/websockify` |
-| `/<agent-id>/vnc.html?path=<agent-id>/websockify` | noVNC client (proxied from browser container) |
+| `/media/` | Directory listing of agent media files |
+| `/<agent-id>/` | Redirects to noVNC client |
+| `/<agent-id>/vnc.html?path=...` | noVNC client (proxied from browser container) |
 | `/<agent-id>/*` | HTTP proxy to browser container's noVNC static files |
 | `/<agent-id>/websockify` (WebSocket) | VNC stream proxy |
 
-The `?path=<agent-id>/websockify` query parameter is critical — it tells the noVNC client to connect the WebSocket through the proxy's prefixed path rather than the root `/websockify`.
+The `?path=` query parameter tells the noVNC client where to connect the WebSocket. It includes the base path when set.
 
-**Example:** `https://browser-openclaw.ventureunknown.com/main/vnc.html?path=main/websockify`
+**Examples:**
+- Subdomain: `https://browser-openclaw.example.com/main/vnc.html?path=main/websockify`
+- Subpath: `https://openclaw.example.com/browser/main/vnc.html?path=browser/main/websockify`
 
 ## Components
 
 ### `deploy/novnc-proxy.mjs`
 
-Node.js reverse proxy (~160 lines, zero dependencies — built-in `http` module only). Handles:
+Node.js reverse proxy (zero dependencies — built-in `http` module only). Reads `NOVNC_BASE_PATH` env var for subpath-aware routing. Handles:
 
 - **HTTP proxying**: pipes request/response streams to the backend noVNC server
 - **WebSocket proxying**: handles `upgrade` events, creates TCP socket to backend, pipes both directions
@@ -77,14 +93,27 @@ fi
 
 - Port mapping: `127.0.0.1:6090:6090` (localhost-only for tunnel access)
 - Volume: `./deploy/novnc-proxy.mjs:/app/deploy/novnc-proxy.mjs:ro`
+- Environment: `NOVNC_BASE_PATH=${NOVNC_BASE_PATH:-}` (derived from `OPENCLAW_BROWSER_PUBLIC_URL`)
 
 ### Cloudflare Tunnel Route
 
-Public hostname on the existing `openclaw` tunnel:
+Add a route on the existing `openclaw` tunnel. Two approaches:
 
-| Subdomain | Domain | Service |
-|-----------|--------|---------|
-| `browser-openclaw` (or your choice) | `yourdomain.com` | `http://localhost:6090` |
+**Option A: Separate subdomain** (e.g., `browser-openclaw.yourdomain.com`)
+
+| Subdomain | Domain | Path | Service |
+|-----------|--------|------|---------|
+| `browser-openclaw` | `yourdomain.com` | *(empty)* | `http://localhost:6090` |
+
+Set `OPENCLAW_BROWSER_PUBLIC_URL=browser-openclaw.yourdomain.com` (no path → `NOVNC_BASE_PATH` is empty).
+
+**Option B: Subpath on main domain** (e.g., `openclaw.yourdomain.com/browser`)
+
+| Subdomain | Domain | Path | Service |
+|-----------|--------|------|---------|
+| `openclaw` | `yourdomain.com` | `/browser` | `http://localhost:6090` |
+
+Set `OPENCLAW_BROWSER_PUBLIC_URL=openclaw.yourdomain.com/browser` (path `/browser` → `NOVNC_BASE_PATH=/browser`).
 
 No new tunnel needed — just add a public hostname to the existing tunnel in the Dashboard.
 
@@ -117,23 +146,26 @@ This avoids the concurrency problems of a shared browser sidecar approach.
 
 1. Go to **Cloudflare Dashboard** → **Zero Trust** → **Networks** → **Tunnels**
 2. Click your tunnel → **Configure** → **Public Hostname** tab
-3. Add a new public hostname:
-   - Subdomain: `browser-openclaw` (or your preference)
-   - Domain: your domain
-   - Service: `http://localhost:6090`
-4. (Optional) Add a Cloudflare Access policy to restrict who can view browser sessions
+3. Add a new public hostname pointing to `http://localhost:6090` (see "Cloudflare Tunnel Route" above for subdomain vs subpath options)
+4. Add a Cloudflare Access policy to restrict who can view browser sessions
+5. Set `OPENCLAW_BROWSER_PUBLIC_URL` in `openclaw-config.env` to match your chosen URL
 
 ### Verification
 
 ```bash
-# Proxy is listening
+# Proxy is listening (use base path if configured)
 sudo docker exec openclaw-gateway curl -s http://127.0.0.1:6090/
+# Or with base path:
+sudo docker exec openclaw-gateway curl -s http://127.0.0.1:6090/browser/
+
+# Check startup log for base path
+sudo docker logs openclaw-gateway 2>&1 | grep 'novnc-proxy'
 
 # After a browser task runs, check session routing
-sudo docker exec openclaw-gateway curl -s http://127.0.0.1:6090/main/vnc.html
+sudo docker exec openclaw-gateway curl -s http://127.0.0.1:6090/browser/main/vnc.html
 
 # External access via tunnel
-curl -s https://browser-openclaw.yourdomain.com/
+curl -s https://<OPENCLAW_BROWSER_PUBLIC_URL>/
 ```
 
 ## Troubleshooting
