@@ -1,12 +1,20 @@
 # OVHCloud Setup Guide for OpenClaw Deployment
 
-This guide covers the manual steps you need to complete before handing off to Claude Code.
+This guide covers setting up your VPS on OVHCloud before handing off to Claude Code to deploy OpenClaw.
+
+Any VPS host will work as long as it supports root SSH access and Ubuntu 24+.
+
+The deployment playbooks take care of hardening and system updates. Only a provisioned VPS
+with root SSH key access (no password) is required to start.
+
+For non-Ubuntu Linux distros, you'll need a kernel that supports sysbox, and you'll need to have claude
+modify the playbooks for your distro.
 
 ---
 
 ## Overview
 
-You'll be setting up **a VPS instance** on OVHCloud:
+Setting up **a VPS instance** on OVHCloud:
 
 | VPS | Purpose | Hostname | IP (example) |
 |-----|---------|----------|--------------|
@@ -32,7 +40,7 @@ reinstalling the OS in the OVH dashboard.
 
 ```bash
 # On your local machine
-ssh-keygen -t ed25519 -C "ovh-openclaw-vps" -f ~/.ssh/ovh_openclaw_ed25519
+ssh-keygen -t ed25519 -C "vps1-openclaw" -f ~/.ssh/vps1_openclaw_ed25519
 # Enter a secure password when prompted, used to decrypt the local private key
 # Securely store the password, you'll need it for ssh-add step later on
 
@@ -40,7 +48,7 @@ ssh-keygen -t ed25519 -C "ovh-openclaw-vps" -f ~/.ssh/ovh_openclaw_ed25519
 chmod -R 600 ~/.ssh/*
 
 # View public key to paste into OVHCloud
-cat ~/.ssh/ovh_openclaw_ed25519.pub
+cat ~/.ssh/vps1_openclaw_ed25519.pub
 ```
 
 ## Step 3: Order a VPS Instance
@@ -78,10 +86,9 @@ Record it in openclaw-config.env:
 # openclaw-config.env
 
 VPS1_IP=15.x.x.x
-VPS1_HOSTNAME=openclaw
 
 # SSH Configuration (required)
-SSH_KEY_PATH=~/.ssh/ovh_openclaw_ed25519 # Path to your ssh key generated in Step 2
+SSH_KEY_PATH=~/.ssh/vps1_openclaw_ed25519 # Path to your ssh key generated in Step 2
 SSH_USER=ubuntu # This is the initial user created by OVH, it will get changed to admin claw during hardening
 SSH_PORT=22 # Initial SSH port, will get changed to 222 during hardening
 ```
@@ -94,10 +101,10 @@ Test SSH access to VPS-1 from your local machine:
 
 ```bash
 # Add ssh key for local sessions - needed for claude to do it's work
-ssh-add ~/.ssh/ovh_openclaw_ed25519
+ssh-add ~/.ssh/vps1_openclaw_ed25519
 
 # Test VPS-1 (OpenClaw)
-ssh -i ~/.ssh/ovh_openclaw_ed25519 ubuntu@<VPS-1-IP>
+ssh -i ~/.ssh/vps1_openclaw_ed25519 ubuntu@<VPS-1-IP>
 ```
 
 On first connection, accept the host key fingerprint.
@@ -157,13 +164,13 @@ Finish the setup steps in README.md and hand off to claude to implement.
 
 ```bash
 # Add ssh key for local sessions - needed for claude to do it's work
-ssh-add ~/.ssh/ovh_openclaw_ed25519
+ssh-add ~/.ssh/vps1_openclaw_ed25519
 
 # SSH to OpenClaw VPS (before deployment - default port 22)
-ssh -i ~/.ssh/ovh_openclaw_ed25519 ubuntu@<VPS-1-IP>
+ssh -i ~/.ssh/vps1_openclaw_ed25519 ubuntu@<VPS-1-IP>
 
 # After claude deployment and hardening - use port 222 and adminclaw user
-ssh -i ~/.ssh/ovh_openclaw_ed25519 -p 222 adminclaw@<VPS-1-IP>
+ssh -i ~/.ssh/vps1_openclaw_ed25519 -p 222 adminclaw@<VPS-1-IP>
 ```
 
 ### OVHCloud Control Panel Links
@@ -187,7 +194,6 @@ ssh -i ~/.ssh/ovh_openclaw_ed25519 -p 222 adminclaw@<VPS-1-IP>
 - [ ] Ubuntu 24.04 LTS installed
 - [ ] Kernel version is 6.x
 - [ ] Configuration file created (`~/openclaw-config.env`)
-- [ ] Anthropic API key ready
 - [ ] (Optional) Domain DNS records created
 - [ ] (Optional) Messaging bot tokens ready
 

@@ -237,10 +237,10 @@ ss -tlnp | grep 222
 
 ```bash
 # From LOCAL machine — test port 222
-ssh -i ~/.ssh/ovh_openclaw_ed25519 -p 222 adminclaw@<VPS1_IP> "echo 'Port 222 works!'"
+ssh -i <SSH_KEY_PATH> -p 222 adminclaw@<VPS1_IP> "echo 'Port 222 works!'"
 
 # If successful, SSH back in on 222 and remove port 22
-ssh -i ~/.ssh/ovh_openclaw_ed25519 -p 222 adminclaw@<VPS1_IP>
+ssh -i <SSH_KEY_PATH> -p 222 adminclaw@<VPS1_IP>
 sudo ufw delete allow 22/tcp
 sudo ufw status
 ```
@@ -421,7 +421,7 @@ After completing all steps on VPS-1:
 
 ```bash
 # Test SSH on port 222
-ssh -i ~/.ssh/ovh_openclaw_ed25519 -p 222 adminclaw@<VPS1_IP> "echo 'VPS-1 OK'"
+ssh -i <SSH_KEY_PATH> -p 222 adminclaw@<VPS1_IP> "echo 'VPS-1 OK'"
 
 # Verify UFW is active
 sudo ufw status

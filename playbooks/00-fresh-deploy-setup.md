@@ -45,7 +45,7 @@ Report any missing/invalid fields and wait for the user to provide values before
 
 ## 0.3 SSH Check
 
-1. Validate `SSH_KEY_PATH` exists on the local system (default: `~/.ssh/ovh_openclaw_ed25519`).
+1. Validate `SSH_KEY_PATH` exists on the local system (default: `~/.ssh/vps1_openclaw_ed25519`).
 2. Test SSH connectivity using **fresh VPS defaults** (`SSH_USER=ubuntu`, `SSH_PORT=22`):
 
 ```bash

@@ -99,7 +99,7 @@ All steps are sequential on a single VPS. Workers deployment (01-workers) runs f
 
 ```bash
 # After base setup, SSH as adminclaw (not ubuntu)
-ssh -i ~/.ssh/ovh_openclaw_ed25519 -p <SSH_PORT:222> <SSH_USER:adminclaw>@<VPS1-IP>
+ssh -i <SSH_KEY_PATH:~/.ssh/vps1_openclaw_ed25519> -p <SSH_PORT:222> <SSH_USER:adminclaw>@<VPS1-IP>
 
 # Run commands as openclaw
 sudo -u openclaw <command>

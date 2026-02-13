@@ -30,7 +30,7 @@ sudo reboot
 Wait 1-2 minutes for VPS-1 to come back online, then verify SSH access:
 
 ```bash
-ssh -i ~/.ssh/ovh_openclaw_ed25519 -p 222 adminclaw@<VPS1_IP> "echo 'VPS-1 online'"
+ssh -i <SSH_KEY_PATH> -p 222 adminclaw@<VPS1_IP> "echo 'VPS-1 online'"
 ```
 
 ---

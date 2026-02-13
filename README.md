@@ -196,7 +196,7 @@ You're now ready for Claude Code to automate the rest.
 1. Ensure your SSH key is loaded:
 
    ```bash
-   ssh-add ~/.ssh/ovh_openclaw_ed25519
+   ssh-add ~/.ssh/vps1_openclaw_ed25519
    ```
 
 2. Open Claude Code in this directory

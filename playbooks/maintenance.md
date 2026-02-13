@@ -15,7 +15,7 @@ All secrets should be rotated on a regular cadence. If a token is suspected comp
 | `LOG_WORKER_TOKEN` | VPS `.env` + Log Receiver Worker secret | 90 days |
 | Provider API keys (Anthropic, OpenAI, etc.) | AI Gateway Worker secrets (Cloudflare Dashboard) | Per provider policy |
 | `TELEGRAM_BOT_TOKEN` | VPS `.env` | As needed |
-| SSH keys (`~/.ssh/ovh_openclaw_ed25519`) | Local machine + VPS `authorized_keys` | Annual |
+| SSH keys (`~/.ssh/vps1_openclaw_ed25519`) | Local machine + VPS `authorized_keys` | Annual |
 
 ### Rotation Procedures
 
@@ -87,14 +87,14 @@ echo "new-key-value" | npx wrangler secret put OPENAI_API_KEY
 
 ```bash
 # 1. Generate new key pair (local machine)
-ssh-keygen -t ed25519 -f ~/.ssh/ovh_openclaw_ed25519_new
+ssh-keygen -t ed25519 -f ~/.ssh/vps1_openclaw_ed25519_new
 
 # 2. Add new public key to VPS (while old key still works)
-ssh -i ~/.ssh/ovh_openclaw_ed25519 -p 222 adminclaw@<VPS1_IP> \
+ssh -i ~/.ssh/vps1_openclaw_ed25519 -p 222 adminclaw@<VPS1_IP> \
   "echo 'NEW_PUBLIC_KEY' >> ~/.ssh/authorized_keys"
 
 # 3. Test new key
-ssh -i ~/.ssh/ovh_openclaw_ed25519_new -p 222 adminclaw@<VPS1_IP> echo "OK"
+ssh -i ~/.ssh/vps1_openclaw_ed25519_new -p 222 adminclaw@<VPS1_IP> echo "OK"
 
 # 4. Remove old key from VPS authorized_keys
 # 5. Update openclaw-config.env with new SSH_KEY_PATH

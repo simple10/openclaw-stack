@@ -55,7 +55,7 @@ VPS1_IP=15.x.x.1
 CF_TUNNEL_TOKEN=                   # Create tunnel first (see docs/CLOUDFLARE-TUNNEL.md)
 
 # === SSH (defaults work for fresh Ubuntu VPS) ===
-SSH_KEY_PATH=~/.ssh/ovh_openclaw_ed25519
+SSH_KEY_PATH=~/.ssh/vps1_openclaw_ed25519
 SSH_USER=ubuntu                    # Changed to adminclaw during hardening
 SSH_PORT=22                        # Changed to 222 during hardening
 
