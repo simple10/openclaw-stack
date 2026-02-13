@@ -17,10 +17,17 @@
       "Bash(grep:*)",
       "Bash(wrangler types:*)",
       "Bash(openssl rand:*)",
-      "mcp__plugin_context7_context7__resolve-library-id",
-      "mcp__plugin_context7_context7__query-docs",
       "Bash(test:*)",
-      "Bash(source:*)"
+      "Bash(source:*)",
+      "Bash(npx wrangler whoami:*)",
+      "Bash(npx wrangler secret put:*)",
+      "Bash(npm run deploy:*)",
+      "Bash(do echo *)",
+      "Bash(done)",
+      "WebSearch",
+      "Bash(gh api:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(nc:*)"
     ]
   }
 }
