@@ -588,6 +588,11 @@ sudo openclaw devices list
 **Expected:** Both commands succeed. The first triggers auto-pairing (first device on fresh
 gateway). The second confirms the host wrapper works.
 
+> **If auto-pairing fails:** The gateway *should* auto-approve the first device, but this
+> doesn't always work reliably. If the commands above fail with "pairing required", see
+> the **CLI Pairing Lost** section in Troubleshooting below — the same file-manipulation
+> approach works for first-deploy failures too.
+
 > **Re-pairing after identity loss:** If the CLI identity is deleted while other devices
 > are already paired, auto-pair won't work — the gateway only auto-approves the first
 > device. To re-pair: run a CLI command (it creates a pending request), then approve it
@@ -749,8 +754,8 @@ sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart v
 
 ### CLI Pairing Lost
 
-If the CLI device identity is deleted or corrupted while other devices are already paired,
-the gateway won't auto-approve a new CLI device. To re-pair:
+If the CLI device identity is deleted or corrupted, or if auto-pairing fails on first
+deploy, the gateway won't auto-approve a new CLI device. To pair manually:
 
 1. **Trigger a pending request** — run any CLI command (it will fail but register a pending pairing):
    ```bash
@@ -777,6 +782,7 @@ the gateway won't auto-approve a new CLI device. To re-pair:
                'roles': req['roles'], 'scopes': req['scopes'],
                'remoteIp': req['remoteIp'],
                'createdAtMs': now, 'approvedAtMs': now,
+               'tokens': {},
            }
            del pending[req_id]
            break
