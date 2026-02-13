@@ -2,6 +2,8 @@
 
 AGENTS: IGNORE THIS TODO LIST - for development only
 
+- [ ] Add docs/SKILL-ROUTER.md to point to skill router README.md on how to use skill-router config in openclaw.json
+
 - [ ] Mess around with the config in the UI then check the openclaw.json
   - Use the changes to update 04 playbook - e.g.
 
