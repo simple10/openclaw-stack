@@ -144,8 +144,7 @@ sudo cat /home/openclaw/.openclaw/logs/backup.log
 sudo ls -la /home/openclaw/.openclaw/backups/
 
 # Stop OpenClaw
-cd /home/openclaw/openclaw
-sudo -u openclaw docker compose down
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose down'
 
 # Restore from backup
 BACKUP_FILE="/home/openclaw/.openclaw/backups/openclaw_backup_YYYYMMDD_HHMMSS.tar.gz"
@@ -155,7 +154,7 @@ sudo tar -xzf "${BACKUP_FILE}" -C /home/openclaw
 sudo chown -R 1000:1000 /home/openclaw/.openclaw
 
 # Restart OpenClaw
-sudo -u openclaw docker compose up -d
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'
 ```
 
 ---

@@ -614,7 +614,7 @@ gateway). The second confirms the host wrapper works.
 
 ```bash
 # Check containers are running
-sudo -u openclaw docker compose ps
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose ps'
 
 # Check gateway logs
 sudo docker logs --tail 50 openclaw-gateway

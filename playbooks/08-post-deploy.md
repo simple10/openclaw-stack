@@ -375,7 +375,7 @@ All URLs are protected by Cloudflare Access.
 |------|---------|
 | SSH to VPS | `ssh -i <KEY> -p 222 adminclaw@<IP>` |
 | Gateway logs | `sudo docker logs -f openclaw-gateway` |
-| Container status | `sudo -u openclaw docker compose ps` |
+| Container status | `sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose ps'` |
 | List devices | `openclaw devices list` |
 | Approve device | `openclaw devices approve <requestId>` |
 | Run backup | `sudo /home/openclaw/scripts/backup.sh` |

@@ -111,17 +111,16 @@ sudo su - openclaw
 ### Service Management
 
 ```bash
-# OpenClaw Gateway
-cd /home/openclaw/openclaw
-sudo -u openclaw docker compose up -d      # Start
-sudo -u openclaw docker compose down       # Stop
-sudo -u openclaw docker compose logs -f    # Logs
-sudo -u openclaw docker compose ps         # Status
+# OpenClaw Gateway (adminclaw can't cd into openclaw's home — wrap in bash -c)
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'      # Start
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose down'       # Stop
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose logs -f'    # Logs
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose ps'         # Status
 
 # Vector logs (log shipper)
-sudo -u openclaw docker compose logs vector        # View Vector logs
-sudo -u openclaw docker compose logs -f vector     # Follow Vector logs
-sudo -u openclaw docker compose restart vector     # Restart Vector
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose logs vector'        # View Vector logs
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose logs -f vector'     # Follow Vector logs
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart vector'     # Restart Vector
 ```
 
 ### Firewall

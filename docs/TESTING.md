@@ -183,18 +183,18 @@ ssh -p 222 adminclaw@<VPS1_IP> "sudo -u openclaw docker ps --format '{{.Names}}:
 
 ### Gateway Not Healthy
 
-1. Check container logs: `sudo -u openclaw docker compose logs --tail 50 openclaw-gateway`
-2. Check container is running: `sudo -u openclaw docker compose ps`
+1. Check container logs: `sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose logs --tail 50 openclaw-gateway'`
+2. Check container is running: `sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose ps'`
 3. Verify localhost access: `curl -s http://localhost:18789/health`
 
 ### No Logs in Cloudflare
 
-1. Check Vector logs: `sudo -u openclaw docker compose logs vector`
+1. Check Vector logs: `sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose logs vector'`
 2. Verify LOG_WORKER_URL includes `/logs` path
 3. Check Log Receiver Worker health: `curl -s https://<LOG_WORKER_URL>/health`
 
 ### Container Permission Errors
 
 1. Check container user matches volume ownership
-2. Verify `.openclaw` is owned by uid 1000: `ls -la /home/openclaw/.openclaw/`
+2. Verify `.openclaw` is owned by uid 1000: `sudo ls -la /home/openclaw/.openclaw/`
 3. Review `read_only` settings if files can't be written
