@@ -39,8 +39,7 @@ ssh -i <SSH_KEY_PATH> -p 222 adminclaw@<VPS1_IP> "echo 'VPS-1 online'"
 
 ```bash
 # Check containers are running
-cd /home/openclaw/openclaw
-sudo -u openclaw docker compose ps
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose ps'
 
 # Check gateway logs for errors
 sudo docker logs --tail 50 openclaw-gateway
@@ -57,13 +56,13 @@ curl -s http://localhost:18789<OPENCLAW_DOMAIN_PATH>/ | head -5
 
 ```bash
 # Check Vector is running
-sudo -u openclaw docker compose ps vector
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose ps vector'
 
 # Check Vector logs for errors
 sudo docker logs --tail 20 vector
 
 # Check checkpoint data exists
-ls -la /home/openclaw/openclaw/data/vector/
+sudo ls -la /home/openclaw/openclaw/data/vector/
 ```
 
 **Expected:** Vector running, no errors in logs, checkpoint files present.
@@ -182,6 +181,64 @@ sudo docker exec --user node openclaw-gateway \
 
 ---
 
+## 7.5c Verify Resource Limits
+
+Verify that the deployed gateway container resource limits match the actual VPS hardware.
+
+### Query VPS Resources
+
+```bash
+# On VPS: get CPU count and total memory in bytes
+nproc && free -b | awk '/^Mem:/{print $2}'
+```
+
+This returns two lines: CPU count (e.g., `6`) and total memory in bytes (e.g., `11811160064`).
+
+### Read Deployed Limits
+
+```bash
+# On VPS: read gateway resource limits from the deployed override
+sudo docker inspect openclaw-gateway --format '{{.HostConfig.NanoCpus}} {{.HostConfig.Memory}}'
+```
+
+NanoCpus is CPUs × 1e9 (e.g., `6000000000` = 6 CPUs). Memory is in bytes (e.g., `11811160064`).
+
+### Compare
+
+- **CPUs:** `limits.cpus` should equal the VPS CPU count from `nproc`
+- **Memory:** `limits.memory` should be total VPS memory minus 500M–1GB
+  - Vector uses ~128M, system/kernel needs ~500M
+  - Acceptable range: `total - 1G` to `total - 500M`
+- **Reservations:** `reservations.cpus` must not exceed `limits.cpus`
+
+**If values match:** Report that resource limits are correctly sized and continue.
+
+**If mismatch detected:** Show the user a comparison:
+
+```
+VPS Resources:
+  CPUs:   <nproc result>
+  Memory: <total from free, human-readable>
+
+Deployed gateway limits (docker-compose.override.yml):
+  CPUs:   <current cpus value>
+  Memory: <current memory value>
+
+Recommended gateway limits:
+  CPUs:   <nproc result>
+  Memory: <total - 750M, rounded to nearest 0.5G>
+```
+
+Ask the user if they want to adjust the limits. If confirmed, update the **local** `deploy/docker-compose.override.yml`, then re-deploy the file to the VPS and restart the gateway:
+
+```bash
+# After updating the local file, copy to VPS and restart
+scp -i <SSH_KEY_PATH> -P <SSH_PORT> deploy/docker-compose.override.yml <SSH_USER>@<VPS1_IP>:/home/openclaw/openclaw/docker-compose.override.yml
+ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> "sudo chown openclaw:openclaw /home/openclaw/openclaw/docker-compose.override.yml && sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'"
+```
+
+---
+
 ## 7.6 Security Checklist
 
 ### VPS-1
@@ -210,11 +267,12 @@ ss -tlnp | grep 222
 - [ ] Backup cron job configured
 - [ ] Host alerter cron job configured
 - [ ] Container ports bound to localhost only (not 0.0.0.0)
+- [ ] Gateway resource limits match VPS hardware (CPUs = nproc, memory = total - 500M–1G)
 - [ ] Gateway pids_limit set
 
 ```bash
 sudo systemctl status sysbox
-sudo -u openclaw docker compose ps
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose ps'
 sudo docker logs --tail 5 vector
 cat /etc/cron.d/openclaw-backup
 cat /etc/cron.d/openclaw-alerts
@@ -312,8 +370,8 @@ openclaw doctor --deep
 ### Container Issues
 
 ```bash
-sudo -u openclaw docker compose ps
-sudo -u openclaw docker compose logs -f <service>
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose ps'
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose logs -f <service>'
 docker system df
 free -h
 ```
@@ -325,7 +383,7 @@ free -h
 sudo docker logs --tail 50 vector
 
 # Restart Vector
-sudo -u openclaw docker compose restart vector
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart vector'
 
 # Check if Worker endpoint is reachable
 curl -s https://<LOG_WORKER_URL>/health
