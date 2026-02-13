@@ -65,8 +65,8 @@
             "PATH": "/opt/skill-bins:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
           },
           "pidsLimit": 512,
-          "memory": "4g",
-          "memorySwap": "6g",
+          "memory": "2g",
+          "memorySwap": "4g",
           "cpus": 2,
           "binds": [
             "/opt/skill-bins:/opt/skill-bins:ro",
@@ -115,8 +115,8 @@
           "docker": {
             "image": "openclaw-sandbox-common:bookworm-slim",
             "network": "bridge",
-            "memory": "3g",
-            "memorySwap": "5g",
+            "memory": "2g",
+            "memorySwap": "4g",
             "cpus": 2,
             "binds": [
               "/home/node/sandboxes-home/code:/home/sandbox"
@@ -131,10 +131,7 @@
           "docker": {
             "image": "openclaw-sandbox-common:bookworm-slim",
             "network": "bridge",
-            "pidsLimit": 256,
-            "memory": "2g",
-            "memorySwap": "4g",
-            "cpus": 2
+            "pidsLimit": 256
           }
         }
       }
