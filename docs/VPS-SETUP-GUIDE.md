@@ -65,6 +65,18 @@ cat ~/.ssh/vps1_openclaw_ed25519.pub
    | **SSH Key** | Add your public SSH key |
    | **Hostname** | `openclaw` |
 
+### VPS Size
+
+If you setup a VPS that's smaller or larger than 6 cores + 12GB RAM, you'll likely want to adjust:
+
+1. Gateway container size in [docker-compoase.override.yml](../deploy/docker-compose.override.yml)
+2. Sandbox container resources in [openclaw.json](../deploy/openclaw.json)
+
+Just ask claude to do adjust the sizing for you before deploying. The gateway container limits should
+nearly max out the limits of your VPS. It effectively shares resources with it's nested sandbox
+containers - the openclaw agent and browser containers. Besides the openclaw gateway, the VPS
+runs the vector container and normal Ubuntu system daemons.
+
 ---
 
 ## Step 4: Wait for Provisioning
