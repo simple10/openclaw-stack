@@ -386,9 +386,11 @@ seed_agent_homes() {
   fi
 
   # Emit "id image" pairs — each agent's image from config, falling back to defaults
+  # Use JSON5.parse because openclaw.json supports JSON5 (comments, trailing commas, etc.)
   local agent_entries
   agent_entries=$(node -e "
-    const cfg = JSON.parse(require('fs').readFileSync('$config_file', 'utf8'));
+    const JSON5 = require('json5');
+    const cfg = JSON5.parse(require('fs').readFileSync('$config_file', 'utf8'));
     const defaultImage = cfg.agents?.defaults?.sandbox?.docker?.image || '';
     for (const a of cfg.agents?.list || []) {
       const image = a.sandbox?.docker?.image || defaultImage;

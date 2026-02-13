@@ -3,7 +3,7 @@
     "restart": true
   },
   "gateway": {
-    "bind": "lan",
+    "bind": "lan", // Required for cloudflared (tunnel) to connect to gateway in the docker container
     "mode": "local",
     "auth": {
       "mode": "token",
@@ -20,19 +20,27 @@
     }
   },
   "logging": {
-    "consoleStyle": "json",
-    "redactSensitive": "tools"
+    "consoleStyle": "json", // Send json logs to vector -> Log Worker
+    "redactSensitive": "tools" // Redact sensitive info before shipping logs
   },
   "hooks": {
     "internal": {
       "enabled": true,
       "entries": {
+        // Bundled with openclaw - logs sessions to agent workspace/ dir
         "session-memory": {
           "enabled": true
         },
+        // Bundled with openclaw - when enabled, commands will be logged and shipped to the Log Worker via vector
+        // Only logs command events; see debug-logger for all events
         "command-logger": {
           "enabled": true
         },
+        // Custom: Logs all openclaw commands - see hooks/debug-logger/
+        // Logs to /home/openclaw/.openclaw/logs/debug.log (on VPS) - logrotate manages the log files
+        // Bind mounted into openclaw-gateway container at /home/openclaw/.openclaw/logs/debug.log`
+        // Useful for claude to debug openclaw installations
+        // Recommendation: disable in production
         "debug-logger": {
           "enabled": true
         }
@@ -40,9 +48,10 @@
     }
   },
   "agents": {
+    // Agent sandbox default settings - all agents inherit these settings & can override per agent
     "defaults": {
       "sandbox": {
-        "mode": "all",
+        "mode": "all", // All agents run in sandbox containers
         "scope": "agent",
         "docker": {
           "image": "openclaw-sandbox:bookworm-slim",
@@ -53,27 +62,36 @@
             "/tmp",
             "/var/tmp",
             "/run",
-            "/home/linuxbrew:uid=1000,gid=1000"
+            "/home/linuxbrew:uid=1000,gid=1000" // Allow agents to update or install packages, does not persist
           ],
-          "network": "none",
-          "user": "1000:1000",
+          "network": "none", // Disable network access by default; each agent must enable
+          "user": "1000:1000", // Gets mapped to sandbox user - don't change this unless you know what you're doing
           "capDrop": [
-            "ALL"
+            "ALL" // Drop all docker container privileges by default
           ],
           "env": {
             "LANG": "C.UTF-8",
+            // Add /opt/skill-bins to path to enable sandbox-toolkit bins shimming
+            // Required for skill-router to work properly - allows gateway to pass skill requirement checks
+            // Requires Patch #3 in build-openclaw.sh to properly set ENV vars in sandbox containers - patches missing openclaw feature
             "PATH": "/opt/skill-bins:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
           },
-          "pidsLimit": 512,
-          "memory": "2g",
+          "pidsLimit": 512, // Add fork-bomb protection
+          "memory": "2g", // Default agent container RAM - browser containers also inherit this setting
           "memorySwap": "4g",
-          "cpus": 2,
+          "cpus": 2, // Default agent container CPU
           "binds": [
+            // Skills bins shim - if agent actually has the bin, it will run the real bin
+            // skills-bin is only needed by agents that can spawn other agents (e.g. main) - added here in defaults for simplicity
             "/opt/skill-bins:/opt/skill-bins:ro",
-            "/app/docs:/workspace/docs:ro",
-            "/app/docs:/app/docs:ro"
+            // Add openclaw docs to each agent - helps agents be able to answer openclaw usage questions
+            "/app/docs:/workspace/docs:ro", // Agents can use 'read' tool to access docs here - requires customizing AGENTS.md
+            "/app/docs:/app/docs:ro" // Default location of docs - openclaw defaults instruct agents to look here - requires 'exec' to access
           ]
         },
+        // Enable each agent to have it's own browser container
+        // Move browser settings to individual agent to restrict browser use or enforce single browser container
+        // Browser sessions are accessible to users via the novnc-proxy at OPENCLAW_BROWSER_PUBLIC_URL after deploy
         "browser": {
           "enabled": true,
           "image": "openclaw-sandbox-browser:bookworm-slim",
@@ -86,13 +104,22 @@
           "autoStart": true,
           "autoStartTimeoutMs": 12000
         },
+        // Default sandbox pruning - kill agent containers after 24 hours of idle or every 7 days
+        // Sandbox workspace is persistent by default - pruning just helps keep resources tidy
+        // Openclaw does not gracefully shutdown sandbox containers - it just kills them and re-spawns.
+        // Override pruning settings per agent to prevent killing a sandbox mid task - e.g. during a long claude code session
         "prune": {
           "idleHours": 24,
           "maxAgeDays": 7
         }
       }
     },
+    // List of agents
+    // Agents inherit the default sandbox settings above - the configs in list are the overrides
+    // Main agent is required when mode:all scope:agent is enabled
+    // All other agents should be customized as needed - the default list config is just to get you started with examples
     "list": [
+      // MAIN AGENT
       {
         "id": "main",
         "default": true,
@@ -102,12 +129,14 @@
           }
         },
         "subagents": {
+          // Main agent can spawn other agents
           "allowAgents": [
             "code",
             "skills"
           ]
         }
       },
+      // CODING AGENT
       {
         "id": "code",
         "name": "Code Agent",
@@ -124,6 +153,8 @@
           }
         }
       },
+      // MISC SKILLS AGENT - this agent is not really needed - it's here as an example
+      // Be sure to change skill-router config (below) if you change the name of this agent or remove it
       {
         "id": "skills",
         "name": "Skills Agent",
@@ -138,19 +169,31 @@
     ]
   },
   "plugins": {
-    "enabled": true,
+    "enabled": true, // Enable openclaw plugins
     "allow": [
-      "skill-router"
+      "skill-router" // Enable the custom skill-router plugin - see plugins/skill-router/README.md
     ],
     "entries": {
+      // Skill Router Config
+      // This controls how the custom skill-router plugin works
       "skill-router": {
         "enabled": true,
         "config": {
+          // Define custom rules to route requests to different agents based on capabilities (skills)
           "rules": [
             {
-              "agent": "main",
-              "delegateTo": "skills",
+              "agent": "main", // The agent handling the request
+              "delegateTo": "skills", // The agent to delegate the request to for the particular skill
               "skills": [
+                // List of skills for the agent (main) to delegate to the other agent (skills).
+                // e.g. When main agent is asked to use gifgrep to search for a gif, it will instead delegate to
+                // the "skills" agent to fulfill the task. This is useful when agents are configured with different bins
+                // or capabilities like network access. The skill must be installed globally or on the active agent (main)
+                // in order for skills routing to work - this is due to current openclaw limitations.
+                // The skill-router dynamically remaps skill descriptions before sending the request to the LLM.
+                // The LLM then knows to respond back with "delegate this task to the XYZ agent".
+                // Without the skill router, the current agent handling the request will keep trying different
+                // methods (with a LOT of LLM turns) before it finally realizes it doesn't have the capabilities.
                 "gifgrep"
               ]
             }
