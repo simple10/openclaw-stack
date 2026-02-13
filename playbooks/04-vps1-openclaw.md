@@ -59,15 +59,15 @@ Compare the latest release tag against `SYSBOX_VERSION` below.
 - **If the pinned version is already the latest:** proceed directly.
 
 <!-- Pinned version — update both values together -->
-`SYSBOX_VERSION=0.6.4`
-`SYSBOX_SHA256=d034ddd364ee1f226b8b1ce7456ea8a12abc2eb661bdf42d3e603ed2dc741827`
+`SYSBOX_VERSION=0.6.7`
+`SYSBOX_SHA256=b7ac389e5a19592cadf16e0ca30e40919516128f6e1b7f99e1cb4ff64554172e`
 
 ### Install
 
 ```bash
 #!/bin/bash
-SYSBOX_VERSION="0.6.4"
-SYSBOX_SHA256="d034ddd364ee1f226b8b1ce7456ea8a12abc2eb661bdf42d3e603ed2dc741827"
+SYSBOX_VERSION="0.6.7"
+SYSBOX_SHA256="b7ac389e5a19592cadf16e0ca30e40919516128f6e1b7f99e1cb4ff64554172e"
 SYSBOX_DEB="sysbox-ce_${SYSBOX_VERSION}-0.linux_amd64.deb"
 
 # Download
