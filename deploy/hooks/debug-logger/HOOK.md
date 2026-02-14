@@ -1,6 +1,6 @@
 ---
 name: debug-logger
-description: "Log all gateway events (command, agent, gateway) to a debug audit file"
+description: "Log all gateway events (command, agent, gateway, session) to a debug audit file"
 metadata:
   {
     "openclaw":
@@ -14,7 +14,7 @@ metadata:
 
 # Debug Logger Hook
 
-Logs **all** gateway events (command, agent, gateway) to a single audit file for debugging and monitoring.
+Logs **all** gateway events (command, agent, gateway, session) to a single audit file for debugging and monitoring.
 
 ## What It Does
 
