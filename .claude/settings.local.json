@@ -30,7 +30,8 @@
       "Bash(nc:*)",
       "WebFetch(domain:docs.openclaw.ai)",
       "Bash(python3:*)",
-      "Bash(fi)"
+      "Bash(fi)",
+      "Bash(git add:*)"
     ]
   }
 }
