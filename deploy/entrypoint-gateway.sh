@@ -115,8 +115,8 @@ fi
 # ── 1h. Deploy plugins to global extensions dir ────────────────────
 # Plugins from deploy/plugins/ are copied to ~/.openclaw/extensions/
 # where the gateway discovers them automatically.
-# The skill-router plugin replaces per-skill SKILL.md overrides — it rewrites
-# skill descriptions in the system prompt based on config rules in openclaw.json.
+# The coordinator plugin builds a routing table from agent configs and injects
+# delegation context into the coordinator agent via prependContext.
 global_extensions="/home/node/.openclaw/extensions"
 deploy_plugins="/app/deploy/plugins"
 if [ -d "$deploy_plugins" ]; then

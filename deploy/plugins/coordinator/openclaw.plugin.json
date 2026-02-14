@@ -1,0 +1,30 @@
+{
+  "id": "coordinator",
+  "name": "Coordinator",
+  "description": "Builds sub-agent routing table from agent configs and injects delegation context into the coordinator agent",
+  "version": "1.0.0",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "coordinatorAgent": {
+        "type": "string",
+        "description": "Agent ID that acts as coordinator (receives routing context)",
+        "default": "main"
+      },
+      "routes": {
+        "type": "array",
+        "description": "Static fallback routes — used only if api.runtime is unavailable",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string", "description": "Sub-agent ID" },
+            "name": { "type": "string", "description": "Display name for the sub-agent" },
+            "skills": { "type": "array", "items": { "type": "string" }, "description": "Skills this sub-agent handles" }
+          },
+          "required": ["id", "name", "skills"]
+        }
+      }
+    }
+  }
+}

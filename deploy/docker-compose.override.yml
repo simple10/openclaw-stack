@@ -48,7 +48,7 @@ services:
       # Persist nested Docker images across restarts (Sysbox auto-provisions ephemeral storage by default)
       - ./data/docker:/var/lib/docker
       # Plugins: entrypoint copies these to ~/.openclaw/extensions/ where
-      # the gateway discovers them (e.g. skill-router for auto-delegation)
+      # the gateway discovers them (e.g. coordinator for capability-based routing)
       - ./deploy/plugins:/app/deploy/plugins:ro
       # Managed hooks: entrypoint copies these to ~/.openclaw/hooks/
       - ./deploy/hooks:/app/deploy/hooks:ro

@@ -100,13 +100,13 @@
           // Sandbox env settings
           // OpenClaw reads these when processing agent requests. e.g. Can be used to override API Keys per agent.
           // Requires a custom patch to propagate env to the sandbox containers to be used for bins.
-          // See Patch #3 in build-openclaw.sh to properly set ENV vars in sandbox containers - patches missing openclaw feature.
+          // See Patch #2 in build-openclaw.sh to properly set ENV vars in sandbox containers - patches missing openclaw feature.
           // Env is only propagated into the containers at build time.
           // Requires rebuilding & restarting sandboxes if you need any of these env settings in the sandbox container.
           "env": {
             "LANG": "C.UTF-8",
-            // Add /opt/skill-bins to path to enable sandbox-toolkit bins shimming
-            // Required for skill-router to work properly - allows gateway to pass skill requirement checks
+            // Add /opt/skill-bins to PATH so gateway passes skill binary preflight checks.
+            // Shims satisfy load-time checks; real binaries live in sandbox images.
             "PATH": "/opt/skill-bins:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
           },
           "pidsLimit": 512, // Add fork-bomb protection
@@ -114,8 +114,8 @@
           "memorySwap": "4g",
           "cpus": 2, // Default agent container CPU
           "binds": [
-            // Skills bins shim - if agent actually has the bin, it will run the real bin
-            // skills-bin is only needed by the main agent to enable skills routing
+            // Skill bins shims — pass through to real binaries inside sandboxes,
+            // satisfy gateway preflight checks on the host
             "/opt/skill-bins:/opt/skill-bins:ro",
             // Add openclaw docs to each agent - helps agents answer openclaw usage questions without relying on LLM fetching of docs
             "/app/docs:/workspace/docs:ro", // Agents can use 'read' tool to access docs here - requires customizing AGENTS.md to use /workspace/docs location
@@ -158,14 +158,16 @@
       {
         // Main inherits docker.image from defaults: openclaw-sandbox:bookworm-slim
         // It has limited capabilities - no sandbox-toolkit, only bin shims
-        // Main essentially runs as a coordinate agent in this configuration
-        // The first round of user message requests will be processed by main (and it's associated AGENTS.md, SOUL.md, etc.)
-        // Main handles basic tool calls but then hands off requests to other agents to perform skills that require sandbox-toolkit bins.
-        // The skill-router is used to map sub-requests to the correct agent based on capabilities (skills)
-        // If you want to use only one agent, or make main fully capable of exec'ing, simply set
-        // image: openclaw-sandbox-common:bookworm-slim and modify the skill-router config below to not delegate requests
+        // Main is a pure coordinator — it has no skills of its own and delegates
+        // all skill-based tasks to sub-agents via sessions_spawn.
+        // The coordinator plugin injects routing context so main knows which
+        // sub-agent handles each skill. Per-agent skill filtering ("skills": [])
+        // ensures main's system prompt contains no skill blocks.
+        // If you want a single fully-capable agent, set image: openclaw-sandbox-common:bookworm-slim,
+        // remove "skills": [], and disable the coordinator plugin.
         "id": "main",
         "default": true,
+        "skills": [],
         "sandbox": {
           "docker": {
             "network": "bridge" // Set network to "none" to fully restrict main agent, forcing other agents to handle requests
@@ -189,6 +191,7 @@
       {
         "id": "code",
         "name": "Code Agent",
+        "skills": ["coding-agent", "github", "clawhub", "skill-creator"],
         "sandbox": {
           "docker": {
             "image": "openclaw-sandbox-common:bookworm-slim", // sandbox-common has the full sandbox-toolkit bins
@@ -202,11 +205,17 @@
           }
         }
       },
-      // MISC SKILLS AGENT - this agent is not really needed - it's here as an example
-      // Be sure to change skill-router config (below) if you change the name of this agent or remove it
+      // MISC SKILLS AGENT — handles all non-coding skills
+      // Add new skills to this agent's "skills" array and restart — the coordinator
+      // plugin automatically picks up changes and updates routing context.
       {
         "id": "skills",
         "name": "Skills Agent",
+        "skills": [
+          "blogwatcher", "gemini", "gifgrep", "healthcheck", "himalaya",
+          "mcporter", "nano-pdf", "openai-image-gen", "openai-whisper-api",
+          "oracle", "ordercli", "tmux", "video-frames", "wacli", "weather"
+        ],
         "sandbox": {
           "docker": {
             "image": "openclaw-sandbox-common:bookworm-slim",
@@ -218,32 +227,35 @@
     ]
   },
   "plugins": {
-    "enabled": true, // Enable openclaw plugins
+    "enabled": true,
     "allow": [
-      "skill-router" // Enable the custom skill-router plugin - see plugins/skill-router/README.md
+      "coordinator" // Coordinator plugin — builds routing table from agent configs
     ],
     "entries": {
-      // Skill Router Config
-      // This is a custom plugin that handles skill based delegation between agents
-      "skill-router": {
+      // Coordinator Plugin
+      // Reads each agent's "skills" filter and injects a routing table into the
+      // coordinator agent's context via prependContext. The coordinator then uses
+      // sessions_spawn to delegate skill tasks to the right sub-agent.
+      // See deploy/plugins/coordinator/README.md for details.
+      "coordinator": {
         "enabled": true,
         "config": {
-          // Define custom rules to route requests to different agents based on capabilities (skills)
-          "rules": [
+          "coordinatorAgent": "main",
+          // Static fallback routes — used only if api.runtime is unavailable.
+          // When api.runtime works, routes are built dynamically from agents.list[].skills.
+          "routes": [
             {
-              "agent": "main", // The agent handling the request
-              "delegateTo": "skills", // The agent to delegate the request to for the particular skill
+              "id": "code",
+              "name": "Code Agent",
+              "skills": ["coding-agent", "github", "clawhub", "skill-creator"]
+            },
+            {
+              "id": "skills",
+              "name": "Skills Agent",
               "skills": [
-                // List of skills for the agent (main) to delegate to the other agent (skills).
-                // e.g. When main agent is asked to use gifgrep to search for a gif, it will instead delegate to
-                // the "skills" agent to fulfill the task. This is useful when agents are configured with different bins
-                // or capabilities like network access. The skill must be installed globally or on the active agent (main)
-                // in order for skills routing to work - this is due to current openclaw limitations.
-                // The skill-router dynamically remaps skill descriptions before sending the request to the LLM.
-                // The LLM then knows to respond back with "delegate this task to the XYZ agent".
-                // Without the skill router, the current agent handling the request will keep trying different
-                // methods (with a LOT of LLM turns) before it finally realizes it doesn't have the capabilities.
-                "gifgrep"
+                "blogwatcher", "gemini", "gifgrep", "healthcheck", "himalaya",
+                "mcporter", "nano-pdf", "openai-image-gen", "openai-whisper-api",
+                "oracle", "ordercli", "tmux", "video-frames", "wacli", "weather"
               ]
             }
           ]
