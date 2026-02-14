@@ -1,8 +1,8 @@
 {
   "id": "coordinator",
   "name": "Coordinator",
-  "description": "Builds sub-agent routing table from agent configs and injects delegation context into the coordinator agent",
-  "version": "1.0.0",
+  "description": "Auto-discovers sub-agent routes from agent configs and writes routing table to coordinator's AGENTS.md",
+  "version": "2.0.0",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
@@ -14,7 +14,7 @@
       },
       "routes": {
         "type": "array",
-        "description": "Static fallback routes — used only if api.runtime is unavailable",
+        "description": "Optional static fallback routes — only used if loadConfig() is unavailable. Normally routes are auto-discovered from agent configs.",
         "items": {
           "type": "object",
           "properties": {

@@ -1,7 +1,12 @@
 // Coordinator Plugin
-// Builds a sub-agent routing table from plugin config and writes it to the
-// coordinator agent's AGENTS.md workspace file. OpenClaw's native workspace
-// file injection loads it into the system prompt — no user message pollution.
+// Auto-discovers sub-agent routes from openclaw.json agent configs and writes
+// a routing table to the coordinator agent's AGENTS.md workspace file.
+// OpenClaw's native workspace file injection loads it into the system prompt.
+//
+// Route discovery: calls api.runtime.config.loadConfig() to read agents.list,
+// filters to agents with skills (excluding the coordinator), and builds routes
+// automatically. The agent's "skills" array is the single source of truth —
+// no duplicate route config needed.
 //
 // Writes to both the template workspace (for new sandboxes) and the active
 // sandbox (for immediate effect). Uses HTML comment sentinels to manage
@@ -9,7 +14,6 @@
 //
 // Config (in openclaw.json -> plugins.entries.coordinator.config):
 //   coordinatorAgent: agent ID that acts as coordinator (default: "main")
-//   routes: static routes array [{ id, name, skills }]
 
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -64,16 +68,46 @@ function updateAgentsMd(filePath, routingSection, logger) {
   return true // written
 }
 
+function discoverRoutes(api, coordinatorAgent) {
+  // Read agent configs from openclaw.json via the runtime API.
+  // loadConfig() is synchronous and returns the full OpenClawConfig including agents.list.
+  try {
+    const config = api.runtime?.config?.loadConfig?.()
+    const agents = config?.agents?.list
+    if (Array.isArray(agents) && agents.length > 0) {
+      const routes = agents
+        .filter(a => a.id !== coordinatorAgent && Array.isArray(a.skills) && a.skills.length > 0)
+        .map(a => ({ id: a.id, name: a.name || a.id, skills: a.skills }))
+      if (routes.length > 0) {
+        api.logger.info(`[coordinator] Auto-discovered ${routes.length} routes from agent configs`)
+        return routes
+      }
+    }
+  } catch (e) {
+    api.logger.warn(`[coordinator] Failed to read agent configs via loadConfig: ${e.message}`)
+  }
+  return null
+}
+
 // Gateway package.json has "type": "module" — plugins must use ESM exports
 export default {
   id: 'coordinator',
 
   register(api) {
     const coordinatorAgent = api.pluginConfig?.coordinatorAgent || 'main'
-    const routes = api.pluginConfig?.routes || []
+
+    // Auto-discover routes from agent configs in openclaw.json.
+    // Falls back to static routes from plugin config if loadConfig is unavailable.
+    let routes = discoverRoutes(api, coordinatorAgent)
+    if (!routes) {
+      routes = api.pluginConfig?.routes || []
+      if (routes.length > 0) {
+        api.logger.info(`[coordinator] Using static fallback routes from plugin config`)
+      }
+    }
 
     if (routes.length === 0) {
-      api.logger.warn('[coordinator] No routes configured')
+      api.logger.warn('[coordinator] No routes found (no agents with skills configured)')
       return
     }
 
@@ -111,8 +145,7 @@ export default {
       api.logger.warn(`[coordinator] Failed to update sandbox AGENTS.md files: ${e.message}`)
     }
 
-    // Hook is still registered to catch new sandboxes that might be created
-    // between registration and the next restart
+    // Hook catches new sandboxes created between registration and next restart
     api.on('before_agent_start', async (event, ctx) => {
       if (ctx.agentId !== coordinatorAgent) return
       if (!ctx.workspaceDir) return

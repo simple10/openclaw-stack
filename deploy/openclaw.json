@@ -160,9 +160,9 @@
         // It has limited capabilities - no sandbox-toolkit, only bin shims
         // Main is a pure coordinator — it has no skills of its own and delegates
         // all skill-based tasks to sub-agents via sessions_spawn.
-        // The coordinator plugin injects routing context so main knows which
-        // sub-agent handles each skill. Per-agent skill filtering ("skills": [])
-        // ensures main's system prompt contains no skill blocks.
+        // The coordinator plugin auto-discovers routes from agent configs and writes
+        // a routing table to AGENTS.md (loaded into system prompt).
+        // Per-agent skill filtering ("skills": []) ensures main sees no skill blocks.
         // If you want a single fully-capable agent, set image: openclaw-sandbox-common:bookworm-slim,
         // remove "skills": [], and disable the coordinator plugin.
         "id": "main",
@@ -207,7 +207,7 @@
       },
       // MISC SKILLS AGENT — handles all non-coding skills
       // Add new skills to this agent's "skills" array and restart — the coordinator
-      // plugin automatically picks up changes and updates routing context.
+      // plugin reads agent configs via loadConfig() and updates routing automatically.
       {
         "id": "skills",
         "name": "Skills Agent",
@@ -233,32 +233,14 @@
     ],
     "entries": {
       // Coordinator Plugin
-      // Reads each agent's "skills" filter and injects a routing table into the
-      // coordinator agent's context via prependContext. The coordinator then uses
-      // sessions_spawn to delegate skill tasks to the right sub-agent.
+      // Auto-discovers routes from agents.list[].skills via loadConfig() and writes
+      // a routing table to the coordinator's AGENTS.md (loaded into system prompt).
+      // No duplicate route config needed — the agent "skills" arrays are the source of truth.
       // See deploy/plugins/coordinator/README.md for details.
       "coordinator": {
         "enabled": true,
         "config": {
-          "coordinatorAgent": "main",
-          // Static fallback routes — used only if api.runtime is unavailable.
-          // When api.runtime works, routes are built dynamically from agents.list[].skills.
-          "routes": [
-            {
-              "id": "code",
-              "name": "Code Agent",
-              "skills": ["coding-agent", "github", "clawhub", "skill-creator"]
-            },
-            {
-              "id": "skills",
-              "name": "Skills Agent",
-              "skills": [
-                "blogwatcher", "gemini", "gifgrep", "healthcheck", "himalaya",
-                "mcporter", "nano-pdf", "openai-image-gen", "openai-whisper-api",
-                "oracle", "ordercli", "tmux", "video-frames", "wacli", "weather"
-              ]
-            }
-          ]
+          "coordinatorAgent": "main"
         }
       }
     }

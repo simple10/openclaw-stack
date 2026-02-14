@@ -1,20 +1,30 @@
 # Coordinator Plugin
 
-Builds a sub-agent routing table and writes it to the coordinator agent's `AGENTS.md` workspace file, enabling capability-based task delegation via the system prompt.
+Auto-discovers sub-agent routes from `openclaw.json` agent configs and writes a routing table to the coordinator agent's `AGENTS.md` workspace file, enabling capability-based task delegation via the system prompt.
 
 ## Why
 
-The coordinator pattern splits agents by capability: a main agent handles conversation and delegates skill-based tasks to specialized sub-agents. This plugin automates the routing — it writes a routing table to `AGENTS.md` so the coordinator knows exactly which sub-agent handles each skill.
+The coordinator pattern splits agents by capability: a main agent handles conversation and delegates skill-based tasks to specialized sub-agents. This plugin automates the routing — it reads each agent's `skills` array from `openclaw.json` and writes a routing table to `AGENTS.md` so the coordinator knows exactly which sub-agent handles each skill.
 
 ## How It Works
 
 1. Gateway loads the plugin from `~/.openclaw/extensions/coordinator/`
-2. At **registration time**, the plugin writes a routing section to:
+2. At **registration time**, the plugin calls `api.runtime.config.loadConfig()` to read agent configs
+3. It builds routes from agents that have a non-empty `skills` array (excluding the coordinator)
+4. The routing section is written to:
    - The template workspace `AGENTS.md` (so new sandboxes inherit it)
    - The coordinator agent's existing sandbox `AGENTS.md` (for immediate effect)
-3. OpenClaw's native workspace file injection loads `AGENTS.md` into the **system prompt**
-4. The coordinator uses `sessions_spawn` to delegate skill tasks to the right sub-agent
-5. On `before_agent_start`, the plugin also writes to `ctx.workspaceDir` to catch any new sandboxes created between restarts
+5. OpenClaw's native workspace file injection loads `AGENTS.md` into the **system prompt**
+6. The coordinator uses `sessions_spawn` to delegate skill tasks to the right sub-agent
+7. On `before_agent_start`, the plugin also writes to `ctx.workspaceDir` to catch any new sandboxes created between restarts
+
+### Single Source of Truth
+
+The agent's `"skills"` array in `openclaw.json` is the single source of truth. It controls two things:
+- **Skill filtering** (OpenClaw core): which skills appear in the agent's system prompt
+- **Routing** (this plugin): which agent the coordinator delegates to for each skill
+
+No duplicate route configuration is needed. Add a skill to an agent's `skills` array, restart, and the coordinator automatically knows about it.
 
 ### Why AGENTS.md?
 
@@ -22,20 +32,12 @@ OpenClaw only injects a [hardcoded list of workspace files](https://github.com/o
 
 The routing section is wrapped in HTML comment sentinels (`<!-- coordinator-plugin:start -->` / `<!-- coordinator-plugin:end -->`) so it can be updated without disturbing user content.
 
-### Skill Filtering
-
-Per-agent skill filtering is configured in `openclaw.json` via `agents.list[].skills`:
-- `"skills": []` — agent sees no skills (pure coordinator)
-- `"skills": ["gifgrep", "weather"]` — agent only sees listed skills
-
-The plugin's `routes` config should mirror these skill assignments.
-
 ## Plugin Files
 
 | File | Purpose |
 |------|---------|
 | `openclaw.plugin.json` | Plugin manifest — `id`, `name`, `version`, and `configSchema` |
-| `index.js` | Plugin logic — writes routing table to AGENTS.md at registration and via hook |
+| `index.js` | Plugin logic — auto-discovers routes and writes routing table to AGENTS.md |
 
 ## Configuration
 
@@ -50,11 +52,7 @@ Configuration lives in **`openclaw.json`**, not in the plugin directory.
       "coordinator": {
         "enabled": true,
         "config": {
-          "coordinatorAgent": "main",
-          "routes": [
-            { "id": "code", "name": "Code Agent", "skills": ["coding-agent", "github", "clawhub", "skill-creator"] },
-            { "id": "skills", "name": "Skills Agent", "skills": ["gifgrep", "weather", "..."] }
-          ]
+          "coordinatorAgent": "main"
         }
       }
     }
@@ -65,23 +63,16 @@ Configuration lives in **`openclaw.json`**, not in the plugin directory.
 ### Config fields
 
 - **`coordinatorAgent`** — Agent ID that acts as coordinator (default: `"main"`)
-- **`routes`** — Sub-agent routing table:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string | Sub-agent ID (e.g. `"skills"`) |
-| `name` | string | Display name (e.g. `"Skills Agent"`) |
-| `skills` | string[] | Skills this sub-agent handles |
+- **`routes`** *(optional)* — Static fallback routes, only used if `loadConfig()` is unavailable. Normally not needed since routes are auto-discovered from agent configs.
 
 ## Adding a New Skill
 
 1. Install the skill globally (e.g. `~/.openclaw/skills/jira/`)
 2. Add `"jira"` to the appropriate agent's `"skills"` array in `openclaw.json`
-3. Add `"jira"` to the same agent's entry in `plugins.entries.coordinator.config.routes`
-4. Restart gateway — plugin writes updated routing to AGENTS.md automatically
-5. Clear session caches if needed (see below)
+3. Restart gateway — plugin reads updated agent configs and writes updated routing to AGENTS.md
+4. Clear session caches if needed (see below)
 
-Steps 2 and 3 are manual — deciding which agent handles the new skill and keeping the routes in sync.
+Only step 2 is manual — deciding which agent handles the new skill.
 
 ## Deployment
 
@@ -98,7 +89,8 @@ docker exec openclaw-gateway sh -c 'find /home/node/.openclaw/agents -name "sess
 
 ## Technical Notes
 
-- **Routes are static** — defined in plugin config, not read from `api.runtime` (which only exposes `loadConfig`/`writeConfigFile` functions, not agent data)
+- **Routes are auto-discovered** — the plugin calls `api.runtime.config.loadConfig()` which returns the full `OpenClawConfig` including `agents.list` with each agent's `skills` array
+- **Static fallback** — if `loadConfig()` is unavailable, the plugin falls back to `routes` in plugin config (optional, normally not configured)
 - **AGENTS.md is written at registration time** — before any messages, so the system prompt has routing context from the first interaction
 - **The `before_agent_start` hook** is kept as a fallback to catch new sandboxes created after registration
-- **No `prependContext`** — earlier versions used `prependContext` which polluted the user message bubble in the chat UI. The AGENTS.md approach puts routing in the system prompt cleanly.
+- **No `prependContext`** — earlier versions used `prependContext` which polluted the user message bubble in the chat UI. The AGENTS.md approach puts routing in the system prompt cleanly
