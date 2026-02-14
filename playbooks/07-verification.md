@@ -30,8 +30,17 @@ sudo reboot
 Wait 1-2 minutes for VPS-1 to come back online, then verify SSH access:
 
 ```bash
-ssh -i <SSH_KEY_PATH> -p 222 adminclaw@<VPS1_IP> "echo 'VPS-1 online'"
+ssh -i <SSH_KEY_PATH> -p 222 -o ConnectTimeout=10 adminclaw@<VPS1_IP> "echo 'VPS-1 online'"
 ```
+
+**If VPS doesn't come back after 3-4 minutes:**
+
+> "The VPS hasn't come back online after reboot. This is usually just slow boot.
+> Try again in another minute. If it still doesn't respond after 5 minutes:
+>
+> - Check the VPS status in the OVH dashboard — it may be stuck in reboot
+> - Use the provider's console/VNC to check boot progress
+> - As a last resort, use the provider's dashboard to force a hard reboot"
 
 ---
 
@@ -49,6 +58,16 @@ curl -s http://localhost:18789<OPENCLAW_DOMAIN_PATH>/ | head -5
 ```
 
 **Expected:** All containers running, endpoint returns the Control UI HTML.
+
+**If containers are not running after reboot:**
+
+> "Containers didn't auto-start after reboot. Start them manually:"
+
+```bash
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'
+```
+
+> If they fail to start, check `sudo docker logs openclaw-gateway` for errors.
 
 ---
 
@@ -75,16 +94,23 @@ sudo ls -la /home/openclaw/openclaw/data/vector/
 
 ```bash
 # Health check (no auth required)
-curl -s https://<LOG_WORKER_URL>/health
+# NOTE: LOG_WORKER_URL contains /logs suffix — strip it for the base URL health check
+curl -s https://<LOG_WORKER_BASE_URL>/health
 
-# Test log ingestion (replace with your actual URL and token)
-curl -X POST https://<LOG_WORKER_URL>/logs \
+# Test log ingestion (use the full LOG_WORKER_URL which includes /logs)
+curl -X POST https://<LOG_WORKER_URL> \
   -H "Authorization: Bearer <LOG_WORKER_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{"container_name":"test","message":"verification test","stream":"stdout","timestamp":"2026-01-01T00:00:00Z"}'
 ```
 
 **Expected:** Health returns `{"status":"ok"}`, log ingestion returns `{"status":"ok","count":1}`.
+
+**If health check fails:**
+
+> "The Log Receiver Worker isn't responding. Check that the worker is deployed
+> and the URL is correct in `openclaw-config.env`. You can verify the worker
+> status in the Cloudflare Dashboard under Workers & Pages."
 
 ### AI Gateway Worker
 
@@ -94,6 +120,13 @@ curl -s https://<AI_GATEWAY_WORKER_URL>/health
 ```
 
 **Expected:** Returns `{"status":"ok"}`.
+
+**If either worker health check fails:**
+
+> "A Cloudflare Worker isn't responding. Check that it's deployed and the URL
+> is correct in `openclaw-config.env`. Verify the worker status in the
+> Cloudflare Dashboard under Workers & Pages. If not deployed, run
+> `01-workers.md` to deploy it."
 
 ### Verify Logs in Cloudflare Dashboard
 
@@ -121,7 +154,43 @@ curl -sk --connect-timeout 5 https://<VPS1_IP>/ || echo "Direct access blocked (
 
 **Expected:** cloudflared active, no auth errors in logs, port 443 closed, direct IP blocked.
 
-> **Note:** External access via the domain (`curl https://<OPENCLAW_DOMAIN>`) is tested in `08-post-deploy.md` after the user configures Cloudflare Access and the published hostname route.
+### Verify domain routing (run from LOCAL machine)
+
+```bash
+# Should get 302/403 redirect to Cloudflare Access login
+curl -sI --connect-timeout 10 https://<OPENCLAW_DOMAIN><OPENCLAW_DOMAIN_PATH>/ 2>&1 | head -10
+```
+
+**Expected:** 302 or 403 response with `Location` header pointing to Cloudflare Access.
+
+```bash
+# Also verify browser VNC route
+curl -sI --connect-timeout 10 https://<OPENCLAW_BROWSER_DOMAIN><OPENCLAW_BROWSER_DOMAIN_PATH>/ 2>&1 | head -10
+```
+
+**Expected:** 302 or 403 redirect to Cloudflare Access login.
+
+**If either returns 200 (unprotected):**
+
+> "Your domain is publicly accessible without authentication. Anyone with the URL
+> can reach the gateway. Configure Cloudflare Access to protect it — see
+> [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md) (Steps 1-3)."
+
+**If connection fails (timeout, DNS error, connection refused):**
+
+> "Domain routing isn't working. The tunnel may not be forwarding traffic to the
+> configured hostnames."
+
+Debug steps:
+```bash
+# Check DNS resolution
+dig <OPENCLAW_DOMAIN>
+# Expected: CNAME to <tunnel-id>.cfargotunnel.com
+
+# Check tunnel status on VPS
+sudo systemctl status cloudflared
+sudo journalctl -u cloudflared --no-pager | tail -20
+```
 
 ---
 
@@ -385,8 +454,8 @@ sudo docker logs --tail 50 vector
 # Restart Vector
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart vector'
 
-# Check if Worker endpoint is reachable
-curl -s https://<LOG_WORKER_URL>/health
+# Check if Worker endpoint is reachable (strip /logs suffix for base URL)
+curl -s https://<LOG_WORKER_BASE_URL>/health
 ```
 
 ### Networking Issues
@@ -439,4 +508,4 @@ Deployment is complete when:
 9. Gateway ports (18789, 18790) not reachable from external network
 10. Security audit passes with no critical or warning findings
 
-> **Note:** Full end-to-end verification (user authenticating through Cloudflare Access, sending messages, verifying LLM routing) is covered in `08-post-deploy.md` (user-driven) and [`docs/TESTING.md`](../docs/TESTING.md) (browser automation via Chrome DevTools).
+> **Note:** Full end-to-end verification (user authenticating through Cloudflare Access, sending messages) is covered in `08-post-deploy.md` (device pairing) and [`docs/TESTING.md`](../docs/TESTING.md) (browser automation via Chrome DevTools).

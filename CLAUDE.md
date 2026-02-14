@@ -25,7 +25,7 @@ All deployment steps are in modular playbooks under `playbooks/`:
 | `06-backup.md` | Backup scripts and cron jobs |
 | `07-verification.md` | Testing and verification |
 | `maintenance.md` | Token rotation schedules and procedures |
-| `08-post-deploy.md` | First access & device pairing |
+| `08-post-deploy.md` | Device pairing & deployment report |
 
 See [playbooks/README.md](playbooks/README.md) for detailed playbook documentation.
 
@@ -48,9 +48,9 @@ IMPORTANT: Read configuration from `openclaw-config.env`:
 
 ```bash
 # See openclaw-config.env.example for all fields and documentation.
-# Only VPS1_IP and CF_TUNNEL_TOKEN are required to start a fresh deployment.
+# VPS1_IP, CF_TUNNEL_TOKEN, and domain config are required to start a fresh deployment.
 # Domain config (OPENCLAW_DOMAIN, OPENCLAW_BROWSER_DOMAIN, OPENCLAW_BROWSER_DOMAIN_PATH, OPENCLAW_DOMAIN_PATH)
-# is deferred to post-deploy when Cloudflare Tunnel routes are configured.
+# is validated during fresh deploy setup (00-fresh-deploy-setup.md).
 ```
 
 SSH_USER and SSH_PORT start as `ubuntu`/`22` and are changed to `adminclaw`/`222` during hardening.
@@ -69,7 +69,7 @@ Check `openclaw-config.env` exists. If missing, tell user to `cp openclaw-config
 
 Ask: **New deployment** (fresh VPS) or **Existing deployment** (already configured)?
 
-- **New deployment:** Follow `playbooks/00-fresh-deploy-setup.md` for minimal validation (only `VPS1_IP` + `CF_TUNNEL_TOKEN` + SSH needed to start). Domain configuration is deferred to post-deploy.
+- **New deployment:** Follow `playbooks/00-fresh-deploy-setup.md` for validation (`VPS1_IP`, `CF_TUNNEL_TOKEN`, domain config, and SSH needed). Cloudflare Access must be configured before deploy begins.
 - **Existing deployment:** Ask: **Analyze** (`00-analysis-mode.md`), **Test** (`07-verification.md`), or **Modify** (describe custom changes). If "something else," use plan mode.
 
 ---
@@ -86,7 +86,7 @@ Ask: **New deployment** (fresh VPS) or **Existing deployment** (already configur
 5. Execute 06-backup.md on VPS-1
 6. Reboot VPS-1
 7. Execute 07-verification.md
-8. Execute 08-post-deploy.md
+8. Execute 08-post-deploy.md (device pairing & deployment report)
 ```
 
 All steps are sequential on a single VPS. Workers deployment (01-workers) runs from the local machine using `wrangler` and is triggered automatically during config validation if needed.

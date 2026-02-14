@@ -92,6 +92,19 @@ sudo docker info | grep -i "sysbox"
 rm "${SYSBOX_DEB}"
 ```
 
+**If sha256sum fails:**
+
+> "The Sysbox download didn't match the expected checksum. This could mean a
+> corrupted download or a version mismatch. Delete the file and re-download:"
+>
+> `rm ${SYSBOX_DEB} && wget "https://downloads.nestybox.com/sysbox/releases/v${SYSBOX_VERSION}/${SYSBOX_DEB}"`
+
+**If `dpkg -i` fails with dependency errors:**
+
+> "Sysbox has unmet dependencies. Fix with:"
+>
+> `sudo apt --fix-broken install -y`
+
 ---
 
 ## 4.2 Create Docker Networks
@@ -159,6 +172,21 @@ mkdir -p /home/openclaw/openclaw/data/docker
 mkdir -p /home/openclaw/openclaw/data/vector
 EOF
 ```
+
+**If git clone fails with "fatal: unable to access":**
+
+> "Can't reach GitHub from the VPS. Check network connectivity:"
+>
+> `curl -sI https://github.com` — if this times out, the VPS may have
+> DNS or outbound connectivity issues.
+
+**If git clone fails with "already exists and is not an empty directory":**
+
+> "The openclaw directory already exists. This VPS may have a previous
+> installation. Use `00-analysis-mode.md` to analyze it first, or
+> remove it to start fresh:"
+>
+> `sudo rm -rf /home/openclaw/openclaw`
 
 ---
 
@@ -471,15 +499,20 @@ How it works:
 
 SCP the plugin to the VPS:
 
+**Run from LOCAL machine:**
+
 ```bash
-#!/bin/bash
 # Create deploy/plugins directory on VPS
-sudo -u openclaw mkdir -p /home/openclaw/openclaw/deploy/plugins
+ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP} \
+  "sudo -u openclaw mkdir -p /home/openclaw/openclaw/deploy/plugins"
 
-# Copy plugins from local repo
-# Run from local machine:
+# Copy plugins from local repo to VPS
 scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r deploy/plugins/* ${SSH_USER}@${VPS1_IP}:/tmp/deploy-plugins/
+```
 
+**Run on VPS (via SSH):**
+
+```bash
 # Move into place with correct ownership
 sudo cp -r /tmp/deploy-plugins/* /home/openclaw/openclaw/deploy/plugins/
 sudo chown -R openclaw:openclaw /home/openclaw/openclaw/deploy/plugins/
@@ -531,15 +564,20 @@ Custom managed hooks live in `deploy/hooks/<name>/` (HOOK.md + handler.js). The 
 
 SCP hooks to the VPS:
 
+**Run from LOCAL machine:**
+
 ```bash
-#!/bin/bash
 # Create deploy/hooks directory on VPS
-sudo -u openclaw mkdir -p /home/openclaw/openclaw/deploy/hooks
+ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP} \
+  "sudo -u openclaw mkdir -p /home/openclaw/openclaw/deploy/hooks"
 
-# Copy hooks from local repo
-# Run from local machine:
+# Copy hooks from local repo to VPS
 scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r deploy/hooks/* ${SSH_USER}@${VPS1_IP}:/tmp/deploy-hooks/
+```
 
+**Run on VPS (via SSH):**
+
+```bash
 # Move into place with correct ownership
 sudo cp -r /tmp/deploy-hooks/* /home/openclaw/openclaw/deploy/hooks/
 sudo chown -R openclaw:openclaw /home/openclaw/openclaw/deploy/hooks/
@@ -564,6 +602,26 @@ sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose ps'
 sudo docker logs --tail 20 openclaw-gateway
 ```
+
+**If build fails:**
+
+> "The Docker image build failed. Common causes:"
+>
+> - **Disk space:** `df -h` — need at least 10GB free
+> - **Network:** build downloads npm packages — check `curl -sI https://registry.npmjs.org`
+> - **Patch conflict:** the build script patches the Dockerfile — if upstream changed
+>   significantly, the patch may fail. Check the build script output for "FAILED" messages.
+
+**If `docker compose up -d` fails:**
+
+> "Container failed to start. Check the error with:"
+>
+> `sudo docker logs openclaw-gateway`
+>
+> Common issues:
+> - **Port already in use:** another process on port 18789 — `sudo ss -tlnp | grep 18789`
+> - **Sysbox not available:** `sudo systemctl status sysbox` — must be active
+> - **Invalid .env:** missing required variables — `cat /home/openclaw/openclaw/.env`
 
 ### Wait for full startup
 

@@ -28,13 +28,13 @@ NEW_TOKEN=$(openssl rand -hex 32)
 # 2. Update .env on VPS
 # Edit /home/openclaw/openclaw/.env — change OPENCLAW_GATEWAY_TOKEN value
 
-# 3. Rebuild image (token is baked into /app/.env at build time)
-sudo -u openclaw /home/openclaw/scripts/build-openclaw.sh
+# 3. Update openclaw.json on VPS
+# Edit /home/openclaw/.openclaw/openclaw.json — update gateway.auth.token and gateway.remote.token
 
-# 4. Restart gateway
-sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'
+# 4. Restart gateway (no rebuild needed — .env and config are bind-mounted, not baked into image)
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart openclaw-gateway'
 
-# 5. Update all paired devices with new token
+# 5. Update all paired devices with new token (existing browser URLs will need the new token parameter)
 ```
 
 #### AI Gateway Auth Token

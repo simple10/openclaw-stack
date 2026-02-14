@@ -53,6 +53,15 @@ sudo systemctl enable docker
 sudo systemctl start docker
 ```
 
+**If `apt install docker-ce` fails with "Unable to locate package":**
+
+> "The Docker repository wasn't added correctly. Verify the GPG key and
+> repo entry exist:"
+>
+> `ls /etc/apt/keyrings/docker.gpg && cat /etc/apt/sources.list.d/docker.list`
+>
+> If either is missing, re-run the GPG key and repository setup commands above.
+
 ---
 
 ## 3.2 Docker Daemon Hardening
@@ -92,6 +101,15 @@ EOF
 
 sudo systemctl restart docker
 ```
+
+**If Docker fails to restart after daemon.json changes:**
+
+> "Docker won't start with the new daemon config. This usually means a JSON
+> syntax error in `/etc/docker/daemon.json`. Validate it:"
+>
+> `sudo cat /etc/docker/daemon.json | python3 -m json.tool`
+>
+> Fix any syntax errors and retry: `sudo systemctl restart docker`
 
 See [REQUIREMENTS.md § 2.8](../REQUIREMENTS.md#28-docker) for setting rationale.
 

@@ -160,10 +160,14 @@ Note the Worker URL from the output (e.g., `https://log-receiver.<account>.worke
 
 Capture the Worker URL from the deploy output and update `LOG_WORKER_URL` in `openclaw-config.env` (include the `/logs` path suffix). `LOG_WORKER_TOKEN` should already be set from the secret configuration step above.
 
-Then update the VPS `.env` and restart Vector:
+> **Fresh deploy:** During initial deployment, skip the VPS update below — Vector
+> isn't running yet. The correct values will be used when `04-vps1-openclaw.md`
+> creates the `.env` file from `openclaw-config.env`.
+
+**Re-deployment only** — if Vector is already running on VPS and you're updating the worker:
 
 ```bash
-# On VPS-1
+# On VPS-1: update LOG_WORKER_URL and LOG_WORKER_TOKEN in .env, then restart Vector
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart vector'
 ```
 

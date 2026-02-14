@@ -42,7 +42,7 @@ From `../openclaw-config.env`:
 
 Complete sections 2.1-2.9 on VPS-1.
 
-Connect initially as `ubuntu` (OVH default), then use `adminclaw` after section 1.5.
+Connect initially as `ubuntu` (OVH default), then switch to `adminclaw` after section 2.4 (SSH hardening).
 
 ---
 
@@ -64,6 +64,16 @@ sudo apt install -y \
     apt-transport-https software-properties-common \
     ufw fail2ban auditd
 ```
+
+**If `apt update` fails with "Could not resolve" or network errors:**
+
+> "The VPS can't reach Ubuntu's package repositories. Check DNS and
+> outbound connectivity:"
+>
+> `ping -c 2 archive.ubuntu.com`
+>
+> If DNS fails, check `/etc/resolv.conf` — it may need a valid nameserver
+> (e.g., `nameserver 1.1.1.1`).
 
 ---
 
@@ -238,11 +248,41 @@ ss -tlnp | grep 222
 ```bash
 # From LOCAL machine — test port 222
 ssh -i <SSH_KEY_PATH> -p 222 adminclaw@<VPS1_IP> "echo 'Port 222 works!'"
+```
 
-# If successful, SSH back in on 222 and remove port 22
+**If port 222 test succeeds:** SSH back in on 222 and remove port 22:
+
+```bash
 ssh -i <SSH_KEY_PATH> -p 222 adminclaw@<VPS1_IP>
 sudo ufw delete allow 22/tcp
 sudo ufw status
+```
+
+**If port 222 test fails with "Connection refused":**
+
+> "SSH on port 222 is not responding. This usually means the systemd socket override
+> didn't take effect. I'll check the socket config and restart SSH."
+
+```bash
+# SSH in on port 22 (still open) and debug
+ssh -i <SSH_KEY_PATH> -p 22 adminclaw@<VPS1_IP>
+cat /etc/systemd/system/ssh.socket.d/override.conf
+sudo systemctl daemon-reload
+sudo systemctl restart ssh.socket
+sudo systemctl restart ssh
+ss -tlnp | grep 222
+```
+
+**If port 222 test fails with "Permission denied":**
+
+> "SSH key authentication failed for adminclaw on port 222. I'll verify the
+> authorized_keys file was copied correctly."
+
+```bash
+# SSH in as ubuntu (original user) and check adminclaw's keys
+ssh -i <SSH_KEY_PATH> -p 22 ubuntu@<VPS1_IP>
+sudo cat /home/adminclaw/.ssh/authorized_keys
+sudo ls -la /home/adminclaw/.ssh/
 ```
 
 ---
@@ -411,7 +451,24 @@ sudo systemctl status cloudflared
 sudo ufw delete allow 443/tcp 2>/dev/null || true
 ```
 
-> **Note:** The tunnel connects but has no public hostname yet. The domain is configured in post-deploy after Cloudflare Access is set up. See `docs/CLOUDFLARE-TUNNEL.md`.
+**If `cloudflared service install` fails:**
+
+> "The tunnel token may be invalid or expired. Verify the token in
+> `openclaw-config.env` matches the one in Cloudflare Dashboard
+> (Zero Trust -> Networks -> Tunnels -> your tunnel -> Configure)."
+
+**If cloudflared starts but immediately exits (check with `systemctl status`):**
+
+> "The tunnel service started but crashed. Check the logs:"
+>
+> `sudo journalctl -u cloudflared --no-pager | tail -20`
+>
+> Common issues:
+> - **"failed to sufficiently increase receive buffer size"** — harmless warning, not a crash cause
+> - **"Tunnel credentials not found"** — token is malformed. Re-copy from Cloudflare Dashboard
+> - **"connection refused"** — outbound connectivity issue. Check `curl -sI https://cloudflare.com`
+
+> **Note:** The tunnel connects and begins routing traffic to the configured public hostname routes. Domain and Cloudflare Access were verified during fresh deploy setup (`00-fresh-deploy-setup.md`).
 
 ---
 

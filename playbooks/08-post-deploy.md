@@ -1,153 +1,21 @@
-# 08 - Post-Deploy: First Access & Device Pairing
+# 08 - Post-Deploy: Device Pairing & Deployment Report
 
-Interactive guide for accessing OpenClaw and pairing your first device after deployment.
+Guide for pairing your first device and completing deployment.
 
 ## Overview
 
-After `07-verification.md` confirms all services are healthy, this playbook walks you through:
+After `07-verification.md` confirms all services are healthy and domain routing is
+verified, this playbook walks you through:
 
-- Configuring Cloudflare Access and connecting the domain
 - Retrieving the gateway access token
 - Opening the OpenClaw UI for the first time
 - Approving your first device pairing request
-- Verifying the connection works end-to-end
+- Generating the deployment report
 
 ## Prerequisites
 
 - `07-verification.md` completed successfully
-- OpenClaw gateway running on VPS-1
-- Cloudflare Tunnel service running (02-base-setup.md section 2.9)
-- Browser available on your local machine
-
----
-
-## 8.0 Connect Gateway Domain via Cloudflare Tunnel
-
-### Check if OPENCLAW_DOMAIN has a placeholder
-
-Read `OPENCLAW_DOMAIN` from `openclaw-config.env`. If it still contains `<example>` or other angle-bracket placeholders:
-
-> "Your gateway domain isn't configured yet. You need to:
->
-> 1. **Decide on your domain** (e.g., `openclaw.yourdomain.com`)
-> 2. **Configure Cloudflare Access** — see [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md) (Steps 1-3)
-> 3. **Add a public hostname** to your tunnel pointing to `localhost:18789`
->
-> Once done, tell me your domain (e.g., `openclaw.mydomain.com`) and I'll update the config."
-
-Wait for the user to provide the domain. Update `OPENCLAW_DOMAIN` in `openclaw-config.env`, then continue.
-
-### Verify domain is protected by Cloudflare Access
-
-```bash
-# Test if the domain resolves — should get a 302/403 redirect to the Access login page
-curl -sI --connect-timeout 10 https://<OPENCLAW_DOMAIN><OPENCLAW_DOMAIN_PATH>/ 2>&1 | head -10
-```
-
-**If connection refused, timeout, or DNS error:**
-
-The user needs to configure Cloudflare Access and add the published hostname route. Present:
-
-> "Your tunnel is running but the domain isn't connected yet. Before connecting it, you should set up Cloudflare Access so the domain is protected from the first request.
->
-> Follow the steps in [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md):
->
-> 1. **Configure Cloudflare Access** (Steps 1-3) — set up the application, policy, and identity provider
-> 2. **Connect your domain** (Step 4) — add the published hostname route in the tunnel config
-> 3. **Test** (Step 5) — verify the Access login page appears in an incognito window
->
-> Let me know when you've completed these steps."
-
-Wait for the user to confirm before proceeding.
-
-**If the response is a 302/403 redirect** (to a URL containing `cloudflareaccess.com` or `access.` in the `Location` header): Cloudflare Access is protecting the domain. Proceed to section 8.0b.
-
-**If the response is 200** (domain accessible without auth), warn:
-
-> "Your domain is accessible without Cloudflare Access authentication. This means anyone with the URL can reach OpenClaw.
->
-> Configure Cloudflare Access now — see [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md) (Steps 1-3).
->
-> Let me know when done."
-
-Wait for the user to confirm before proceeding.
-
-> **Note:** Do NOT attempt to verify that the gateway is reachable through the tunnel from here. Cloudflare Access blocks unauthenticated requests. The gateway was already verified internally (localhost) in `07-verification.md`. End-to-end browser verification happens in [`docs/TESTING.md`](../docs/TESTING.md) where the user authenticates through Cloudflare Access via Chrome DevTools.
-
-> **Tunnel routing:** The gateway's WebSocket endpoint accepts connections at any URL path,
-> but the Control UI client connects to `wss://<host>/` (root path, not the basePath).
-> This means the reverse proxy/tunnel **must use catch-all routing** for the gateway hostname
-> — path-based routing (e.g., only forwarding `/openclaw/*`) will break WebSocket connections.
-> If both gateway and browser VNC share the same hostname, configure the browser path rule
-> (`/browser` → `localhost:6090`) **before** the catch-all gateway rule (`*` → `localhost:18789`).
-> There is no gateway config option for a WebSocket basePath.
-
----
-
-## 8.0b Connect Browser VNC via Cloudflare Tunnel
-
-### Check if OPENCLAW_BROWSER_DOMAIN has a placeholder
-
-Read `OPENCLAW_BROWSER_DOMAIN` and `OPENCLAW_BROWSER_DOMAIN_PATH` from `openclaw-config.env`. If `OPENCLAW_BROWSER_DOMAIN` contains `<example>` or other angle-bracket placeholders:
-
-> "Your browser VNC domain isn't configured yet. You need to:
->
-> 1. **Decide on your browser URL** — either:
->    - A subpath on your main domain (e.g., domain `openclaw.yourdomain.com`, path `/browser`)
->    - A separate subdomain (e.g., domain `browser-openclaw.yourdomain.com`, path empty)
-> 2. **Add a public hostname** (or path) in your Cloudflare Tunnel pointing to `http://localhost:6090`
-> 3. **Protect it with Cloudflare Access** (same Access application or a new one)
->
-> Tell me the browser domain and path (if any) and I'll update the config."
-
-Wait for the user to provide the values. Then:
-
-1. Update `OPENCLAW_BROWSER_DOMAIN` and `OPENCLAW_BROWSER_DOMAIN_PATH` in `openclaw-config.env`
-2. Update `NOVNC_BASE_PATH` in the `.env` file on VPS (direct copy of `OPENCLAW_BROWSER_DOMAIN_PATH`):
-
-```bash
-# Update NOVNC_BASE_PATH in .env on VPS
-ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
-  "sudo sed -i 's|^NOVNC_BASE_PATH=.*|NOVNC_BASE_PATH=<OPENCLAW_BROWSER_DOMAIN_PATH>|' /home/openclaw/openclaw/.env"
-```
-
-3. Restart the gateway to pick up the new base path:
-
-```bash
-ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
-  "sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart openclaw-gateway'"
-```
-
-### Verify browser VNC route is protected
-
-```bash
-# Test browser VNC URL — should get 302/403 redirect to Cloudflare Access login
-curl -sI --connect-timeout 10 https://<OPENCLAW_BROWSER_DOMAIN><OPENCLAW_BROWSER_DOMAIN_PATH>/ 2>&1 | head -10
-```
-
-**Expected:** A 302 or 403 response redirecting to the Cloudflare Access login page. This confirms the tunnel route exists and is protected. Do NOT expect a 200 — Cloudflare Access blocks unauthenticated requests.
-
-If you get a connection error or timeout, the tunnel route hasn't been configured yet. Ask the user to add it in the Cloudflare Dashboard.
-
-### Verify novnc-proxy internally (via SSH)
-
-```bash
-# Check novnc-proxy is running with the correct base path
-ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
-  "sudo docker logs openclaw-gateway 2>&1 | grep 'novnc-proxy'"
-```
-
-**Expected:** Log line showing `[novnc-proxy] Listening on port 6090, base path: /browser` (or similar, matching the configured path).
-
-```bash
-# Internal check: verify the proxy responds on localhost (inside the VPS, bypasses Cloudflare Access)
-ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
-  "curl -sI http://localhost:6090/<NOVNC_BASE_PATH_WITHOUT_LEADING_SLASH>/ 2>&1 | head -5"
-```
-
-**Expected:** 200 response with `text/html` content type (the index page).
-
-> **Note:** Full end-to-end browser verification (authenticating through Cloudflare Access and viewing VNC sessions) is covered in [`docs/TESTING.md`](../docs/TESTING.md).
+- Domain verified as protected by Cloudflare Access (during `00-fresh-deploy-setup.md`)
 
 ---
 
@@ -190,13 +58,14 @@ Ask the user to confirm they can see the page (even with the pairing error) befo
 
 ## 8.3 Approve Device Pairing
 
-After the user opens the URL and sees the "pairing required" message, approve their webchat device.
+After the user opens the URL and sees "pairing required", approve their device.
 
-The CLI was auto-paired during deployment (section 4.9 of `04-vps1-openclaw.md`),
-so `openclaw devices approve` works directly.
+### Approach 1: Standard CLI Pairing (try first)
+
+The CLI was auto-paired during deployment (`04-vps1-openclaw.md` §4.9).
 
 ```bash
-# 1. List pending device requests
+# List pending device requests
 ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
   "openclaw devices list"
 ```
@@ -204,21 +73,18 @@ ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
 Find the `requestId` for the `openclaw-control-ui` client, then approve:
 
 ```bash
-# 2. Approve the webchat device
+# Approve the webchat device
 ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
   "openclaw devices approve <requestId>"
 ```
 
-Tell the user to wait ~15 seconds — the browser auto-retries and should connect.
+Tell the user to wait ~15 seconds for browser auto-retry.
 
-### If no pending requests appear
+**If this works:** Skip to §8.4.
 
-- Pending requests have a **5-minute TTL**. If the user waited too long, ask them to refresh.
-- Each browser retry creates a new pending request. Use the most recent `requestId`.
+### Approach 2: Re-pair CLI with Explicit Token
 
-### If CLI fails with "pairing required"
-
-The CLI device identity was lost or never created. Re-run auto-pairing:
+If `openclaw devices list` fails with "pairing required", the CLI identity was lost.
 
 ```bash
 GATEWAY_TOKEN=$(ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
@@ -228,7 +94,60 @@ ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
     openclaw devices list --url ws://localhost:18789 --token $GATEWAY_TOKEN"
 ```
 
-Then retry the approval above.
+This re-pairs the CLI. Now retry Approach 1.
+
+### Approach 3: File-Based Pairing (from 04-vps1-openclaw.md)
+
+If the CLI pairing keeps failing, use the file-manipulation approach from the
+initial deployment. This bypasses the WebSocket pairing handshake entirely.
+
+```bash
+# 1. Fix .openclaw ownership (gateway creates dirs as root before gosu drops to node)
+ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
+  "sudo docker exec openclaw-gateway chown -R 1000:1000 /home/node/.openclaw"
+
+# 2. Trigger a pending CLI pairing request (expected to fail, but registers the device)
+ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
+  "sudo docker exec --user node openclaw-gateway openclaw devices list 2>&1 || true"
+
+# 3. Approve the CLI device via file manipulation on the VPS
+```
+
+For step 3, run the Python approval script from `04-vps1-openclaw.md` §4.9 on the VPS.
+It reads `pending.json`, moves the CLI entry to `paired.json`, and the gateway picks
+up the change immediately (no restart needed).
+
+```bash
+# 4. Verify CLI is paired
+ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> "openclaw devices list"
+```
+
+**Expected:** Shows 1 paired device with role `operator`. Now retry Approach 1 to
+approve the browser device.
+
+### Approach 4: Gateway Restart + Fresh Pairing
+
+As a last resort, restart the gateway and try again:
+
+```bash
+ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
+  "sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart openclaw-gateway'"
+```
+
+Wait 30-60 seconds for full startup (sandbox images are cached, so restarts are faster
+than first boot), then retry from Approach 1.
+
+### Tips for Users
+
+- **Pending requests expire after 5 minutes.** If the user waited too long between
+  opening the URL and running `devices list`, ask them to refresh the browser page
+  to generate a new request.
+- **Each browser refresh creates a new request.** Always use the most recent
+  `requestId` from `devices list`.
+- **The browser auto-retries** every few seconds. After approval, the user just
+  needs to wait — no manual refresh needed.
+- **Check the browser console** (F12 → Console) if the page doesn't connect after
+  approval. Look for WebSocket errors.
 
 ---
 
@@ -255,30 +174,7 @@ If the device shows as approved but the browser still can't connect, ask the use
 
 ---
 
-## 8.5 Reference: Device Management
-
-**CLI commands** (from local machine via SSH):
-
-```bash
-openclaw devices list                    # List pending/approved
-openclaw devices approve <requestId>     # Approve a device
-```
-
-**Control UI:** Once one device is paired, approve new devices from the Control UI.
-
-**Notes:** Pending requests expire after 5 minutes. The browser auto-retries, creating new requests. Refresh the page if a request expired.
-
-**Re-pairing the CLI** (if device identity is lost):
-
-```bash
-GATEWAY_TOKEN=$(sudo grep OPENCLAW_GATEWAY_TOKEN /home/openclaw/openclaw/.env | cut -d= -f2)
-sudo docker exec --user node openclaw-gateway \
-  openclaw devices list --url ws://localhost:18789 --token "$GATEWAY_TOKEN"
-```
-
----
-
-## 8.6 Deployment Report
+## 8.5 Deployment Report
 
 **IMPORTANT:** After the user confirms the chat interface is working, output a complete deployment report. This is the final step — do NOT skip it.
 
@@ -294,7 +190,7 @@ Collect the following values and present them in a single, neatly formatted repo
      "sudo grep OPENCLAW_GATEWAY_TOKEN /home/openclaw/openclaw/.env | cut -d= -f2"
    ```
 
-3. **Domain and URLs** — from `openclaw-config.env` values set during this playbook.
+3. **Domain and URLs** — from `openclaw-config.env`.
 
 ### Report format
 
@@ -375,6 +271,7 @@ Check `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in `openclaw-config.env`.
 >
 > 1. Follow [`docs/TELEGRAM.md`](../docs/TELEGRAM.md) to create a Telegram bot and get your chat ID
 > 2. Tell Claude to update the host alerter with your bot token and chat ID
+
 ```
 
 ---
