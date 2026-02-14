@@ -27,7 +27,8 @@
       "WebSearch",
       "Bash(gh api:*)",
       "WebFetch(domain:github.com)",
-      "Bash(nc:*)"
+      "Bash(nc:*)",
+      "WebFetch(domain:docs.openclaw.ai)"
     ]
   }
 }

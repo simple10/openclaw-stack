@@ -1,7 +1,9 @@
 {
   "cSpell.words": [
     "adminclaw",
-    "openclaw"
+    "openclaw",
+    "reloadable",
+    "webchat"
   ],
   "files.associations": {
     "deploy/openclaw.json": "json5"
