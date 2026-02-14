@@ -11,3 +11,5 @@ node_modules/
 
 # Local sync of /home/node/.openclaw/media/ via the scripts/sync-media.sh script
 media/
+
+agents/
