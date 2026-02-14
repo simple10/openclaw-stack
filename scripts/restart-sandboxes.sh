@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # Remove running sandbox containers so OpenClaw recreates them from current images.
 #
-# Sandbox containers are persistent (scope: "agent", prune.idleHours: 168) and
+# Sandbox containers are persistent (scope: "agent", prune.idleHours: 24) and
 # keep running old images after a rebuild. This script removes them — OpenClaw
 # automatically recreates them on the next agent request using the new images.
+#
+# Note: changes to openclaw.json may not be picked up and propagated to the sandboxes
+# until the gateway is restarted.
 #
 # Usage:
 #   scripts/restart-sandboxes.sh              # restart agent sandboxes
