@@ -1,3 +1,31 @@
+//
+// OpenClaw Config
+//
+// This file is json5 compatible.
+// Use jsonc (JSON with comments) when editing to avoid IDE formatting errors.
+//
+// This file is what controls the core setup of OpenClaw. It's loaded by the OpenClaw Gateway.
+//
+// Some settings can be changed and hot-reloaded without a gateway restart.
+//
+// Hot-reloadable (no restart needed):
+//   - hooks — reloads hook handlers
+//   - cron — restarts cron jobs
+//   - browser — restarts browser control
+//   - agents.defaults.heartbeat — restarts heartbeat
+//   - Channel configs (telegram, whatsapp, etc.)
+// Requires gateway restart (kind: "restart"):
+//   - gateway.* settings
+//   - plugins.* settings
+//   - discovery.*
+// Ignored (kind: "none" — detected but no action taken):
+//   - agents (agent configs, sandbox settings, env vars)
+//   - tools
+//   - routing
+//   - models
+//   - logging
+//   - skills
+//
 {
   "commands": {
     "restart": true
@@ -69,11 +97,16 @@
           "capDrop": [
             "ALL" // Drop all docker container privileges by default
           ],
+          // Sandbox env settings
+          // OpenClaw reads these when processing agent requests. e.g. Can be used to override API Keys per agent.
+          // Requires a custom patch to propagate env to the sandbox containers to be used for bins.
+          // See Patch #3 in build-openclaw.sh to properly set ENV vars in sandbox containers - patches missing openclaw feature.
+          // Env is only propagated into the containers at build time.
+          // Requires rebuilding & restarting sandboxes if you need any of these env settings in the sandbox container.
           "env": {
             "LANG": "C.UTF-8",
             // Add /opt/skill-bins to path to enable sandbox-toolkit bins shimming
             // Required for skill-router to work properly - allows gateway to pass skill requirement checks
-            // Requires Patch #3 in build-openclaw.sh to properly set ENV vars in sandbox containers - patches missing openclaw feature
             "PATH": "/opt/skill-bins:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
           },
           "pidsLimit": 512, // Add fork-bomb protection
@@ -82,16 +115,18 @@
           "cpus": 2, // Default agent container CPU
           "binds": [
             // Skills bins shim - if agent actually has the bin, it will run the real bin
-            // skills-bin is only needed by agents that can spawn other agents (e.g. main) - added here in defaults for simplicity
+            // skills-bin is only needed by the main agent to enable skills routing
             "/opt/skill-bins:/opt/skill-bins:ro",
-            // Add openclaw docs to each agent - helps agents be able to answer openclaw usage questions
-            "/app/docs:/workspace/docs:ro", // Agents can use 'read' tool to access docs here - requires customizing AGENTS.md
-            "/app/docs:/app/docs:ro" // Default location of docs - openclaw defaults instruct agents to look here - requires 'exec' to access
+            // Add openclaw docs to each agent - helps agents answer openclaw usage questions without relying on LLM fetching of docs
+            "/app/docs:/workspace/docs:ro", // Agents can use 'read' tool to access docs here - requires customizing AGENTS.md to use /workspace/docs location
+            "/app/docs:/app/docs:ro" // Default location of docs - openclaw's default instructions direct agents to look here - requires 'exec' to access
           ]
         },
-        // Enable each agent to have it's own browser container
+        // Each agent has it's browser container - requires the "browser" tool
+        // Browsers are run in separate sandbox containers, not inside the agent sandbox
         // Move browser settings to individual agent to restrict browser use or enforce single browser container
         // Browser sessions are accessible to users via the novnc-proxy at OPENCLAW_BROWSER_DOMAIN after deploy
+        // Browser containers inherit the default CPU and memory settings of their associated agent
         "browser": {
           "enabled": true,
           "image": "openclaw-sandbox-browser:bookworm-slim",
@@ -121,20 +156,34 @@
     "list": [
       // MAIN AGENT
       {
+        // Main inherits docker.image from defaults: openclaw-sandbox:bookworm-slim
+        // It has limited capabilities - no sandbox-toolkit, only bin shims
+        // Main essentially runs as a coordinate agent in this configuration
+        // The first round of user message requests will be processed by main (and it's associated AGENTS.md, SOUL.md, etc.)
+        // Main handles basic tool calls but then hands off requests to other agents to perform skills that require sandbox-toolkit bins.
+        // The skill-router is used to map sub-requests to the correct agent based on capabilities (skills)
+        // If you want to use only one agent, or make main fully capable of exec'ing, simply set
+        // image: openclaw-sandbox-common:bookworm-slim and modify the skill-router config below to not delegate requests
         "id": "main",
         "default": true,
         "sandbox": {
           "docker": {
-            "network": "bridge"
+            "network": "bridge" // Set network to "none" to fully restrict main agent, forcing other agents to handle requests
           }
         },
         "subagents": {
-          // Main agent can spawn other agents
+          // Main agent can spawn other agents to complete tasks
           "allowAgents": [
             "code",
             "skills"
           ]
-        }
+        },
+        // Example tool override settings
+        // "tools": {
+        //   "deny": [
+        //     "browser", // Deny browser use
+        //   ]
+        // }
       },
       // CODING AGENT
       {
@@ -142,8 +191,8 @@
         "name": "Code Agent",
         "sandbox": {
           "docker": {
-            "image": "openclaw-sandbox-common:bookworm-slim",
-            "network": "bridge",
+            "image": "openclaw-sandbox-common:bookworm-slim", // sandbox-common has the full sandbox-toolkit bins
+            "network": "bridge", // enable network access for claude code, codex, etc. to work
             "memory": "2g",
             "memorySwap": "4g",
             "cpus": 2,
@@ -175,7 +224,7 @@
     ],
     "entries": {
       // Skill Router Config
-      // This controls how the custom skill-router plugin works
+      // This is a custom plugin that handles skill based delegation between agents
       "skill-router": {
         "enabled": true,
         "config": {
@@ -202,21 +251,27 @@
       }
     }
   },
+  // Top-level Tools Config
+  // These are the default tool settings for all agents
+  // Add agent specific overrides in the agents list above
+  // It's highly recommended to restrict tool usage per agent in production to protect against prompt injection attacks
   "tools": {
     "sandbox": {
       "tools": {
+        // Comment out tools if you don't need them
+        // Each tool increases the size of the system prompt and increases the blast radius of prompt injections
         "allow": [
           "exec",
           "process",
           "read",
           "write",
           "edit",
-          "apply_patch",
-          "browser",
+          "apply_patch", // Allow LLM to apply patches to files instead of individual edits
+          "browser", // Each agent can spawn a browser
           "sessions_list",
           "sessions_history",
           "sessions_send",
-          "sessions_spawn",
+          "sessions_spawn", // Can spawn other agents
           "session_status"
         ],
         "deny": [
@@ -224,7 +279,7 @@
           "nodes",
           "cron",
           "discord",
-          "gateway"
+          "gateway" // Prevent agents from manipulating the gateway - denying will require manual restart of the gateway
         ]
       }
     }
