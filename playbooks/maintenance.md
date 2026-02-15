@@ -14,7 +14,7 @@ All secrets should be rotated on a regular cadence. If a token is suspected comp
 | `AI_GATEWAY_AUTH_TOKEN` | VPS `.env` + AI Gateway Worker secret | 90 days |
 | `LOG_WORKER_TOKEN` | VPS `.env` + Log Receiver Worker secret | 90 days |
 | Provider API keys (Anthropic, OpenAI, etc.) | AI Gateway Worker secrets (Cloudflare Dashboard) | Per provider policy |
-| `TELEGRAM_BOT_TOKEN` | VPS `.env` | As needed |
+| `HOSTALERT_TELEGRAM_BOT_TOKEN` | VPS `.env` | As needed |
 | SSH keys (`~/.ssh/vps1_openclaw_ed25519`) | Local machine + VPS `authorized_keys` | Annual |
 
 ### Rotation Procedures

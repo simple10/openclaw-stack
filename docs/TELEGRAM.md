@@ -1,11 +1,6 @@
 # Telegram Setup
 
-Telegram is used for two things:
-
-1. Host Alerter - sends messages about VPS health
-2. OpenClaw channel - configures OpenClaw to communicate over telegram
-
-The host alerter script sends VPS health alerts (disk, memory, container crashes) to Telegram. This requires a bot `token` and a `chat ID`.
+The host alerter script sends VPS health alerts (disk, memory, container crashes) to Telegram. This requires a bot token and a chat ID.
 
 Both values are optional — if left empty in `openclaw-config.env`, the alerter silently skips Telegram notifications.
 
@@ -19,7 +14,7 @@ Both values are optional — if left empty in `openclaw-config.env`, the alerter
 6. Copy the token into `openclaw-config.env`:
 
    ```bash
-   TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz
+   HOSTALERT_TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz
    ```
 
 ## 2. Get Your Chat ID
@@ -47,7 +42,7 @@ Both values are optional — if left empty in `openclaw-config.env`, the alerter
 
 ```bash
 # openclaw-config.env
-TELEGRAM_CHAT_ID=123456789
+HOSTALERT_TELEGRAM_CHAT_ID=123456789
 ```
 
 ## 3. Test It

@@ -335,7 +335,7 @@ All URLs are protected by Cloudflare Access.
 | Host alerter | Every 15 minutes via Telegram | <see note> |
 ```
 
-Check `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in `openclaw-config.env`.
+Check `HOSTALERT_TELEGRAM_BOT_TOKEN` and `HOSTALERT_TELEGRAM_CHAT_ID` in `openclaw-config.env`.
 
 **If both are set:** Host alerter is active. Show status as `Active` in the table.
 

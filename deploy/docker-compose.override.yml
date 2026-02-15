@@ -92,7 +92,6 @@ services:
       # - CEREBRAS_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
       # - MISTRAL_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
       # - OPENROUTER_API_KEY=${AI_GATEWAY_AUTH_TOKEN}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       # noVNC proxy base path — set when browser VNC is served under a URL subpath
       # (e.g., /browser). Empty = serve at root. Set from OPENCLAW_BROWSER_DOMAIN_PATH.
       - NOVNC_BASE_PATH=${NOVNC_BASE_PATH:-}

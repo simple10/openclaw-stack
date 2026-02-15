@@ -13,20 +13,20 @@ fi
 
 source "$CONFIG_FILE"
 
-if [[ -z "${TELEGRAM_BOT_TOKEN:-}" ]]; then
-  echo "Error: TELEGRAM_BOT_TOKEN is not set in openclaw-config.env" >&2
+if [[ -z "${HOSTALERT_TELEGRAM_BOT_TOKEN:-}" ]]; then
+  echo "Error: HOSTALERT_TELEGRAM_BOT_TOKEN is not set in openclaw-config.env" >&2
   exit 1
 fi
 
-if [[ -z "${TELEGRAM_CHAT_ID:-}" ]]; then
-  echo "Error: TELEGRAM_CHAT_ID is not set in openclaw-config.env" >&2
+if [[ -z "${HOSTALERT_TELEGRAM_CHAT_ID:-}" ]]; then
+  echo "Error: HOSTALERT_TELEGRAM_CHAT_ID is not set in openclaw-config.env" >&2
   exit 1
 fi
 
 MESSAGE="${1:-Test alert from OpenClaw}"
 
-RESPONSE=$(curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-  -d "chat_id=${TELEGRAM_CHAT_ID}" \
+RESPONSE=$(curl -s "https://api.telegram.org/bot${HOSTALERT_TELEGRAM_BOT_TOKEN}/sendMessage" \
+  -d "chat_id=${HOSTALERT_TELEGRAM_CHAT_ID}" \
   -d "text=${MESSAGE}")
 
 if echo "$RESPONSE" | grep -q '"ok":true'; then

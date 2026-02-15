@@ -2,7 +2,7 @@
 # Host resource monitoring — sends Telegram alerts on threshold breaches.
 # Runs via cron every 15 minutes: /etc/cron.d/openclaw-alerts
 #
-# Requires: TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in /home/openclaw/openclaw/.env
+# Requires: HOSTALERT_HOSTALERT_TELEGRAM_BOT_TOKEN and HOSTALERT_HOSTALERT_TELEGRAM_CHAT_ID in /home/openclaw/openclaw/.env
 # Only alerts on state *change* to avoid spam (tracks state in /tmp/host-alert-state).
 set -euo pipefail
 
@@ -17,7 +17,7 @@ fi
 # shellcheck source=/dev/null
 source "$CONFIG_FILE"
 
-if [[ -z "${TELEGRAM_BOT_TOKEN:-}" || -z "${TELEGRAM_CHAT_ID:-}" ]]; then
+if [[ -z "${HOSTALERT_TELEGRAM_BOT_TOKEN:-}" || -z "${HOSTALERT_TELEGRAM_CHAT_ID:-}" ]]; then
   # Silently exit if Telegram not configured — not an error
   exit 0
 fi
@@ -100,8 +100,8 @@ $(printf '  - %s\n' "${alerts[@]}")"
 fi
 
 hostname=$(hostname)
-curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-  -d "chat_id=${TELEGRAM_CHAT_ID}" \
+curl -s "https://api.telegram.org/bot${HOSTALERT_TELEGRAM_BOT_TOKEN}/sendMessage" \
+  -d "chat_id=${HOSTALERT_TELEGRAM_CHAT_ID}" \
   -d "text=🖥️ ${hostname}: ${message}" \
   -d "parse_mode=HTML" \
   >/dev/null 2>&1

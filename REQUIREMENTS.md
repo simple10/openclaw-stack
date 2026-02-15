@@ -463,8 +463,8 @@ See `04-vps1-openclaw.md` § 4.6 (compose) and § 4.7 (vector.yaml) for the full
 **Alert delivery:** Sends messages via Telegram Bot API:
 
 ```bash
-curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-  -d "chat_id=${TELEGRAM_CHAT_ID}" \
+curl -s "https://api.telegram.org/bot${HOSTALERT_TELEGRAM_BOT_TOKEN}/sendMessage" \
+  -d "chat_id=${HOSTALERT_TELEGRAM_CHAT_ID}" \
   -d "text=VPS Alert: Disk usage at 92%"
 ```
 
@@ -472,8 +472,8 @@ curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
 
 **Required configuration:**
 
-- `TELEGRAM_BOT_TOKEN` — In `openclaw-config.env`
-- `TELEGRAM_CHAT_ID` — In `openclaw-config.env` (the chat/group ID to send alerts to)
+- `HOSTALERT_TELEGRAM_BOT_TOKEN` — In `openclaw-config.env`
+- `HOSTALERT_TELEGRAM_CHAT_ID` — In `openclaw-config.env` (the chat/group ID to send alerts to)
 
 ### 3.12 Backup
 

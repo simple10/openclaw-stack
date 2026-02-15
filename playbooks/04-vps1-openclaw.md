@@ -29,9 +29,8 @@ From `../openclaw-config.env`:
 - `AI_GATEWAY_AUTH_TOKEN` - Required, AI Gateway auth token
 - `LOG_WORKER_URL` - Required, Log Receiver Worker URL
 - `LOG_WORKER_TOKEN` - Required, Log Receiver auth token
-- `TELEGRAM_BOT_TOKEN` - Optional
-- `TELEGRAM_CHAT_ID` - Optional (required for host alerter)
-- `DISCORD_BOT_TOKEN` - Optional
+- `HOSTALERT_TELEGRAM_BOT_TOKEN` - Optional (for host alerter)
+- `HOSTALERT_TELEGRAM_CHAT_ID` - Optional (for host alerter)
 - `OPENCLAW_DOMAIN_PATH` - URL subpath for the gateway UI (default: `/_openclaw`)
 - `OPENCLAW_BROWSER_DOMAIN_PATH` - Base path for the noVNC proxy (e.g., `/browser`), empty if using a separate subdomain
 
@@ -208,11 +207,9 @@ OPENCLAW_GATEWAY_TOKEN=${GATEWAY_TOKEN}
 AI_GATEWAY_WORKER_URL=${AI_GATEWAY_WORKER_URL}
 AI_GATEWAY_AUTH_TOKEN=${AI_GATEWAY_AUTH_TOKEN}
 
-# Channels (add as needed)
-TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
-TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
-DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:-}
-
+# Host alerter (Telegram notifications — see docs/TELEGRAM.md)
+HOSTALERT_TELEGRAM_BOT_TOKEN=${HOSTALERT_TELEGRAM_BOT_TOKEN:-}
+HOSTALERT_TELEGRAM_CHAT_ID=${HOSTALERT_TELEGRAM_CHAT_ID:-}
 # Log shipping to Cloudflare Worker
 LOG_WORKER_URL=${LOG_WORKER_URL}
 LOG_WORKER_TOKEN=${LOG_WORKER_TOKEN}
@@ -434,7 +431,7 @@ sudo chmod +x /home/openclaw/openclaw/scripts/entrypoint-gateway.sh
 
 Install a host monitoring script that sends alerts via Telegram when disk, memory, or CPU thresholds are exceeded.
 
-> **Note:** Requires `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` set in `openclaw-config.env`.
+> **Note:** Requires `HOSTALERT_TELEGRAM_BOT_TOKEN` and `HOSTALERT_TELEGRAM_CHAT_ID` set in `openclaw-config.env`.
 
 ```bash
 #!/bin/bash
