@@ -470,7 +470,7 @@ Create a convenience wrapper so `adminclaw` can run `openclaw <command>` directl
 sudo tee /usr/local/bin/openclaw << 'WRAPEOF'
 #!/bin/bash
 # OpenClaw CLI wrapper — runs commands inside the gateway container as node user
-exec sudo docker exec --user node openclaw-gateway openclaw "$@"
+exec sudo docker exec -it --user node openclaw-gateway openclaw "$@"
 WRAPEOF
 
 sudo chmod +x /usr/local/bin/openclaw
