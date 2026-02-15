@@ -187,6 +187,8 @@ EOF
 
 ## 4.5 Create Environment File
 
+> **Batch:** Steps 4.5 through 4.8 write independent config files. Execute all file writes in a single SSH session.
+
 ```bash
 #!/bin/bash
 # Generate gateway token
@@ -330,7 +332,7 @@ sudo chown 1000:1000 /home/openclaw/.openclaw/openclaw.json
 sudo chmod 600 /home/openclaw/.openclaw/openclaw.json
 ```
 
-Create the agent model configuration to route API calls through the AI Gateway proxy:
+Create the agent model configuration for all agents to route API calls through the AI Gateway proxy:
 
 ```bash
 #!/bin/bash
@@ -343,48 +345,16 @@ Create the agent model configuration to route API calls through the AI Gateway p
 # instead of overriding the built-in anthropic models, and the built-in
 # entries (with hardcoded api.anthropic.com) take precedence.
 
-sudo mkdir -p /home/openclaw/.openclaw/agents/main/agent
-
-# SOURCE: deploy/models.json (template) → /home/openclaw/.openclaw/agents/main/agent/models.json
+# SOURCE: deploy/models.json (template) → /home/openclaw/.openclaw/agents/<agent>/agent/models.json
 # VARS: AI_GATEWAY_WORKER_URL (from openclaw-config.env)
-sudo tee /home/openclaw/.openclaw/agents/main/agent/models.json << 'JSONEOF'
+for agent in main code skills; do
+  sudo mkdir -p /home/openclaw/.openclaw/agents/${agent}/agent
+  sudo tee /home/openclaw/.openclaw/agents/${agent}/agent/models.json << 'JSONEOF'
 # <<< deploy/models.json (template) >>>
 JSONEOF
-
-sudo chown -R 1000:1000 /home/openclaw/.openclaw/agents/main
-sudo chmod 600 /home/openclaw/.openclaw/agents/main/agent/models.json
-```
-
-Create the same model configuration for the code agent:
-
-```bash
-#!/bin/bash
-sudo mkdir -p /home/openclaw/.openclaw/agents/code/agent
-
-# SOURCE: deploy/models.json (template) → /home/openclaw/.openclaw/agents/code/agent/models.json
-# VARS: AI_GATEWAY_WORKER_URL (from openclaw-config.env)
-sudo tee /home/openclaw/.openclaw/agents/code/agent/models.json << 'JSONEOF'
-# <<< deploy/models.json (template) >>>
-JSONEOF
-
-sudo chown -R 1000:1000 /home/openclaw/.openclaw/agents/code
-sudo chmod 600 /home/openclaw/.openclaw/agents/code/agent/models.json
-```
-
-Create the same model configuration for the skills agent:
-
-```bash
-#!/bin/bash
-sudo mkdir -p /home/openclaw/.openclaw/agents/skills/agent
-
-# SOURCE: deploy/models.json (template) → /home/openclaw/.openclaw/agents/skills/agent/models.json
-# VARS: AI_GATEWAY_WORKER_URL (from openclaw-config.env)
-sudo tee /home/openclaw/.openclaw/agents/skills/agent/models.json << 'JSONEOF'
-# <<< deploy/models.json (template) >>>
-JSONEOF
-
-sudo chown -R 1000:1000 /home/openclaw/.openclaw/agents/skills
-sudo chmod 600 /home/openclaw/.openclaw/agents/skills/agent/models.json
+  sudo chown -R 1000:1000 /home/openclaw/.openclaw/agents/${agent}
+  sudo chmod 600 /home/openclaw/.openclaw/agents/${agent}/agent/models.json
+done
 ```
 
 ---

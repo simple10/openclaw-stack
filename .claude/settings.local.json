@@ -15,23 +15,24 @@
       "Bash(npm install:*)",
       "Bash(npm run typecheck:*)",
       "Bash(grep:*)",
-      "Bash(wrangler types:*)",
       "Bash(openssl rand:*)",
       "Bash(test:*)",
       "Bash(source:*)",
       "Bash(npx wrangler whoami:*)",
+      "Bash(wrangler types:*)",
+      "Bash(npx wrangler deploy:*)",
       "Bash(npx wrangler secret put:*)",
       "Bash(npm run deploy:*)",
       "Bash(do echo *)",
       "Bash(done)",
       "WebSearch",
       "Bash(gh api:*)",
-      "WebFetch(domain:github.com)",
       "Bash(nc:*)",
       "WebFetch(domain:docs.openclaw.ai)",
       "Bash(python3:*)",
       "Bash(fi)",
-      "Bash(git add:*)"
+      "Bash(until ssh:*)",
+      "Bash(do sleep 10)"
     ]
   }
 }

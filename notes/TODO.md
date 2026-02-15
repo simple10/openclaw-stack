@@ -2,10 +2,6 @@
 
 AGENTS: IGNORE THIS TODO LIST - for development only
 
-- [ ] Make claude store adminclaw and openclaw user passwords in openclaw-config.env as comments when they're generated
-
-- [ ] Add docs/SKILL-ROUTER.md to point to skill router README.md on how to use skill-router config in openclaw.json
-
 - [ ] Mess around with the config in the UI then check the openclaw.json
   - Use the changes to update 04 playbook - e.g.
 
@@ -23,6 +19,9 @@ AGENTS: IGNORE THIS TODO LIST - for development only
 
 ## Completed (this branch)
 
+- [x] Scan playbooks for compaction and optimization
+- [x] Make claude store adminclaw and openclaw user passwords in openclaw-config.env as comments when they're generated
+- [x] Fix failed first try attempts in playbooks - happened fairly early, probably 02, check asciinema
 - [x] Update playbooks to remove AI Gateway requirement or checks
 - [x] Serve html instead of not found for media server when no files are present
 - [x] Add docs/ to sandbox agents, system prompt references docs/ to assist users with openclaw: <https://docs.openclaw.ai/concepts/system-prompt>

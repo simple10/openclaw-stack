@@ -299,6 +299,8 @@ sudo ls -la /home/adminclaw/.ssh/
 
 ## 2.5 Swap Configuration
 
+> **Batch:** Steps 2.5 through 2.8 are independent system configurations. Execute all in a single SSH session after § 2.4 completes.
+
 Run on: **VPS-1**
 
 Create a swap file so Docker containers can use swap-backed memory (`memorySwap` limits).

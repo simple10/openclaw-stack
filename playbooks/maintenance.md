@@ -31,9 +31,7 @@ NEW_TOKEN=$(openssl rand -hex 32)
 # 3. Update openclaw.json on VPS
 # Edit /home/openclaw/.openclaw/openclaw.json — update gateway.auth.token and gateway.remote.token
 
-# 4. Recreate gateway to pick up new .env values
-# IMPORTANT: `docker compose restart` does NOT reload .env — it only restarts the process
-# with old env vars. `up -d` recreates the container with the updated .env values.
+# 4. Recreate gateway to pick up new .env values (see CLAUDE.md: restart vs up -d)
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d openclaw-gateway'
 
 # 5. Update all paired devices with new token (existing browser URLs will need the new token parameter)
@@ -50,11 +48,9 @@ cd workers/ai-gateway
 echo "$NEW_TOKEN" | npx wrangler secret put AUTH_TOKEN
 
 # 3. Update VPS .env — change AI_GATEWAY_AUTH_TOKEN value
-# This also updates ANTHROPIC_API_KEY, OPENAI_API_KEY, etc. via compose environment mapping
 
-# 4. Rebuild image and restart
-sudo -u openclaw /home/openclaw/scripts/build-openclaw.sh
-sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'
+# 4. Recreate gateway to pick up new .env values (no rebuild needed — token is an env var)
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d openclaw-gateway'
 ```
 
 #### Log Worker Token
@@ -69,8 +65,7 @@ echo "$NEW_TOKEN" | npx wrangler secret put AUTH_TOKEN
 
 # 3. Update VPS .env — change LOG_WORKER_TOKEN value
 
-# 4. Recreate Vector to pick up new .env values
-# IMPORTANT: `restart` does NOT reload .env — use `up -d` to recreate with new env vars
+# 4. Recreate Vector to pick up new .env values (see CLAUDE.md: restart vs up -d)
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d vector'
 ```
 

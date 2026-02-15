@@ -35,11 +35,13 @@ Execute **all** verification steps from [`playbooks/07-verification.md`](../play
 | **7.3** | Cloudflare Workers health (AI Gateway + Log Receiver) |
 | **7.4** | Cloudflare Tunnel running, external access works, direct IP blocked |
 | **7.5** | Host alerter script and cron job |
-| **7.6** | Security checklist — SSH hardening, UFW, fail2ban, Sysbox, localhost-only port bindings, backup/alerter crons |
+| **7.5a** | Log rotation config installed and working |
+| **7.5b** | CLI device paired and communicating with gateway |
+| **7.5c** | Gateway resource limits match VPS hardware |
+| **7.6** | Security verification — SSH hardening, UFW, fail2ban, port binding, external reachability, OpenClaw security audit + doctor |
 | **7.7** | End-to-end LLM test — send message, verify AI Gateway routing, check Cloudflare dashboards |
-| **7.8** | Security verification — external port reachability, full listening port audit, OpenClaw security audit |
 
-**Important**: Section 7.8 includes tests that run on the **local machine** (not the VPS):
+**Important**: Section 7.6 includes tests that run on the **local machine** (not the VPS):
 
 ```bash
 # Run from LOCAL machine — confirm gateway ports aren't externally reachable
@@ -148,10 +150,14 @@ After running all tests, compile results:
 | **Workers** | AI Gateway healthy | 7.3 | |
 | | Log Receiver healthy | 7.3 | |
 | **Monitoring** | Host alerter cron | 7.5 | |
+| | Log rotation | 7.5a | |
 | | Backup cron | 7.6 | |
-| **Security** | Ports bound to localhost only | 7.6, 7.8 | |
-| | External port reachability blocked | 7.8 | |
-| | Security audit passes | 7.8 | |
+| **CLI** | CLI device paired | 7.5b | |
+| | Resource limits match VPS | 7.5c | |
+| **Security** | Ports bound to localhost only | 7.6 | |
+| | External port reachability blocked | 7.6 | |
+| | Security audit passes | 7.6 | |
+| | Doctor check (lan warning only) | 7.6 | |
 | **End-to-End** | LLM request via AI Gateway | 7.7 | |
 | | Logs in Cloudflare dashboard | 7.7 | |
 | **Browser UI** | Cloudflare Access gate works | Phase 2.1 | |
@@ -191,7 +197,7 @@ ssh -p 222 adminclaw@<VPS1_IP> "sudo -u openclaw docker ps --format '{{.Names}}:
 
 1. Check Vector logs: `sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose logs vector'`
 2. Verify LOG_WORKER_URL includes `/logs` path
-3. Check Log Receiver Worker health: `curl -s https://<LOG_WORKER_URL>/health`
+3. Check Log Receiver Worker health (strip `/logs` suffix): `curl -s https://<LOG_WORKER_BASE_URL>/health`
 
 ### Container Permission Errors
 

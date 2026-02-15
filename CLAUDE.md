@@ -112,29 +112,20 @@ sudo su - openclaw
 
 ### Service Management
 
+All docker compose commands run as openclaw (adminclaw can't cd into openclaw's home):
+
 ```bash
-# OpenClaw Gateway (adminclaw can't cd into openclaw's home — wrap in bash -c)
-sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'      # Start
-sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose down'       # Stop
-sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose logs -f'    # Logs
-sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose ps'         # Status
-
-# Restart gateway (service name is "openclaw-gateway", not "gateway")
-sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart openclaw-gateway'
-
-# Vector logs (log shipper)
-sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose logs vector'        # View Vector logs
-sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose logs -f vector'     # Follow Vector logs
-sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart vector'     # Restart Vector
+# Pattern: sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose <cmd>'
+# Examples:
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'       # Start all
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose ps'           # Status
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose logs -f'      # Follow logs
+# Per-service: append service name (e.g., restart openclaw-gateway, logs vector)
 ```
 
-> **Note:** Docker Compose prints warnings about unset `CLAUDE_AI_SESSION_KEY`, `CLAUDE_WEB_SESSION_KEY`, and `CLAUDE_WEB_COOKIE` variables on every command. These are harmless — the variables are optional and default to blank strings.
+> **Note:** Docker Compose warns about unset `CLAUDE_AI_SESSION_KEY`/`CLAUDE_WEB_SESSION_KEY`/`CLAUDE_WEB_COOKIE` — harmless, these are optional.
 
-> **IMPORTANT — `restart` vs `up -d` after `.env` changes:**
-> `docker compose restart` only restarts the container process — it does **not** reload `.env` variables. Environment variables from `.env` are baked into the container at creation time.
->
-> - **Changed `.env` values** (tokens, URLs, API keys) → use `docker compose up -d <service>` to recreate the container with new env vars.
-> - **Changed bind-mounted files** (openclaw.json, plugins, hooks, entrypoint scripts, vector.yaml) → `docker compose restart <service>` is sufficient since files are read from disk at process startup.
+> **`restart` vs `up -d`:** `restart` does NOT reload `.env` values (baked at container creation). Use `up -d <service>` after `.env` changes. `restart` is fine for bind-mounted file changes (read from disk at startup).
 
 ### Firewall
 
@@ -173,4 +164,4 @@ For detailed architecture, configuration, and gotchas, see [REQUIREMENTS.md](REQ
 
 ## Security Checklist
 
-See [07-verification.md § 7.6](playbooks/07-verification.md) for the full security checklist.
+See [07-verification.md § 7.6](playbooks/07-verification.md) for the full security verification.

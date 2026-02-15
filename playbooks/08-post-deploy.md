@@ -161,10 +161,9 @@ ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
 
 This re-pairs the CLI. Now retry Approach 1.
 
-### Approach 3: File-Based Pairing (from 04-vps1-openclaw.md)
+### Approach 3: File-Based Pairing
 
-If the CLI pairing keeps failing, use the file-manipulation approach from the
-initial deployment. This bypasses the WebSocket pairing handshake entirely.
+If the CLI pairing keeps failing, bypass WebSocket pairing entirely via file manipulation.
 
 ```bash
 # 1. Fix .openclaw ownership (gateway creates dirs as root before gosu drops to node)
@@ -175,15 +174,37 @@ ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
 ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
   "sudo docker exec --user node openclaw-gateway openclaw devices list 2>&1 || true"
 
-# 3. Approve the CLI device via file manipulation on the VPS
-```
+# 3. Approve the CLI device via file manipulation — moves CLI entry from pending.json to paired.json
+ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> "sudo python3 -c \"
+import json, time, os
+pending_file = '/home/openclaw/.openclaw/devices/pending.json'
+paired_file = '/home/openclaw/.openclaw/devices/paired.json'
+if not os.path.exists(pending_file):
+    print('No pending.json found'); exit(1)
+with open(pending_file) as f: pending = json.load(f)
+paired = {}
+if os.path.exists(paired_file):
+    with open(paired_file) as f: paired = json.load(f)
+for req_id, req in list(pending.items()):
+    if req.get('clientId') == 'cli':
+        now = int(time.time() * 1000)
+        paired[req['deviceId']] = {
+            'deviceId': req['deviceId'], 'publicKey': req['publicKey'],
+            'platform': req['platform'], 'clientId': req['clientId'],
+            'clientMode': req['clientMode'], 'role': req['role'],
+            'roles': req['roles'], 'scopes': req['scopes'],
+            'remoteIp': req['remoteIp'],
+            'createdAtMs': now, 'approvedAtMs': now, 'tokens': {},
+        }
+        del pending[req_id]; break
+else:
+    print('No CLI pending request found'); exit(1)
+with open(paired_file, 'w') as f: json.dump(paired, f, indent=2)
+with open(pending_file, 'w') as f: json.dump(pending, f, indent=2)
+print('CLI device approved')
+\""
 
-For step 3, run the Python approval script from `04-vps1-openclaw.md` §4.9 on the VPS.
-It reads `pending.json`, moves the CLI entry to `paired.json`, and the gateway picks
-up the change immediately (no restart needed).
-
-```bash
-# 4. Verify CLI is paired
+# 4. Verify CLI is paired (gateway reads files on each connection — no restart needed)
 ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> "openclaw devices list"
 ```
 
