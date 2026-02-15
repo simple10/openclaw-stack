@@ -184,6 +184,7 @@ curl -sI --connect-timeout 10 https://<OPENCLAW_BROWSER_DOMAIN><OPENCLAW_BROWSER
 > configured hostnames."
 
 Debug steps:
+
 ```bash
 # Check DNS resolution
 dig <OPENCLAW_DOMAIN>
@@ -456,6 +457,7 @@ free -h
 sudo docker logs --tail 50 vector
 
 # Restart Vector
+# Restart Vector (use `up -d vector` instead if .env values changed)
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart vector'
 
 # Check if Worker endpoint is reachable (strip /logs suffix for base URL)

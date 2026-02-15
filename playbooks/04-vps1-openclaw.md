@@ -883,6 +883,7 @@ sudo docker exec vector ls -la /etc/vector/
 sudo docker exec vector wget -q -O- <LOG_WORKER_URL_WITHOUT_PATH>/health
 
 # Restart Vector after fixing
+# Restart Vector (use `up -d vector` instead if .env values changed)
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart vector'
 ```
 

@@ -130,6 +130,12 @@ sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart v
 
 > **Note:** Docker Compose prints warnings about unset `CLAUDE_AI_SESSION_KEY`, `CLAUDE_WEB_SESSION_KEY`, and `CLAUDE_WEB_COOKIE` variables on every command. These are harmless — the variables are optional and default to blank strings.
 
+> **IMPORTANT — `restart` vs `up -d` after `.env` changes:**
+> `docker compose restart` only restarts the container process — it does **not** reload `.env` variables. Environment variables from `.env` are baked into the container at creation time.
+>
+> - **Changed `.env` values** (tokens, URLs, API keys) → use `docker compose up -d <service>` to recreate the container with new env vars.
+> - **Changed bind-mounted files** (openclaw.json, plugins, hooks, entrypoint scripts, vector.yaml) → `docker compose restart <service>` is sufficient since files are read from disk at process startup.
+
 ### Firewall
 
 ```bash

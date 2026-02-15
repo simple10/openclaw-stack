@@ -31,8 +31,10 @@ NEW_TOKEN=$(openssl rand -hex 32)
 # 3. Update openclaw.json on VPS
 # Edit /home/openclaw/.openclaw/openclaw.json — update gateway.auth.token and gateway.remote.token
 
-# 4. Restart gateway (no rebuild needed — .env and config are bind-mounted, not baked into image)
-sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart openclaw-gateway'
+# 4. Recreate gateway to pick up new .env values
+# IMPORTANT: `docker compose restart` does NOT reload .env — it only restarts the process
+# with old env vars. `up -d` recreates the container with the updated .env values.
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d openclaw-gateway'
 
 # 5. Update all paired devices with new token (existing browser URLs will need the new token parameter)
 ```
@@ -67,8 +69,9 @@ echo "$NEW_TOKEN" | npx wrangler secret put AUTH_TOKEN
 
 # 3. Update VPS .env — change LOG_WORKER_TOKEN value
 
-# 4. Restart Vector to pick up new token
-sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart vector'
+# 4. Recreate Vector to pick up new .env values
+# IMPORTANT: `restart` does NOT reload .env — use `up -d` to recreate with new env vars
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d vector'
 ```
 
 #### Provider API Keys
@@ -160,6 +163,7 @@ sudo chown 1000:1000 /home/openclaw/openclaw/deploy/<file>
 rm /tmp/<file>
 
 # Restart gateway to pick up changes (service name is "openclaw-gateway")
+# `restart` is correct here — bind-mounted files are read from disk at startup, no env var changes
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart openclaw-gateway'
 ```
 
