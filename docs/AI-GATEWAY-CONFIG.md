@@ -2,6 +2,8 @@
 
 The AI Gateway Worker proxies LLM requests from the OpenClaw gateway to Anthropic and OpenAI. It supports two routing modes, auto-detected based on which secrets are configured.
 
+See also [](CLAUDE-SUBSCRIPTION.md) for using OpenClaw with a claude code subscription.
+
 ## Routing Modes
 
 ### Direct API (default)
