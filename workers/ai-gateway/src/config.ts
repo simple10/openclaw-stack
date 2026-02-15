@@ -14,16 +14,19 @@ const cfAiGateway = {
   headers: { 'cf-aig-authorization': `Bearer ${env.CF_AI_GATEWAY_TOKEN}` },
 }
 
+// Use the Cloudflare AI Gateway if env vars are set
+const useCfGateway = env.CF_AI_GATEWAY_TOKEN && env.CF_AI_GATEWAY_ID && env.CF_AI_GATEWAY_TOKEN
+
+/**
+ * Provider Config
+ *
+ * Change these to any upstream provider or proxy endpoints: Azure, AWS Bedrock, etc.
+ * Defaults to using Cloudflare AI Gateway if env vars are configured.
+ */
 export const PROVIDER_CONFIG = {
   // ── Anthropic ──────────────────────────────────────────────
-  // Cloudflare AI Gateway (optional):
-  // anthropic: cfAiGateway,
-  // Direct API (default)
-  anthropic: { baseUrl: 'https://api.anthropic.com' },
+  anthropic: useCfGateway ? cfAiGateway : { baseUrl: 'https://api.anthropic.com' },
 
   // ── OpenAI ─────────────────────────────────────────────────
-  // Cloudflare AI Gateway (optional):
-  // openai: cfAiGateway,
-  // Direct API — replace the line above to bypass CF AI Gateway:
-  openai: { baseUrl: 'https://api.openai.com' },
+  openai: useCfGateway ? cfAiGateway : { baseUrl: 'https://api.openai.com' },
 }
