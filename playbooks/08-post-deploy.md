@@ -39,7 +39,7 @@ curl -s https://<AI_GATEWAY_WORKER_URL>/health
 Send a minimal request through the AI proxy to verify it can reach a provider:
 
 ```bash
-curl -s -w "\n%{http_code}" https://<AI_GATEWAY_WORKER_URL>/v1/messages \
+curl -s -w "\n%{http_code}" https://<AI_GATEWAY_WORKER_URL>/anthropic/v1/messages \
   -H "Authorization: Bearer <AI_GATEWAY_AUTH_TOKEN>" \
   -H "Content-Type: application/json" \
   -H "anthropic-version: 2023-06-01" \

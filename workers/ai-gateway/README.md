@@ -17,10 +17,10 @@ Streaming works transparently — request and response bodies are passed through
 | Client path | Method | Provider |
 |---|---|---|
 | `/health` | GET | Health check (no auth) |
-| `/v1/chat/completions` | POST | OpenAI |
-| `/v1/embeddings` | POST | OpenAI |
-| `/v1/models` | GET | OpenAI |
-| `/v1/messages` | POST | Anthropic |
+| `/openai/v1/chat/completions` | POST | OpenAI |
+| `/openai/v1/embeddings` | POST | OpenAI |
+| `/openai/v1/models` | GET | OpenAI |
+| `/anthropic/v1/messages` | POST | Anthropic |
 
 ## Prerequisites
 
@@ -72,7 +72,7 @@ curl http://localhost:8787/health
 Test an OpenAI request:
 
 ```bash
-curl http://localhost:8787/v1/chat/completions \
+curl http://localhost:8787/openai/v1/chat/completions \
   -H "Authorization: Bearer <AUTH_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"Hi"}]}'
@@ -81,7 +81,7 @@ curl http://localhost:8787/v1/chat/completions \
 Test an Anthropic request (streaming):
 
 ```bash
-curl http://localhost:8787/v1/messages \
+curl http://localhost:8787/anthropic/v1/messages \
   -H "Authorization: Bearer <AUTH_TOKEN>" \
   -H "Content-Type: application/json" \
   -H "anthropic-version: 2023-06-01" \
@@ -91,7 +91,7 @@ curl http://localhost:8787/v1/messages \
 Verify auth rejection:
 
 ```bash
-curl http://localhost:8787/v1/messages
+curl http://localhost:8787/anthropic/v1/messages
 # → 401 {"error":{"message":"Missing Authorization header"}}
 ```
 

@@ -548,8 +548,8 @@ Proxies LLM requests to Anthropic and OpenAI. Routes directly to provider APIs b
 
 | Method | Path | Auth | Purpose |
 |--------|------|------|---------|
-| `POST` | `/v1/chat/completions` | Bearer token | OpenAI-compatible completions |
-| `POST` | `/v1/messages` | Bearer token | Anthropic messages API |
+| `POST` | `/openai/v1/chat/completions` | Bearer token | OpenAI-compatible completions |
+| `POST` | `/anthropic/v1/messages` | Bearer token | Anthropic messages API |
 | `GET` | `/health` | None | Health check |
 
 **Auth:** Bearer token (`AUTH_TOKEN` secret) — clients must include `Authorization: Bearer <token>` header.

@@ -97,7 +97,7 @@ curl -s https://<AI_GATEWAY_WORKER_URL>/health
 ### Test an LLM request (Anthropic)
 
 ```bash
-curl -s https://<AI_GATEWAY_WORKER_URL>/v1/messages \
+curl -s https://<AI_GATEWAY_WORKER_URL>/anthropic/v1/messages \
   -H "Authorization: Bearer <AI_GATEWAY_AUTH_TOKEN>" \
   -H "Content-Type: application/json" \
   -H "anthropic-version: 2023-06-01" \
@@ -109,7 +109,7 @@ curl -s https://<AI_GATEWAY_WORKER_URL>/v1/messages \
 ### Test an LLM request (OpenAI)
 
 ```bash
-curl -s https://<AI_GATEWAY_WORKER_URL>/v1/chat/completions \
+curl -s https://<AI_GATEWAY_WORKER_URL>/openai/v1/chat/completions \
   -H "Authorization: Bearer <AI_GATEWAY_AUTH_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{"model":"gpt-4o-mini","max_tokens":10,"messages":[{"role":"user","content":"Say hi"}]}'
