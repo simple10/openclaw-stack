@@ -31,6 +31,7 @@ From `../openclaw-config.env`:
 - `LOG_WORKER_TOKEN` - Required, Log Receiver auth token
 - `HOSTALERT_TELEGRAM_BOT_TOKEN` - Optional (for host alerter)
 - `HOSTALERT_TELEGRAM_CHAT_ID` - Optional (for host alerter)
+- `HOSTALERT_DAILY_REPORT_TIME` - Optional, daily health report time (default: `9:00 AM UTC`)
 - `OPENCLAW_DOMAIN_PATH` - URL subpath for the gateway UI (default: `/_openclaw`)
 - `OPENCLAW_BROWSER_DOMAIN_PATH` - Base path for the noVNC proxy (e.g., `/browser`), empty if using a separate subdomain
 
@@ -424,14 +425,24 @@ SCRIPTEOF
 
 sudo chmod +x /home/openclaw/scripts/host-alert.sh
 
-# Create cron entry — runs every 15 minutes as root
+# Create cron entries — alerter every 15 minutes, daily report if Telegram configured
+# HOSTALERT_DAILY_REPORT_TIME is human-readable (e.g., "9:00 AM PST") — Claude converts
+# it to cron format at execution time. Default: 0 17 * * * (9:00 AM PST = 5PM UTC).
 sudo tee /etc/cron.d/openclaw-alerts << 'EOF'
 # OpenClaw host alerter — checks disk, memory, CPU, container health
 */15 * * * * root /home/openclaw/scripts/host-alert.sh
+# Daily health report (time configured via HOSTALERT_DAILY_REPORT_TIME)
+<CRON_MINUTE> <CRON_HOUR> * * * root /home/openclaw/scripts/host-alert.sh --report
 EOF
 
 sudo chmod 644 /etc/cron.d/openclaw-alerts
 ```
+
+**Cron generation rules:**
+
+- **Cron runs in the server's local timezone**, not necessarily UTC. Before converting `HOSTALERT_DAILY_REPORT_TIME` to cron fields, check the server timezone: `timedatectl show -p Timezone --value` (or `cat /etc/timezone` as fallback). Convert the user's specified time to the server's local timezone, then write the cron minute/hour fields in that timezone. Include the server timezone and original user time in the cron comment for clarity.
+- If `HOSTALERT_DAILY_REPORT_TIME` is not set, default to `9:00 AM UTC` — still convert to the server's local timezone.
+- Only include the daily report cron line (`--report`) if both `HOSTALERT_TELEGRAM_BOT_TOKEN` and `HOSTALERT_TELEGRAM_CHAT_ID` are set in `openclaw-config.env`. If Telegram is not configured, write only the alerter line (the script exits silently without Telegram credentials, but there's no point scheduling the report).
 
 ---
 

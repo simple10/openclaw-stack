@@ -362,15 +362,16 @@ All URLs are protected by Cloudflare Access.
 |-----|----------|--------|
 | Backup | Daily at 3:00 AM UTC (30-day retention) | Active |
 | Host alerter | Every 15 minutes via Telegram | <see note> |
+| Daily report | Daily at <HOSTALERT_DAILY_REPORT_TIME> via Telegram | <see note> |
 ```
 
 Check `HOSTALERT_TELEGRAM_BOT_TOKEN` and `HOSTALERT_TELEGRAM_CHAT_ID` in `openclaw-config.env`.
 
-**If both are set:** Host alerter is active. Show status as `Active` in the table.
+**If both are set:** Host alerter and daily report are active. Show status as `Active` in both rows. For the daily report schedule, use the value of `HOSTALERT_DAILY_REPORT_TIME` (default: `9:00 AM UTC`).
 
-**If either is empty:** Show status as `Not configured` and append:
+**If either is empty:** Show status as `Not configured` for both rows and append:
 
-> **Host alerter** is not configured. To enable disk/memory/CPU alerts via Telegram:
+> **Host alerter & daily report** are not configured. To enable disk/memory/CPU alerts and daily health reports via Telegram:
 >
 > 1. Follow [`docs/TELEGRAM.md`](../docs/TELEGRAM.md) to create a Telegram bot and get your chat ID
 > 2. Tell Claude to update the host alerter with your bot token and chat ID

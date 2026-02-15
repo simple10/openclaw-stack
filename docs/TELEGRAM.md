@@ -33,7 +33,10 @@ Both values are optional — if left empty in `openclaw-config.env`, the alerter
 ### Option B: Group Chat
 
 1. In Telegram, add your bot to a group - can be a new group or existing one
-2. Send a **slash command** in the group (e.g., `/start` or `/hello`) — bots have privacy mode enabled by default and only see slash commands in groups
+2. Send a **slash command** in the group (e.g., `/start` or `/hello`)
+
+   — bots have privacy mode enabled by default and only see slash commands in groups
+
 3. Check `getUpdates` as above — the group chat ID will be a negative number (e.g., `-1001234567890`)
 
 > **Tip:** If slash commands don't appear in `getUpdates`, disable privacy mode: message `@BotFather`, send `/setprivacy`, select your bot, choose `Disable`, then **remove and re-add** the bot to the group (the change only takes effect on rejoin).
@@ -42,6 +45,7 @@ Both values are optional — if left empty in `openclaw-config.env`, the alerter
 
 ```bash
 # openclaw-config.env
+# IMPORTANT: your chat ID should be a negative # if it's a group chat
 HOSTALERT_TELEGRAM_CHAT_ID=123456789
 ```
 
@@ -71,3 +75,10 @@ The host alerter (`/home/openclaw/scripts/host-alert.sh`) runs via cron every 15
 - Container crash/restart detection
 
 Alerts are only sent on **state changes** — you won't get repeated messages for the same ongoing issue. A recovery message is sent when all checks pass again.
+
+## Updating Configs
+
+See [deploy/host-alert.sh](../deploy/host-alert.sh) for threshold configs.
+
+Ask claude to `redeploy host alert` after you've made any changes to host-alert.sh
+or the Telegram settings in openclaw-config.env

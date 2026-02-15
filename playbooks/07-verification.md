@@ -185,6 +185,45 @@ cat /etc/cron.d/openclaw-alerts
 
 **Expected:** Script exits 0 with no errors, cron entry exists.
 
+### Telegram Delivery Test
+
+```bash
+# Test Telegram delivery (if configured)
+TELEGRAM_TOKEN=$(sudo grep -oP 'HOSTALERT_TELEGRAM_BOT_TOKEN=\K.+' /home/openclaw/openclaw/.env)
+TELEGRAM_CHAT=$(sudo grep -oP 'HOSTALERT_TELEGRAM_CHAT_ID=\K.+' /home/openclaw/openclaw/.env)
+
+if [[ -n "$TELEGRAM_TOKEN" && -n "$TELEGRAM_CHAT" ]]; then
+  RESPONSE=$(curl -s "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
+    -d "chat_id=${TELEGRAM_CHAT}" \
+    -d "text=✅ OpenClaw host alerter verified on $(hostname)")
+  if echo "$RESPONSE" | grep -q '"ok":true'; then
+    echo "Telegram delivery: OK"
+  else
+    echo "Telegram delivery: FAILED"
+    echo "$RESPONSE"
+  fi
+else
+  echo "Telegram not configured — skipping delivery test"
+fi
+```
+
+**Expected:** If Telegram is configured, a test message arrives in the chat and the script prints `Telegram delivery: OK`. If not configured, this check is skipped.
+
+**If Telegram test fails:**
+
+- `"chat not found"` — the chat ID is wrong. See `docs/TELEGRAM.md` for getting the correct ID.
+- `"Unauthorized"` — the bot token is wrong. Create a new bot via @BotFather.
+- `"bot was blocked by the user"` — unblock the bot in Telegram.
+
+### Daily Report Cron
+
+```bash
+# Verify daily report cron entry (if Telegram configured)
+grep 'host-alert.sh --report' /etc/cron.d/openclaw-alerts || echo "No daily report cron (Telegram not configured)"
+```
+
+**Expected:** If Telegram is configured, the daily report cron line should be present. If not configured, the line is absent (expected).
+
 ---
 
 ## 7.5a Verify Log Rotation
