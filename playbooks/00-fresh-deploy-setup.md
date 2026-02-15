@@ -235,15 +235,17 @@ Present the full deployment plan to the user:
 
 ```
 Deployment Plan:
-  1. [If needed] Deploy Cloudflare Workers (01-workers.md)
+  1. [If needed] Deploy Cloudflare Workers (01-workers.md) — sets up infrastructure (AUTH_TOKEN only)
   2. Base setup & hardening (02-base-setup.md)
   3. Docker installation (03-docker.md)
   4. OpenClaw deployment (04-vps1-openclaw.md)
   5. Backup configuration (06-backup.md)
   6. Reboot & verification (07-verification.md)
-  7. Post-deploy: device pairing & deployment report (08-post-deploy.md)
+  7. Post-deploy: device pairing, AI proxy configuration & deployment report (08-post-deploy.md)
 ```
 
 Domain and Cloudflare Access have been verified. The deployment can proceed end-to-end without interruption until device pairing.
+
+> **Note:** AI proxy provider API keys (e.g., `ANTHROPIC_API_KEY`) are configured during post-deploy (step 7, `08-post-deploy.md` § 8.5), not during worker deployment (step 1). Worker deployment only sets up the infrastructure (`AUTH_TOKEN`).
 
 Ask the user to confirm before proceeding with the deployment.

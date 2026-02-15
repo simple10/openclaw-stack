@@ -1,9 +1,13 @@
 # AI Gateway Proxy Worker
 
-Cloudflare Worker that proxies LLM API calls through [Cloudflare AI Gateway](https://developers.cloudflare.com/ai-gateway/) for observability, caching, and rate limiting. Sits between the OpenClaw gateway and Anthropic/OpenAI without changing request/response formats.
+Cloudflare Worker that proxies LLM API calls to Anthropic and OpenAI. Sits between the OpenClaw gateway and providers without changing request/response formats. Routes directly to provider APIs by default, or optionally through [Cloudflare AI Gateway](https://developers.cloudflare.com/ai-gateway/) for observability, caching, and rate limiting.
 
 ```
-OpenClaw Gateway → Worker (auth, URL rewrite) → Cloudflare AI Gateway → Anthropic / OpenAI
+Direct mode (default):
+  OpenClaw Gateway → Worker (auth, key swap) → Anthropic / OpenAI
+
+CF AI Gateway mode (optional):
+  OpenClaw Gateway → Worker (auth, URL rewrite) → Cloudflare AI Gateway → Anthropic / OpenAI
 ```
 
 Streaming works transparently — request and response bodies are passed through as `ReadableStream` without parsing.
@@ -20,9 +24,10 @@ Streaming works transparently — request and response bodies are passed through
 
 ## Prerequisites
 
-- Cloudflare account with [AI Gateway](https://dash.cloudflare.com/?to=/:account/ai/ai-gateway) created
+- Cloudflare account with Workers enabled
 - Node.js 18+
-- API keys for the providers you want to proxy
+- API keys for the providers you want to proxy (can be added post-deploy)
+- (Optional) [Cloudflare AI Gateway](https://dash.cloudflare.com/?to=/:account/ai/ai-gateway) created — for analytics, caching, and rate limiting
 
 ## Setup
 
@@ -32,17 +37,11 @@ Streaming works transparently — request and response bodies are passed through
 npm install
 ```
 
-### 2. Configure wrangler.toml
+### 2. (Optional) Configure CF AI Gateway
 
-Set your Cloudflare Account ID and AI Gateway ID:
+By default, the worker routes directly to provider APIs (Anthropic, OpenAI). No `wrangler.jsonc` changes are needed.
 
-```toml
-[vars]
-CF_AI_GATEWAY_ACCOUNT_ID = "your-cloudflare-account-id"
-CF_AI_GATEWAY_ID = "your-ai-gateway-id"
-```
-
-Find these in the Cloudflare dashboard under **AI > AI Gateway**.
+To route through **Cloudflare AI Gateway** for analytics/caching, set `CF_AI_GATEWAY_ID` in `wrangler.jsonc` and add the required secrets (see [docs/AI-GATEWAY-CONFIG.md](../../docs/AI-GATEWAY-CONFIG.md)). The worker auto-detects CF AI Gateway mode when `CF_AI_GATEWAY_TOKEN`, `CF_AI_GATEWAY_ACCOUNT_ID`, and `CF_AI_GATEWAY_ID` are all set.
 
 ### 3. Configure secrets for local dev
 
@@ -98,15 +97,11 @@ curl http://localhost:8787/v1/messages
 
 ## Deploy
 
-### 1. Set secrets
+### 1. Set AUTH_TOKEN (required during deployment)
 
 ```bash
 wrangler secret put AUTH_TOKEN
-wrangler secret put OPENAI_API_KEY
-wrangler secret put ANTHROPIC_API_KEY
 ```
-
-Each command prompts for the value interactively.
 
 ### 2. Deploy the worker
 
@@ -119,6 +114,17 @@ npm run deploy
 ```bash
 curl https://ai-gateway-proxy.<your-subdomain>.workers.dev/health
 ```
+
+### 4. Add provider API keys (post-deploy)
+
+Provider keys are added after deployment so the VPS setup can proceed uninterrupted:
+
+```bash
+wrangler secret put ANTHROPIC_API_KEY    # Required for Anthropic models
+wrangler secret put OPENAI_API_KEY       # Required for OpenAI models
+```
+
+See [docs/AI-GATEWAY-CONFIG.md](../../docs/AI-GATEWAY-CONFIG.md) for the full configuration guide including optional CF AI Gateway setup.
 
 ## Configuring OpenClaw
 

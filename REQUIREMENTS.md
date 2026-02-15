@@ -17,7 +17,7 @@ Single OVHCloud VPS running the OpenClaw gateway and sandboxes. Observability is
 **Data flow:**
 
 - Users -> Cloudflare Edge -> Cloudflare Tunnel -> VPS-1 gateway (port 18789)
-- Users -> Cloudflare -> AI Gateway Worker (LLM proxy + analytics)
+- Users -> Cloudflare -> AI Gateway Worker (LLM proxy; routes to providers directly or via optional CF AI Gateway)
 - VPS-1 Vector -> Cloudflare Log Receiver Worker (log ingestion)
 - VPS-1 cron -> Telegram API (host alerts)
 - Cloudflare Health Check -> VPS-1 /health (uptime monitoring)
@@ -301,7 +301,7 @@ See `04-vps1-openclaw.md` § 4.6 for the full `docker-compose.override.yml`.
 
 `--bind lan` is required for Docker deployments. `loopback` doesn't work because Docker port-forwards traffic through the bridge network — connections from cloudflared arrive from `172.30.0.1` on `eth0`, not loopback. `openclaw doctor` warns about this; actual security is enforced by daemon.json localhost binding (§ 2.8).
 
-All LLM provider API keys are set to `AI_GATEWAY_AUTH_TOKEN` and base URLs to `AI_GATEWAY_WORKER_URL`, routing everything through the AI Gateway Worker. Unsupported providers fail at the Worker (404), preventing leakage to default endpoints.
+All LLM provider API keys are set to `AI_GATEWAY_AUTH_TOKEN` and base URLs to `AI_GATEWAY_WORKER_URL`, routing everything through the AI Gateway Worker. The worker routes to providers directly by default, or through Cloudflare AI Gateway when configured (see [`docs/AI-GATEWAY-CONFIG.md`](docs/AI-GATEWAY-CONFIG.md)). Unsupported providers fail at the Worker (404), preventing leakage to default endpoints.
 
 ### 3.5 Entrypoint Script (`scripts/entrypoint-gateway.sh`)
 
@@ -537,7 +537,12 @@ See `04-vps1-openclaw.md` § 4.5 for the full variable list and creation script.
 
 ### 4.1 AI Gateway Worker (`workers/ai-gateway/`)
 
-Proxies LLM requests through Cloudflare AI Gateway for analytics, rate limiting, and caching. The real API keys live only on the Worker (Cloudflare), not on the VPS.
+Proxies LLM requests to Anthropic and OpenAI. Routes directly to provider APIs by default, or through Cloudflare AI Gateway for analytics/caching when CF AI Gateway env vars are configured. Real API keys live only on the Worker (Cloudflare), not on the VPS.
+
+**Routing modes:**
+
+- **Direct API (default):** Worker forwards requests directly to `api.anthropic.com` / `api.openai.com`. No additional configuration beyond provider API keys.
+- **CF AI Gateway (optional):** When `CF_AI_GATEWAY_TOKEN`, `CF_AI_GATEWAY_ACCOUNT_ID`, and `CF_AI_GATEWAY_ID` are all set, the worker routes through Cloudflare AI Gateway for analytics, caching, and rate limiting. See [`docs/AI-GATEWAY-CONFIG.md`](docs/AI-GATEWAY-CONFIG.md).
 
 **Routes:**
 
@@ -551,19 +556,26 @@ Proxies LLM requests through Cloudflare AI Gateway for analytics, rate limiting,
 
 **Secrets (set via `wrangler secret put`):**
 
+*Required (set during deployment):*
+
 | Secret | Purpose |
 |--------|---------|
 | `AUTH_TOKEN` | Token clients use to authenticate to this worker |
-| `OPENAI_API_KEY` | Forwarded to OpenAI via AI Gateway |
-| `ANTHROPIC_API_KEY` | Forwarded to Anthropic via AI Gateway |
-| `CF_AI_GATEWAY_TOKEN` | Authenticates requests to Cloudflare AI Gateway |
-| `ACCOUNT_ID` | Cloudflare account ID |
+
+*Set post-deploy (see `08-post-deploy.md` § 8.5):*
+
+| Secret | Purpose |
+|--------|---------|
+| `ANTHROPIC_API_KEY` | Forwarded to Anthropic (required for Anthropic models) |
+| `OPENAI_API_KEY` | Forwarded to OpenAI (required for OpenAI models) |
+| `CF_AI_GATEWAY_TOKEN` | Authenticates requests to Cloudflare AI Gateway (optional — CF AI Gateway mode only) |
+| `CF_AI_GATEWAY_ACCOUNT_ID` | Cloudflare account ID (optional — CF AI Gateway mode only) |
 
 **Vars (in `wrangler.jsonc`):**
 
 | Var | Purpose |
 |-----|---------|
-| `CF_AI_GATEWAY_ID` | Cloudflare AI Gateway ID (e.g., `ai-gateway`) |
+| `CF_AI_GATEWAY_ID` | Cloudflare AI Gateway ID (optional — CF AI Gateway mode only) |
 
 ### 4.2 Log Receiver Worker (`workers/log-receiver/`)
 

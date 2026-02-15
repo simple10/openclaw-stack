@@ -75,13 +75,22 @@ sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart v
 
 Provider API keys are stored as Cloudflare Worker secrets in the AI Gateway Worker. They never touch the VPS.
 
+**Direct API mode** (default):
+
 ```bash
 # From local machine
 cd workers/ai-gateway
 echo "new-key-value" | npx wrangler secret put ANTHROPIC_API_KEY
 echo "new-key-value" | npx wrangler secret put OPENAI_API_KEY
-# etc.
 ```
+
+**CF AI Gateway mode** (optional): If using Cloudflare AI Gateway, also rotate the gateway token:
+
+```bash
+echo "new-token" | npx wrangler secret put CF_AI_GATEWAY_TOKEN
+```
+
+See [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md) for details on both modes.
 
 #### SSH Keys
 

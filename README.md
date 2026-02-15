@@ -287,7 +287,7 @@ openclaw-vps/
 │   ├── build-openclaw.sh     # Build script with auto-patching
 │   └── host-alert.sh         # Host monitoring + Telegram alerts
 ├── workers/
-│   ├── ai-gateway/           # Cloudflare AI Gateway proxy worker
+│   ├── ai-gateway/           # LLM API proxy worker (direct or optional CF AI Gateway)
 │   └── log-receiver/         # Cloudflare log receiver worker
 ├── docs/
 │   ├── BROWSER-VNC.md        # Browser VNC access via noVNC proxy

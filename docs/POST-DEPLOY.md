@@ -1,22 +1,19 @@
-# Optional Cloudflare Config
+# Post-Deploy Configuration
 
-This doc is WIP.
+Optional configuration steps to run after the automated deployment.
 
 ## AI Gateway Proxy Worker
 
 ### Configure Provider API Keys
 
-> **After verifying the worker is healthy**, add your real LLM provider API keys via the Cloudflare Dashboard (Workers & Pages -> ai-gateway-proxy -> Settings -> Variables and Secrets) or via wrangler:
->
-> ```bash
-> cd workers/ai-gateway
-> npx wrangler secret put ANTHROPIC_API_KEY
-> npx wrangler secret put OPENAI_API_KEY  # if using OpenAI models
-> ```
->
-> These keys are stored only in Cloudflare and never touch the VPS. They are not set during automated deployment — configure them yourself when ready.
->
-> Optionally, keys can be stored in the upstream Cloudflare AI Gateway, eliminating the need for the worker to have API keys.
+Provider API keys are configured during post-deploy (`08-post-deploy.md` § 8.5). The automated deployment only sets up the worker infrastructure (`AUTH_TOKEN`).
+
+The worker supports two modes:
+
+- **Direct API (default):** Add provider API keys as Worker secrets — requests go directly to Anthropic/OpenAI
+- **Cloudflare AI Gateway (optional):** Route through CF AI Gateway for analytics/caching — requires additional setup
+
+See [`docs/AI-GATEWAY-CONFIG.md`](AI-GATEWAY-CONFIG.md) for the full configuration guide covering both modes.
 
 ## 2. (Optional) Configure Cloudflare Health Check
 

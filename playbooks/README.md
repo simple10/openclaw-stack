@@ -16,7 +16,7 @@ For existing deployments, run `00-analysis-mode.md` first to verify current stat
 ## Execution Order
 
 0. `00-fresh-deploy-setup.md` - Config validation for fresh deploys (VPS1_IP, CF_TUNNEL_TOKEN, domain, Cloudflare Access, SSH)
-1. `01-workers.md` - Deploy Cloudflare Workers (AI Gateway + Log Receiver) — runs locally, triggered during config validation
+1. `01-workers.md` - Deploy Cloudflare Workers (AI Gateway proxy + Log Receiver) — runs locally, sets up infrastructure (provider API keys added post-deploy)
 2. `02-base-setup.md` - VPS-1
 3. `03-docker.md` - VPS-1
 4. `04-vps1-openclaw.md` - VPS-1

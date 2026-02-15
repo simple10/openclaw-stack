@@ -2,12 +2,12 @@
 
 ## Overview
 
-This document orchestrates the automated deployment of OpenClaw on a single OVHCloud VPS instance, with Cloudflare Workers handling observability and LLM proxying.
+This document orchestrates the automated deployment of OpenClaw on a single OVHCloud VPS instance, with Cloudflare Workers handling observability and LLM API proxying.
 
 | Component | Role | Services |
 |-----------|------|----------|
 | **VPS-1** | OpenClaw | Gateway, Sysbox, Vector (log shipper) |
-| **AI Gateway Worker** | LLM Proxy | Cloudflare AI Gateway analytics, API key isolation |
+| **AI Gateway Worker** | LLM Proxy | LLM proxy (direct API or optional CF AI Gateway), API key isolation |
 | **Log Receiver Worker** | Log Ingestion | Accepts container logs from Vector, Cloudflare real-time logs |
 
 ## Playbook Structure

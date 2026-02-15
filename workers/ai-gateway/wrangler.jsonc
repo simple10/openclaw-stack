@@ -15,21 +15,25 @@
   },
 
   "vars": {
-    // Set CF_AI_GATEWAY_ID to your upstream Cloudflare AI Gateway ID
-    // This is the AI Gateway the worker is proxying, see also CF_AI_GATEWAY_TOKEN
+    // CF AI Gateway ID (optional). When CF_AI_GATEWAY_TOKEN, CF_AI_GATEWAY_ACCOUNT_ID,
+    // and CF_AI_GATEWAY_ID are all set, the worker routes through Cloudflare AI Gateway.
+    // Otherwise, it routes directly to provider APIs (Anthropic, OpenAI).
+    // Auto-detected at runtime — no code changes needed to switch modes.
     "CF_AI_GATEWAY_ID": "openclaw-ai-gateway",
     "LOG_LEVEL": "debug"
     // Secrets (set via `wrangler secret put`):
     // Secrets survive `wrangler deploy` and will not be overwritten during new deploys
-    //   AUTH_TOKEN       — token clients use to authenticate to this worker
-    //   OPENAI_API_KEY   — forwarded to OpenAI via AI Gateway
-    //   ANTHROPIC_API_KEY — forwarded to Anthropic via AI Gateway
-    //   CLAUDE_CODE_OAUTH_TOKEN - claude code setup token
     //
-    //   CF_AI_GATEWAY_ACCOUNT_ID: "YOUR_CLOUDFLARE_ACCOUNT_ID", - use `wrangler whoami` to get account ID
-    //   CF_AI_GATEWAY_TOKEN — authenticates requests to Cloudflare AI Gateway
+    // Required (set during deployment):
+    //   AUTH_TOKEN            — token clients use to authenticate to this worker
     //
-    // To bypass Cloudflare AI Gateway and hit provider APIs directly,
-    // edit src/config.ts and redeploy — see examples in that file.
+    // Set post-deploy (see docs/AI-GATEWAY-CONFIG.md):
+    //   OPENAI_API_KEY        — forwarded to OpenAI (required for OpenAI models)
+    //   ANTHROPIC_API_KEY     — forwarded to Anthropic (required for Anthropic models)
+    //   CLAUDE_CODE_OAUTH_TOKEN — claude code setup token
+    //
+    // Optional (CF AI Gateway mode only):
+    //   CF_AI_GATEWAY_ACCOUNT_ID — Cloudflare account ID (`wrangler whoami` to find it)
+    //   CF_AI_GATEWAY_TOKEN      — authenticates requests to Cloudflare AI Gateway
   }
 }

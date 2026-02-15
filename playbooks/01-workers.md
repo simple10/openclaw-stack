@@ -6,7 +6,7 @@ Deploy the AI Gateway and Log Receiver Workers to Cloudflare.
 
 This playbook deploys:
 
-- **AI Gateway Worker** — Proxies LLM requests through Cloudflare AI Gateway for analytics
+- **AI Gateway Worker** — Proxies LLM requests to providers (directly or optionally through CF AI Gateway for analytics)
 - **Log Receiver Worker** — Receives container logs from Vector for Cloudflare capture
 
 ## Prerequisites
@@ -28,7 +28,9 @@ From `../openclaw-config.env`:
 
 ## 1.1 Deploy AI Gateway Worker
 
-The AI Gateway Worker proxies LLM API requests through Cloudflare AI Gateway, providing usage analytics without exposing real API keys on the VPS.
+The AI Gateway Worker proxies LLM API requests to providers (Anthropic, OpenAI), keeping real API keys off the VPS. It routes directly to provider APIs by default, or optionally through Cloudflare AI Gateway for analytics/caching when configured.
+
+> **Note:** During deployment, only `AUTH_TOKEN` is set. Provider API keys (e.g., `ANTHROPIC_API_KEY`) and optional CF AI Gateway configuration are added post-deploy — see `08-post-deploy.md` § 8.5 and [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md).
 
 ### Setup AI Gateway Worker
 
@@ -48,25 +50,9 @@ curl -s https://<AI_GATEWAY_WORKER_URL>/health
 - **If healthy (`{"status":"ok"}`):** The worker is already deployed. Warn the user: re-deploying will overwrite secrets. Ask to confirm before continuing.
 - **If unhealthy or URL is a placeholder:** Proceed with fresh deployment.
 
-### Confirm AI Gateway ID
-
-Read `CF_AI_GATEWAY_ID` from `wrangler.jsonc` (currently `"ai-gateway"`). Ask the user to confirm it matches their upstream Cloudflare AI Gateway (Dashboard -> AI -> AI Gateway).
-
 ### Configure AI Gateway Worker Secrets
 
-#### 1. ACCOUNT_ID
-
-Obtain automatically from `wrangler whoami` (parse the account ID from output):
-
-```bash
-npx wrangler whoami
-# Find the account ID in the output, then set it:
-echo "<account-id>" | npx wrangler secret put ACCOUNT_ID
-```
-
-> **Multiple Cloudflare accounts:** ONLY if `wrangler whoami` lists more than one account, wrangler commands will fail with _"More than one account available but unable to select one in non-interactive mode."_ Fix by adding `"account_id": "<id>"` to `wrangler.jsonc`, or by setting `export CLOUDFLARE_ACCOUNT_ID=<id>` before running wrangler commands. Use the account ID that matches your Workers subscription.
-
-#### 2. AUTH_TOKEN
+#### 1. AUTH_TOKEN
 
 If `AI_GATEWAY_AUTH_TOKEN` in `openclaw-config.env` still contains a placeholder (angle brackets), auto-generate a random token:
 
@@ -83,14 +69,7 @@ echo "<generated-token>" | npx wrangler secret put AUTH_TOKEN
 
 If `AI_GATEWAY_AUTH_TOKEN` already has a real value, use that value instead.
 
-#### 3. CF_AI_GATEWAY_TOKEN
-
-Prompt the user for this value. This is the token for the upstream Cloudflare AI Gateway — a one-time secret, not stored locally.
-
-```bash
-npx wrangler secret put CF_AI_GATEWAY_TOKEN
-# (user enters value interactively)
-```
+> **Multiple Cloudflare accounts:** If `wrangler whoami` lists more than one account, wrangler commands will fail with _"More than one account available but unable to select one in non-interactive mode."_ Fix by adding `"account_id": "<id>"` to `wrangler.jsonc`, or by setting `export CLOUDFLARE_ACCOUNT_ID=<id>` before running wrangler commands. Use the account ID that matches your Workers subscription.
 
 ### Deploy AI Gateway Worker
 
@@ -106,6 +85,8 @@ Capture the Worker URL from the output (e.g., `https://ai-gateway-proxy.<account
 curl -s https://<worker-url>/health
 # Expected: {"status":"ok"}
 ```
+
+> **What about provider API keys?** The worker is now deployed and healthy, but won't proxy LLM requests until provider API keys are added. This is configured during post-deploy (`08-post-deploy.md` § 8.5) so the VPS deployment can proceed uninterrupted.
 
 ---
 
@@ -224,8 +205,9 @@ curl -X POST <LOG_WORKER_URL> \
   -d '{"message":"test"}'
 ```
 
-### AI Gateway Analytics Not Showing
+### AI Gateway Analytics Not Showing (CF AI Gateway mode only)
 
-1. Verify the Gateway ID in `wrangler.jsonc` matches the Cloudflare AI Gateway
-2. Check that requests are going through the Worker (not directly to Anthropic)
-3. Check Worker logs for errors: Dashboard -> Workers -> ai-gateway-proxy -> Logs
+1. Verify the Gateway ID matches your upstream Cloudflare AI Gateway (Dashboard -> AI -> AI Gateway)
+2. Check that `CF_AI_GATEWAY_TOKEN`, `CF_AI_GATEWAY_ACCOUNT_ID`, and `CF_AI_GATEWAY_ID` are all set — the worker routes directly to providers if any are missing
+3. Check that requests are going through the Worker (not directly to Anthropic)
+4. Check Worker logs for errors: Dashboard -> Workers -> ai-gateway-proxy -> Logs

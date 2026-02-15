@@ -174,7 +174,81 @@ If the device shows as approved but the browser still can't connect, ask the use
 
 ---
 
-## 8.5 Deployment Report
+## 8.5 AI Proxy Configuration
+
+After the device pairing is confirmed, verify the AI proxy worker and configure provider API keys if needed.
+
+### Step 1: Health Check
+
+```bash
+curl -s https://<AI_GATEWAY_WORKER_URL>/health
+```
+
+**Expected:** `{"status":"ok"}` — the worker was deployed during step 1 (`01-workers.md`).
+
+**If unhealthy:** The worker may not have deployed correctly. Re-run `01-workers.md` § 1.1 before continuing.
+
+### Step 2: Test LLM Proxy
+
+Send a minimal request through the AI proxy to verify it can reach a provider:
+
+```bash
+curl -s -w "\n%{http_code}" https://<AI_GATEWAY_WORKER_URL>/v1/messages \
+  -H "Authorization: Bearer <AI_GATEWAY_AUTH_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -H "anthropic-version: 2023-06-01" \
+  -d '{"model":"claude-sonnet-4-20250514","max_tokens":10,"messages":[{"role":"user","content":"Say hi"}]}'
+```
+
+### Step 3: Evaluate Result
+
+**If 200 (LLM responds):** Provider keys are already configured. Skip to § 8.6 (Deployment Report).
+
+**If error (expected on fresh deploy — no provider keys yet):**
+
+The AI proxy is deployed and healthy, but doesn't have provider API keys yet. Ask the user:
+
+> "The AI proxy worker is deployed but needs provider API keys to proxy LLM requests. How would you like to configure it?"
+
+Offer three options:
+
+- **(a) Direct API access** — API keys stored as Worker secrets, requests go directly to Anthropic/OpenAI
+- **(b) Cloudflare AI Gateway** — Route through CF AI Gateway for analytics/caching (requires additional setup)
+- **(c) Not sure / skip for now** — Direct them to [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md)
+
+### Step 4: Configure Provider Keys (options a or c)
+
+If the user chooses **(a)** or wants to try direct access:
+
+> "I can add your Anthropic API key to the worker now. The key is stored only in Cloudflare as an encrypted Worker secret — it never touches the VPS and is not saved locally."
+
+Ask the user for their Anthropic API key. When provided (should start with `sk-ant-`):
+
+```bash
+cd workers/ai-gateway
+echo "<key>" | npx wrangler secret put ANTHROPIC_API_KEY
+```
+
+> **OpenAI:** If the user also wants OpenAI, add it the same way: `echo "<key>" | npx wrangler secret put OPENAI_API_KEY`. Otherwise, note in the deployment report that they can add it later.
+
+### Step 5: Configure CF AI Gateway (option b)
+
+If the user chooses **(b)**, direct them to [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md) for the full setup guide (creating an AI Gateway in the CF Dashboard, setting the required secrets). Note this in the deployment report and continue.
+
+### Step 6: Re-test
+
+After adding provider keys, re-run the test from Step 2.
+
+**If 200:** AI proxy is fully configured. Continue to § 8.6.
+
+**If still failing:** Note the issue in the deployment report. Common causes:
+- Invalid API key — double-check the key value
+- Provider account issues (billing, rate limits)
+- Direct the user to [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md) for troubleshooting
+
+---
+
+## 8.6 Deployment Report
 
 **IMPORTANT:** After the user confirms the chat interface is working, output a complete deployment report. This is the final step — do NOT skip it.
 
