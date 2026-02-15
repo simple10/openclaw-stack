@@ -1,4 +1,5 @@
 import { validateAuthToken } from './auth'
+import { PROVIDER_CONFIG } from './config'
 import { handlePreflight, addCorsHeaders } from './cors'
 import { jsonError } from './errors'
 import { createLog, logInboundRequest } from './log'
@@ -46,15 +47,17 @@ export default {
       logInboundRequest(log, request, route, apiKey)
     }
 
-    if (!authToken) {
-      return addCorsHeaders(jsonError('Invalid or missing auth credentials', 401))
-    }
+    const providerConfig = PROVIDER_CONFIG[route.provider]
+
+    // CF AI Gateway uses a different path format (strips /v1/, adds provider prefix)
+    const isGateway = providerConfig.baseUrl.includes('gateway.ai.cloudflare.com')
+    const upstreamPath = isGateway ? route.gatewayPath : route.directPath
 
     let response: Response
     if (route.provider === 'anthropic') {
-      response = await proxyAnthropic(apiKey, request, env, route.path, log)
+      response = await proxyAnthropic(apiKey, request, providerConfig, upstreamPath, log)
     } else {
-      response = await proxyOpenAI(apiKey, request, env, route.path, log)
+      response = await proxyOpenAI(apiKey, request, providerConfig, upstreamPath, log)
     }
     return addCorsHeaders(response)
   },

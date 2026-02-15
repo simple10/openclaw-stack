@@ -21,11 +21,15 @@
     "LOG_LEVEL": "debug"
     // Secrets (set via `wrangler secret put`):
     // Secrets survive `wrangler deploy` and will not be overwritten during new deploys
-    //   "ACCOUNT_ID": "YOUR_CLOUDFLARE_ACCOUNT_ID", - use `wrangler whoami` to get account ID
     //   AUTH_TOKEN       — token clients use to authenticate to this worker
     //   OPENAI_API_KEY   — forwarded to OpenAI via AI Gateway
     //   ANTHROPIC_API_KEY — forwarded to Anthropic via AI Gateway
     //   CLAUDE_CODE_OAUTH_TOKEN - claude code setup token
+    //
+    //   CF_AI_GATEWAY_ACCOUNT_ID: "YOUR_CLOUDFLARE_ACCOUNT_ID", - use `wrangler whoami` to get account ID
     //   CF_AI_GATEWAY_TOKEN — authenticates requests to Cloudflare AI Gateway
+    //
+    // To bypass Cloudflare AI Gateway and hit provider APIs directly,
+    // edit src/config.ts and redeploy — see examples in that file.
   }
 }

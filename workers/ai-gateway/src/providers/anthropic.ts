@@ -1,22 +1,26 @@
-import type { Env, Log } from '../types'
+import type { ProviderConfig, Log } from '../types'
 import { sanitizeHeaders, truncateBody } from '../log'
 
 const DEFAULT_ANTHROPIC_VERSION = '2023-06-01'
 
-/** Proxy the request to Anthropic via AI Gateway. */
+/** Proxy the request to Anthropic (via AI Gateway or direct). */
 export async function proxyAnthropic(
   apiKey: string,
   request: Request,
-  env: Env,
-  gwPath: string,
+  config: ProviderConfig,
+  path: string,
   log: Log
 ): Promise<Response> {
-  const url = `https://gateway.ai.cloudflare.com/v1/${env.ACCOUNT_ID}/${env.CF_AI_GATEWAY_ID}/${gwPath}`
+  const url = `${config.baseUrl}/${path}`
 
   const headers = new Headers()
 
-  // Set Cloudflare Gateway auth token
-  headers.set('cf-aig-authorization', `Bearer ${env.CF_AI_GATEWAY_TOKEN}`)
+  // Set provider-config headers (e.g. cf-aig-authorization for gateway mode)
+  if (config.headers) {
+    for (const [key, value] of Object.entries(config.headers)) {
+      headers.set(key, value)
+    }
+  }
 
   // Merge request headers, skipping auth and cf-* headers
   for (const [key, value] of request.headers) {
@@ -42,6 +46,7 @@ export async function proxyAnthropic(
 
   const body = await request.text()
 
+  log.debug(`[anthropic] url=${url}`)
   log.debug('[anthropic] upstream headers', sanitizeHeaders(headers))
   log.debug('[anthropic] request body', truncateBody(body))
 

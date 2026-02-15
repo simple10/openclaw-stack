@@ -1,23 +1,30 @@
-import type { Env, Log } from '../types'
+import type { ProviderConfig, Log } from '../types'
 import { sanitizeHeaders, truncateBody } from '../log'
 
-/** Proxy the request to OpenAI via AI Gateway. */
+/** Proxy the request to OpenAI (via AI Gateway or direct). */
 export async function proxyOpenAI(
   apiKey: string,
   request: Request,
-  env: Env,
-  gwPath: string,
+  config: ProviderConfig,
+  path: string,
   log: Log
 ): Promise<Response> {
-  const url = `https://gateway.ai.cloudflare.com/v1/${env.ACCOUNT_ID}/${env.CF_AI_GATEWAY_ID}/${gwPath}`
+  const url = `${config.baseUrl}/${path}`
 
   const headers = new Headers(request.headers)
+
   // Replace auth token with OpenAI API key
   headers.set('Authorization', `Bearer ${apiKey}`)
-  // Authenticate to Cloudflare AI Gateway
-  headers.set('cf-aig-authorization', `Bearer ${env.CF_AI_GATEWAY_TOKEN}`)
+
+  // Set provider-config headers (e.g. cf-aig-authorization for gateway mode)
+  if (config.headers) {
+    for (const [key, value] of Object.entries(config.headers)) {
+      headers.set(key, value)
+    }
+  }
 
   const body = await request.text()
+  log.debug(`[openai] url=${url}`)
   log.debug('[openai] upstream headers', sanitizeHeaders(headers))
   log.debug('[openai] request body', truncateBody(body))
 

@@ -1,5 +1,6 @@
 export type { Log } from './log'
 export type { Provider, RouteMatch } from './routing'
+export type { ProviderConfig } from './config'
 
 export interface Env {
   // Vars (wrangler.toml)
@@ -13,7 +14,7 @@ export interface Env {
   //
 
   /** Cloudflare Account ID */
-  ACCOUNT_ID: string
+  CF_AI_GATEWAY_ACCOUNT_ID: string
   /** Token used to authorize requests to this worker */
   AUTH_TOKEN: string
   /** OpenAI API Key - can be omitted if BYOK is configured in Cloudflare AI Gateway */

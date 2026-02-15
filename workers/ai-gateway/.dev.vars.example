@@ -1,9 +1,14 @@
 # Copy to .dev.vars and fill in real values
+
+# Token to authorize requests to the AI proxy
 AUTH_TOKEN=your-shared-auth-token
+
+# Provider API keys
 OPENAI_API_KEY=sk-...
 ANTHROPIC_API_KEY=sk-ant-...
+CLAUDE_CODE_OAUTH_TOKEN= # claude code setup token
 
 # Your Cloudflare Account ID used for AI Gateway - use `wrangler whoami` to get account ID
-ACCOUNT_ID=
+CF_AI_GATEWAY_ACCOUNT_ID=
 # Cloudflare AI Gateway auth token
 CF_AI_GATEWAY_TOKEN=
