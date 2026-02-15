@@ -30,7 +30,7 @@ sudo reboot
 Wait 1-2 minutes for VPS-1 to come back online, then verify SSH access:
 
 ```bash
-ssh -i <SSH_KEY_PATH> -p 222 -o ConnectTimeout=10 adminclaw@<VPS1_IP> "echo 'VPS-1 online'"
+ssh -i <SSH_KEY_PATH> -p <SSH_PORT> -o ConnectTimeout=10 adminclaw@<VPS1_IP> "echo 'VPS-1 online'"
 ```
 
 **If VPS doesn't come back after 3-4 minutes:**
@@ -38,8 +38,8 @@ ssh -i <SSH_KEY_PATH> -p 222 -o ConnectTimeout=10 adminclaw@<VPS1_IP> "echo 'VPS
 > "The VPS hasn't come back online after reboot. This is usually just slow boot.
 > Try again in another minute. If it still doesn't respond after 5 minutes:
 >
-> - Check the VPS status in the OVH dashboard — it may be stuck in reboot
-> - Use the provider's console/VNC to check boot progress
+> - Check the VPS status in the host provider dashboard — it may be stuck in reboot
+> - Use the provider's console/KVM to check boot progress
 > - As a last resort, use the provider's dashboard to force a hard reboot"
 
 ---

@@ -42,7 +42,7 @@ From `../openclaw-config.env`:
 
 Complete sections 2.1-2.9 on VPS-1.
 
-Connect initially as `ubuntu` (OVH default), then switch to `adminclaw` after section 2.4 (SSH hardening).
+Connect initially as `ubuntu` (or whatever the default is for the particular host provider & distro), then switch to `adminclaw` after section 2.4 (SSH hardening).
 
 ---
 
@@ -88,7 +88,7 @@ Two-user security model (see [REQUIREMENTS.md § 2.2](../REQUIREMENTS.md#22-two-
 | `adminclaw` | Key only | Passwordless | System administration, Claude automation |
 | `openclaw` | None | None | Runs application, owns app files |
 
-Passwords are auto-generated and set non-interactively. **Save the output** — you may need these for VNC/console emergency access.
+Passwords are auto-generated and set non-interactively. **Save the output** — you may need these for KVM/console emergency access.
 
 ```bash
 #!/bin/bash
@@ -534,7 +534,7 @@ sudo systemctl restart ssh
 
 If you can't SSH in:
 
-1. Use OVH console/VNC access
+1. Use host provider console/KVM access
 2. Login as adminclaw (or root if still available)
 3. Check `/etc/ssh/sshd_config.d/hardening.conf` for errors
 4. Temporarily: `sudo ufw allow 22/tcp` and restart ssh
