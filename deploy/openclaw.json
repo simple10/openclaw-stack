@@ -267,7 +267,8 @@
   "plugins": {
     "enabled": true,
     "allow": [
-      "coordinator" // Coordinator plugin — builds routing table from agent configs
+      "coordinator", // Coordinator plugin — builds routing table from agent configs
+      "llm-logger"   // LLM logger plugin — logs prompts/responses to llm.log
     ],
     "entries": {
       // Coordinator Plugin
@@ -280,6 +281,14 @@
         "config": {
           "coordinatorAgent": "main"
         }
+      },
+      // LLM Logger Plugin
+      // Logs all LLM input/output events to ~/.openclaw/logs/llm.log (JSONL)
+      // For development debugging — disabled by default to avoid large log files.
+      // Enable with: openclaw config set plugins.entries.llm-logger.enabled true
+      // Requires gateway restart (plugins.* not hot-reloadable).
+      "llm-logger": {
+        "enabled": false
       }
     }
   },

@@ -23,3 +23,18 @@
     delaycompress
     compress
 }
+
+# LLM logs — much larger than other logs (two events per LLM call with full payloads).
+# More aggressive rotation: daily + 50M maxsize trigger for mid-day rotation.
+/home/openclaw/.openclaw/logs/llm.log
+{
+    su root root
+    daily
+    rotate 7
+    maxsize 50M
+    missingok
+    notifempty
+    copytruncate
+    delaycompress
+    compress
+}
