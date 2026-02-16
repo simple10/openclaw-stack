@@ -2,8 +2,6 @@
 
 Deploy [OpenClaw](https://github.com/openclaw/openclaw) on a single VPS with Cloudflare for networking and observability — fully automated by [Claude Code](https://docs.anthropic.com/en/docs/build-with-claude/claude-code/overview).
 
-**This project is an experiment** in using `claude code` for devops. Claude reads modular playbooks, SSHs into your server, and sets up everything from scratch. A significant effort was made to ensure OpenClaw runs as securely as possible without limiting capabilities. However, there's no guarantee Claude will always follow the playbooks as designed.
-
 ## What is OpenClaw?
 
 [OpenClaw](https://docs.openclaw.ai) is an open-source AI agent platform. It provides a gateway that manages multiple AI agents, each running in isolated sandbox containers. Agents can use tools (shell, browser, file I/O), delegate tasks to sub-agents, and interact with users through a web dashboard or messaging channels like Telegram and Discord.
@@ -12,14 +10,25 @@ This repo wraps OpenClaw with production-grade infrastructure: SSH hardening, fi
 
 ## Quick Start
 
+**Use claude to setup your env & clone this repo** (recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/simple10/openclawde/main/docs/CLAUDE_INSTALL.md -o CLAUDE.md
+claude "start"
+```
+
+That's it. The `CLAUDE_INSTALL.md` file instructs claude on how to walk you through the required config setup
+before automating the deploy.
+
+### Manual Steps
+
 1. Clone this repo
 2. Create a **[new VPS](docs/VPS-SETUP-GUIDE.md)** and [Cloudflare Tunnel](docs/CLOUDFLARE-TUNNEL.md)
 3. Run `claude` in this repo dir, just say `start`
 
    ```bash
    # Run claude with skip permissions if you want a more automated deploy
-   claude --dangerously-skip-permissions
-   # Prompt: 'start'
+   claude --dangerously-skip-permissions "start"
 
    # Claude will deploy and test the VPS (15+ minutes)
    ```
@@ -402,80 +411,13 @@ This deployment implements defense-in-depth with multiple independent security l
 
 ## Troubleshooting
 
-### Can't access OpenClaw after deployment
+In general, just chat with claude to troubleshoot. Claude is fully context aware thanks to the CLAUDE.md and playbooks/
 
-1. **Check the tunnel is running**: `sudo systemctl status cloudflared`
-2. **Check Cloudflare Tunnel routes** are configured in the Zero Trust dashboard (this is a post-deploy step)
-3. **Verify the gateway is healthy**: `sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose ps'`
-4. **Check the gateway token** matches what's in the URL
-
-### Gateway shows "unhealthy" in Docker
-
-This is normal during first boot — the gateway takes ~14 minutes to build three sandbox images on first start. The Docker healthcheck has a 5-minute start period, so it may report unhealthy while images are still building. Check the logs:
-
-```bash
-sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose logs -f openclaw-gateway'
-```
-openclaw-vps/
-├── README.md                 # This file (for users)
-├── CLAUDE.md                 # Deployment orchestration (for Claude)
-├── REQUIREMENTS.md           # Architecture reference
-├── openclaw-config.env       # Configuration (contains secrets)
-├── vector.yaml               # Vector log shipper config (YAML; deployed to VPS)
-├── build/
-│   ├── build-openclaw.sh     # Build script with auto-patching
-│   └── host-alert.sh         # Host monitoring + Telegram alerts
-├── workers/
-│   ├── ai-gateway/           # LLM API proxy worker (direct or optional CF AI Gateway)
-│   └── log-receiver/         # Cloudflare log receiver worker
-├── docs/
-│   ├── BROWSER-VNC.md        # Browser VNC access via noVNC proxy
-│   ├── CLOUDFLARE-TUNNEL.md  # Cloudflare Tunnel reference
-│   └── TESTING.md            # Testing instructions
-│   └── VPS-SETUP-GUIDE.md    # VPS setup instructions
-└── playbooks/                # Deployment playbooks (for Claude)
-    ├── 01-workers.md
-    ├── 02-base-setup.md
-    ├── 03-docker.md
-    ├── 04-vps1-openclaw.md
-    ├── 06-backup.md
-    ├── 07-verification.md
-    └── 08-post-deploy.md
-```
-
-Look for `Executing as node` — that means initialization is complete.
-
-### Sysbox installation fails
-
-On Debian, Sysbox may fail with a missing `rsync` dependency. Fix it with:
-
-```bash
-sudo apt --fix-broken install
-```
-
-The playbook handles this automatically, but if you're troubleshooting manually, this is the fix.
-
-### Sandbox build timeout
-
-The first boot builds three sandbox images (base, common with 25+ dev tools, browser with Chrome). This can take 15+ minutes on slower VPS hardware. If it times out, the gateway will still start — sandbox builds are non-fatal. Check the entrypoint logs and re-trigger with:
-
-```bash
-sudo docker exec openclaw-gateway /app/deploy/rebuild-sandboxes.sh --force
-```
-
-### Logs not appearing in Cloudflare
-
-1. Check Vector is running: `sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose logs vector'`
-2. Check the Log Receiver Worker: `curl https://YOUR_LOG_WORKER_URL/health`
-3. Check Cloudflare Workers dashboard for errors
-
-### SSH locked out
-
-If you get locked out after SSH hardening, use your VPS provider's web console (VNC/KVM) to log in with the emergency password that was set during user creation. Then check `/etc/ssh/sshd_config.d/hardening.conf` for the correct port and settings.
+See also [scripts/](./scripts/) for bash utils for SSHing, showing logs, etc.
 
 ---
 
-## File Structure
+## File Structure Highlights
 
 ```
 openclaw-vps/
@@ -512,8 +454,6 @@ openclaw-vps/
 │   ├── CLOUDFLARE-TUNNEL.md          # Tunnel and Access setup
 │   ├── BROWSER-VNC.md                # Remote browser viewing via noVNC
 │   ├── SANDBOX-TOOLKIT.md            # How to add/manage sandbox tools
-│   ├── REQUEST-FLOW.md               # How requests flow through the system
-│   ├── POST-DEPLOY.md                # Optional post-deploy configuration
 │   ├── TELEGRAM.md                   # Telegram integration guide
 │   └── TESTING.md                    # End-to-end testing instructions
 │
@@ -532,7 +472,7 @@ openclaw-vps/
 
 ---
 
-## Support
+## Reference
 
 - OpenClaw Documentation: <https://docs.openclaw.ai>
 - OpenClaw GitHub: <https://github.com/openclaw/openclaw>
@@ -541,30 +481,3 @@ openclaw-vps/
 
 - [Agents Config](https://github.com/openclaw/openclaw/blob/main/src/config/types.agents.ts)
 - [Models Config](https://github.com/openclaw/openclaw/blob/main/src/config/types.models.ts)
-
-## Skills, Plugins & Tools
-
-- <https://github.com/lekt9/unbrowse-openclaw> — auto-generates API skills from browser sessions
-- <https://github.com/jovanSAPFIONEER/Network-AI>
-- <https://docs.openclaw.ai/prose>
-
-## Resources
-
-- <https://deepwiki.com/openclaw/openclaw>
-- <https://openclaw.dog/docs/concepts/multi-agent/>
-- <https://github.com/VoltAgent/awesome-openclaw-skills>
-- <https://github.com/lekt9/openclaw-foundry>
-- <https://gist.github.com/simple10/50b9d5fdaf0a12162c2a682c1f7e2391>
-- <https://github.com/knostic/openclaw-telemetry/>
-- <https://github.com/knostic/openclaw-shield>
-- <https://www.knostic.ai/blog/why-we-built-openclaw-shield-securing-ai-agents-from-themselves>
-- <https://gist.github.com/simple10/7a91c7471fb543bf0a75341cb2367622>
-
-## Guides & Videos
-
-- <https://www.youtube.com/watch?v=3GrG-dOmrLU> — ideas on using Telegram groups for topics
-
-## Related Apps & Tools
-
-- <https://www.easyclaw.app/docs/privacy>
-- <https://seqpu.com/mco>
