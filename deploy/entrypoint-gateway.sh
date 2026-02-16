@@ -209,11 +209,24 @@ fi
 # ── 2b. Start noVNC reverse proxy ────────────────────────────────────
 # Exposes browser sandbox noVNC UIs on a fixed port. Reads browsers.json
 # dynamically to discover sandbox browser containers and their mapped ports.
+# Run as node to avoid creating root-owned jiti cache files in /tmp/jiti/
+# that would block the gateway (also node) from writing cache entries.
 NOVNC_PROXY="/app/deploy/novnc-proxy.mjs"
 if [ -f "$NOVNC_PROXY" ]; then
-  node "$NOVNC_PROXY" &
-  echo "[entrypoint] noVNC proxy started on port 6090"
+  gosu node node "$NOVNC_PROXY" &
+  echo "[entrypoint] noVNC proxy started on port 6090 (as node)"
 fi
+
+# ── 2c. Fix jiti cache permissions ─────────────────────────────────
+# jiti (TypeScript JIT compiler) caches compiled .cjs in $TMPDIR/jiti/.
+# Under Sysbox, uid remapping can cause files in /tmp to appear root-owned
+# even when written by the node process, blocking subsequent writes.
+# Redirect TMPDIR to a node-owned location so jiti (and other temp files)
+# are created with correct ownership after gosu drops privileges.
+export TMPDIR="/home/node/.cache/tmp"
+mkdir -p "$TMPDIR"
+chown 1000:1000 "$TMPDIR"
+echo "[entrypoint] TMPDIR: $TMPDIR"
 
 # ── 3. Drop privileges and exec gateway ─────────────────────────────
 # gosu drops from root to node user without spawning a subshell,

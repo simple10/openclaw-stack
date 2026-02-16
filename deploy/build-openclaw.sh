@@ -3,7 +3,8 @@
 #
 # Patches applied (each auto-skips when upstream fixes the issue):
 #   1. Dockerfile: install Docker + gosu for nested Docker (sandbox isolation via Sysbox)
-#   2. docker.ts: apply sandbox env vars (docker.env) to container creation
+#   2. Dockerfile: clear build-time jiti cache (belt-and-suspenders with entrypoint §2c)
+#   3. docker.ts: apply sandbox env vars (docker.env) to container creation
 #
 # Usage: sudo -u openclaw /home/openclaw/scripts/build-openclaw.sh
 set -euo pipefail
@@ -23,7 +24,18 @@ else
   echo "[build] Docker already in Dockerfile (already patched)"
 fi
 
-# ── 2. Patch docker.ts to apply env vars from sandbox config ──
+# ── 2. Patch Dockerfile to clear build-time jiti cache ──
+# pnpm build compiles TypeScript via jiti, caching to /tmp/jiti/ as root.
+# Belt-and-suspenders: entrypoint-gateway.sh §2c redirects TMPDIR at runtime,
+# but clearing build-time cache keeps the image clean.
+if ! grep -q 'rm.*tmp/jiti' Dockerfile; then
+  echo "[build] Patching Dockerfile: clear jiti cache after build..."
+  sed -i '/^RUN pnpm build/a RUN rm -rf /tmp/jiti' Dockerfile
+else
+  echo "[build] Dockerfile jiti patch already present"
+fi
+
+# ── 3. Patch docker.ts to apply env vars from sandbox config ──
 # The config resolver (config.ts) computes merged env but docker.ts never
 # passes -e flags to docker create. This adds the missing loop.
 DOCKER_FILE="src/agents/sandbox/docker.ts"
@@ -38,7 +50,7 @@ fi
 echo "[build] Building openclaw:local..."
 docker build -t openclaw:local .
 
-# ── 3. Restore patched files (keep git working tree clean) ───────────
+# ── 4. Restore patched files (keep git working tree clean) ───────────
 git checkout -- Dockerfile "$DOCKER_FILE" 2>/dev/null || true
 
 echo "[build] Done. Run: docker compose up -d openclaw-gateway"
