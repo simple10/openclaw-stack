@@ -271,12 +271,12 @@
           "sessions_history",
           "sessions_send",
           "sessions_spawn", // Can spawn other agents
-          "session_status"
+          "session_status",
+          "cron" // Enable for host status monitoring — agents can schedule checks on health/maintenance data
         ],
         "deny": [
           "canvas",
           "nodes",
-          "cron",
           "discord",
           "gateway" // Prevent agents from manipulating the gateway - denying will require manual restart of the gateway
         ]

@@ -1,0 +1,49 @@
+//
+// OpenClaw Default Deploy Cron Jobs — reference definitions
+//
+// Cron jobs are managed by the gateway scheduler at ~/.openclaw/cron/jobs.json.
+// They are NOT part of openclaw.json — use the CLI to add/edit/remove jobs.
+//
+// This file documents the jobs deployed by playbook 04-vps1-openclaw.md § 4.8d.
+// The playbook reads this file and runs `openclaw cron add` for each job.
+//
+// To change the cron job after deploy, use the CLI or simply chat with openclaw to modify it.
+// You can also ask claude to redeploy the cron jobs.
+//
+// Host cron scripts (host-alert.sh, host-maintenance.sh) write status files to the main agent workspace at host-status/:
+//   - health.json — updated every 15 min by host-alert.sh (disk, memory, load, Docker, backup)
+//   - maintenance.json — updated daily by host-maintenance-check.sh (security updates, packages, reboot, services)
+//
+// HEARTBEAT_OK: when the agent responds with exactly this, announce delivery is suppressed
+// and no Telegram message is sent. Only issues trigger notifications.
+//
+{
+  "jobs": [
+    {
+      "name": "Daily VPS Health Check",
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 9 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "agentId": "main",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Read the VPS health report files and analyze them:\n\n1. Read host-status/health.json (resource metrics)\n2. Read host-status/maintenance.json (OS maintenance)\n\nAnalyze for issues that need human attention:\n\nHealth (health.json):\n- disk_pct approaching or exceeding disk_threshold\n- memory_pct approaching or exceeding memory_threshold\n- load_avg significantly above cpu_count\n- docker_ok or gateway_ok is false\n- crashed is non-empty (containers restarting)\n- backup_ok is false or backup_age_hours > 36\n- timestamp older than 30 minutes (monitoring may be broken)\n\nMaintenance (maintenance.json):\n- security_updates > 0 (pending security patches)\n- reboot_required is true\n- failed_services is not \"none\"\n- uptime_days > 90 (consider scheduled reboot)\n- timestamp older than 26 hours (checker may not be running)\n\nIf everything looks healthy, respond with exactly: HEARTBEAT_OK\n\nIf any issues are found, send a concise alert with:\n- What's wrong (use emoji indicators: 🔴 critical, ⚠️ warning)\n- Why it matters (one line per issue)\n- Recommended action\nKeep it brief — this goes to Telegram."
+      },
+      // Delivery: when Telegram is configured, deliver to the specific chat.
+      // When HOSTALERT_TELEGRAM_CHAT_ID is not set, omit "channel" and "to" —
+      // the CLI defaults to channel: "last" (delivers to wherever the user last interacted).
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "{{HOSTALERT_TELEGRAM_CHAT_ID}}",
+        "bestEffort": true
+      },
+      "enabled": true,
+      "deleteAfterRun": false
+    }
+  ]
+}

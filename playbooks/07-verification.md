@@ -172,18 +172,32 @@ curl -sI --connect-timeout 10 https://<OPENCLAW_BROWSER_DOMAIN><OPENCLAW_BROWSER
 
 ---
 
-## 7.5 Verify Host Alerter
+## 7.5 Verify Host Alerter & Maintenance Checker
 
 ```bash
 # Test the alerter script manually (should not send alerts if everything is healthy)
 sudo /home/openclaw/scripts/host-alert.sh
 echo $?  # Should be 0
 
-# Check cron job is installed
+# Verify health.json was written (even without Telegram)
+cat /home/openclaw/.openclaw/workspace/host-status/health.json
+
+# Test the maintenance checker
+sudo /home/openclaw/scripts/host-maintenance-check.sh
+echo $?  # Should be 0
+
+# Verify maintenance.json was written
+cat /home/openclaw/.openclaw/workspace/host-status/maintenance.json
+
+# Check host cron jobs are installed
 cat /etc/cron.d/openclaw-alerts
+cat /etc/cron.d/openclaw-maintenance
+
+# Check OpenClaw cron job is registered
+openclaw cron list
 ```
 
-**Expected:** Script exits 0 with no errors, cron entry exists.
+**Expected:** Both scripts exit 0 with no errors. `health.json` and `maintenance.json` contain valid JSON with current timestamps. Workspace copies exist. Both host cron entries exist. `openclaw cron list` shows "Daily VPS Health Check" with status `ok`.
 
 ### Telegram Delivery Test
 
@@ -364,7 +378,8 @@ openclaw doctor --deep
 - [ ] UFW enabled (SSH only), port 443 closed
 - [ ] Fail2ban running, cloudflared active
 - [ ] Gateway + Vector + Sysbox running
-- [ ] Backup + host alerter cron jobs configured
+- [ ] Backup + host alerter + maintenance checker cron jobs configured
+- [ ] Host status JSON files written and readable from agent sandbox
 - [ ] Container ports localhost-only, pids_limit set, resource limits match VPS
 - [ ] AI Gateway + Log Receiver Workers responding
 - [ ] Security audit: 0 critical/warnings; Doctor: lan warning only
@@ -454,7 +469,7 @@ Deployment is complete when:
 5. Container logs appearing in Cloudflare Workers dashboard
 6. Cloudflare Tunnel running and domain protected by Cloudflare Access (302/403 on unauthenticated curl)
 7. Backup cron job configured on VPS-1
-8. Host alerter cron job configured on VPS-1
+8. Host alerter and maintenance checker cron jobs configured on VPS-1
 9. Gateway ports (18789, 18790) not reachable from external network
 10. Security audit passes with no critical or warning findings
 

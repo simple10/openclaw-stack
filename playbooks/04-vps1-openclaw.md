@@ -13,6 +13,7 @@ This playbook configures:
 - Docker Compose with security hardening
 - Vector for log shipping to Cloudflare
 - Host alerter for Telegram notifications
+- Maintenance checker for OS update monitoring
 
 ## Prerequisites
 
@@ -151,6 +152,12 @@ EOF
 # Change ownership of .openclaw and sandboxes-home to uid 1000 for container write access
 sudo chown -R 1000:1000 /home/openclaw/.openclaw
 sudo chown -R 1000:1000 /home/openclaw/sandboxes-home
+
+# Host status directory — written by root cron scripts, read by agents via workspace
+# Lives under workspace/ so agents can read via relative path (host-status/health.json)
+# Root-owned with 755/644 permissions so both root can write and container can read
+sudo mkdir -p /home/openclaw/.openclaw/workspace/host-status
+sudo chmod 755 /home/openclaw/.openclaw/workspace/host-status
 ```
 
 ---
@@ -410,11 +417,14 @@ sudo chmod +x /home/openclaw/openclaw/scripts/entrypoint-gateway.sh
 
 ---
 
-## 4.8d Create Host Alerter
+## 4.8d Create Host Alerter & Maintenance Checker
 
-Install a host monitoring script that sends alerts via Telegram when disk, memory, or CPU thresholds are exceeded.
+Install host monitoring scripts:
 
-> **Note:** Requires `HOSTALERT_TELEGRAM_BOT_TOKEN` and `HOSTALERT_TELEGRAM_CHAT_ID` set in `openclaw-config.env`.
+- **Host alerter** — real-time health monitoring (disk, memory, CPU, Docker). Sends Telegram alerts on threshold breaches (if configured). Always writes `health.json` for OpenClaw agent access.
+- **Maintenance checker** — daily OS maintenance check (security updates, upgradable packages, reboot required, failed services). Writes `maintenance.json` for both Telegram reports and OpenClaw agents.
+
+> **Note:** Telegram alerts require `HOSTALERT_TELEGRAM_BOT_TOKEN` and `HOSTALERT_TELEGRAM_CHAT_ID` in `openclaw-config.env`. The JSON status files are always written regardless of Telegram configuration.
 
 ```bash
 #!/bin/bash
@@ -436,7 +446,31 @@ sudo tee /etc/cron.d/openclaw-alerts << 'EOF'
 EOF
 
 sudo chmod 644 /etc/cron.d/openclaw-alerts
+
+# --- Maintenance checker ---
+# SOURCE: deploy/host-maintenance-check.sh → /home/openclaw/scripts/host-maintenance-check.sh
+sudo tee /home/openclaw/scripts/host-maintenance-check.sh << 'SCRIPTEOF'
+# <<< deploy/host-maintenance-check.sh >>>
+SCRIPTEOF
+
+sudo chmod +x /home/openclaw/scripts/host-maintenance-check.sh
+
+# Maintenance checker cron — runs daily, 30 min before daily report so data is fresh
+# Always runs (not gated on Telegram) — JSON is needed by OpenClaw agents
+sudo tee /etc/cron.d/openclaw-maintenance << 'EOF'
+# OpenClaw host maintenance checker — detects pending OS updates, required reboots, failed services
+# Runs 30 min before daily report so data is fresh for both Telegram and OpenClaw
+<CRON_MAINTENANCE_MINUTE> <CRON_MAINTENANCE_HOUR> * * * root /home/openclaw/scripts/host-maintenance-check.sh
+EOF
+
+sudo chmod 644 /etc/cron.d/openclaw-maintenance
 ```
+
+**Maintenance cron generation rules:**
+
+- Schedule 30 minutes before the daily report time. If the daily report runs at `9:00 AM`, the maintenance checker runs at `8:30 AM` (same timezone conversion rules as the report cron).
+- If `HOSTALERT_DAILY_REPORT_TIME` is not set, default to 30 minutes before `9:00 AM UTC` (i.e., `8:30 AM UTC`).
+- The maintenance cron **always** runs, even without Telegram — OpenClaw agents read the JSON independently.
 
 **Cron generation rules:**
 
@@ -719,6 +753,84 @@ sudo /usr/local/bin/openclaw devices list
 
 > **Re-pairing after identity loss:** If the CLI identity is deleted while other devices
 > are already paired, use the same 3-step approach above (trigger pending → approve → verify).
+
+---
+
+## 4.10 Deploy OpenClaw Cron Jobs
+
+After the gateway is running and the CLI is paired, deploy the cron jobs defined in `deploy/openclaw-crons.jsonc`.
+
+The playbook reads each job from the reference file and runs `openclaw cron add` via SSH.
+
+### Daily VPS Health Check
+
+This job runs the main agent daily to read the health and maintenance JSON files written by the host cron scripts (§4.8d). If everything is healthy, the agent responds with `HEARTBEAT_OK` and no notification is sent. If issues are found, the agent sends a concise alert.
+
+```bash
+#!/bin/bash
+# SOURCE: deploy/openclaw-crons.jsonc — "Daily VPS Health Check"
+# Schedule uses HOSTALERT_DAILY_REPORT_TIME converted to cron format in the configured timezone.
+# Default: 30 9 * * * America/Los_Angeles (9:30 AM PST)
+
+# Read the message from the reference file
+# The message is a multi-line string — pass it via --message flag
+openclaw cron add \
+  --name "Daily VPS Health Check" \
+  --cron "<CRON_EXPR>" \
+  --tz "<CRON_TZ>" \
+  --session isolated \
+  --wake next-heartbeat \
+  --agent main \
+  --announce \
+  --best-effort-deliver \
+  <DELIVERY_FLAGS> \
+  --message "Read the VPS health report files and analyze them:
+
+1. Read host-status/health.json (resource metrics)
+2. Read host-status/maintenance.json (OS maintenance)
+
+Analyze for issues that need human attention:
+
+Health (health.json):
+- disk_pct approaching or exceeding disk_threshold
+- memory_pct approaching or exceeding memory_threshold
+- load_avg significantly above cpu_count
+- docker_ok or gateway_ok is false
+- crashed is non-empty (containers restarting)
+- backup_ok is false or backup_age_hours > 36
+- timestamp older than 30 minutes (monitoring may be broken)
+
+Maintenance (maintenance.json):
+- security_updates > 0 (pending security patches)
+- reboot_required is true
+- failed_services is not \"none\"
+- uptime_days > 90 (consider scheduled reboot)
+- timestamp older than 26 hours (checker may not be running)
+
+If everything looks healthy, respond with exactly: HEARTBEAT_OK
+
+If any issues are found, send a concise alert with:
+- What's wrong (use emoji indicators: 🔴 critical, ⚠️ warning)
+- Why it matters (one line per issue)
+- Recommended action
+Keep it brief — this goes to Telegram."
+```
+
+**Placeholder rules:**
+
+- `<CRON_EXPR>` — cron expression derived from `HOSTALERT_DAILY_REPORT_TIME`. Same conversion rules as §4.8d. Default: `30 9 * * *`.
+- `<CRON_TZ>` — IANA timezone for the cron expression. Derive from the timezone specified in `HOSTALERT_DAILY_REPORT_TIME` (e.g., "PST" → `America/Los_Angeles`). Default: `America/Los_Angeles`.
+- `<DELIVERY_FLAGS>` — conditional based on Telegram configuration:
+  - **If `HOSTALERT_TELEGRAM_CHAT_ID` is set:** `--channel telegram --to <HOSTALERT_TELEGRAM_CHAT_ID>`
+  - **If not set:** omit both `--channel` and `--to`. The CLI defaults to `channel: "last"` (delivers to wherever the user last interacted).
+
+**Verify:**
+
+```bash
+openclaw cron list
+```
+
+**Expected:** Shows "Daily VPS Health Check" with status `ok` and the correct schedule.
 
 ---
 

@@ -363,6 +363,7 @@ All URLs are protected by Cloudflare Access.
 | Backup | Daily at 3:00 AM UTC (30-day retention) | Active |
 | Host alerter | Every 15 minutes via Telegram | <see note> |
 | Daily report | Daily at <HOSTALERT_DAILY_REPORT_TIME> via Telegram | <see note> |
+| Maintenance checker | Daily (30 min before daily report) | Active |
 ```
 
 Check `HOSTALERT_TELEGRAM_BOT_TOKEN` and `HOSTALERT_TELEGRAM_CHAT_ID` in `openclaw-config.env`.
