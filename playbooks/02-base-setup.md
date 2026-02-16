@@ -82,7 +82,7 @@ sudo apt install -y \
 
 Run on: **VPS-1**
 
-Two-user security model (see [REQUIREMENTS.md § 2.2](../REQUIREMENTS.md#22-two-user-security-model) for rationale):
+Two-user security model (see [REQUIREMENTS.md § 2.1](../REQUIREMENTS.md#21-two-user-model) for rationale):
 
 | User | SSH Access | Sudo | Purpose |
 |------|------------|------|---------|

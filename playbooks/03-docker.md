@@ -111,7 +111,7 @@ sudo systemctl restart docker
 >
 > Fix any syntax errors and retry: `sudo systemctl restart docker`
 
-See [REQUIREMENTS.md § 2.8](../REQUIREMENTS.md#28-docker) for setting rationale.
+See [REQUIREMENTS.md § 2.2](../REQUIREMENTS.md#22-network-security) for Docker network security rationale.
 
 ---
 

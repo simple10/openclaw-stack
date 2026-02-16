@@ -2,6 +2,13 @@
 
 AGENTS: IGNORE THIS TODO LIST - for development only
 
+- Sandbox Config optimization: <https://docs.openclaw.ai/gateway/sandboxing#sandboxing>
+  - See also <https://docs.openclaw.ai/gateway/configuration-reference>
+  - [ ] Change sandbox mode to "non-main" - "all" is overly restrictive and main agent cannot make openclaw rpc/cli calls
+  - [ ] Change agents.defaults.sandbox.workspaceAccess to "ro"? - currently defaulting to "none"
+  - [ ] Set alerts channel for telegram if telegram config is provided
+    - <https://docs.openclaw.ai/gateway/configuration-reference#multi-account-all-channels>
+
 - [ ] Mess around with the config in the UI then check the openclaw.json
   - Use the changes to update 04 playbook - e.g.
 
@@ -12,6 +19,8 @@ AGENTS: IGNORE THIS TODO LIST - for development only
   },
   ```
 
+- [ ] Add cron to openclaw to analyze the vps status reports added daily to its workspace
+
 - [ ] Verify if the health cron in log worker can reach the VPS over the tunnel, if not, remove from README
 
 - [ ] Add seccompProfile, apparmorProfile to sandbox configs in openclaw.json
@@ -19,6 +28,7 @@ AGENTS: IGNORE THIS TODO LIST - for development only
 
 ## Completed (this branch)
 
+- [x] Debug code agent routing: `are you logged in to claude code` didn't route (fixed by changing coordinator prompt)
 - [x] Scan playbooks for compaction and optimization
 - [x] Make claude store adminclaw and openclaw user passwords in openclaw-config.env as comments when they're generated
 - [x] Fix failed first try attempts in playbooks - happened fairly early, probably 02, check asciinema

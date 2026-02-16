@@ -315,7 +315,7 @@ sudo -u openclaw mkdir -p /home/openclaw/openclaw/data/vector
 #   - remote.token: the CLI reads this to authenticate when connecting to the gateway
 #   - Without remote.token, `openclaw doctor`, `openclaw devices list`, and `openclaw security audit --deep`
 #     all fail with "gateway token mismatch".
-# See REQUIREMENTS.md § 3.7 for full rationale.
+# See REQUIREMENTS.md § 3.2 for sandbox config rationale.
 #
 # Tiered sandbox architecture (config-driven via deploy/sandbox-toolkit.yaml):
 #   defaults → base sandbox (openclaw-sandbox:bookworm-slim), no network — lightweight for main agent
@@ -1075,4 +1075,4 @@ curl -s http://localhost:18789<OPENCLAW_DOMAIN_PATH>/
 - `read_only: false` + `user: "0:0"` — required for Sysbox Docker-in-Docker. Sysbox user namespace isolation provides equivalent protection. Entrypoint drops to node via gosu.
 - `no-new-privileges` prevents escalation; resource limits (cpus, memory, pids) prevent runaway containers
 - tmpfs mounts limit persistent writable paths; inner Docker socket group set to `docker`
-- See [REQUIREMENTS.md § 3.4](../REQUIREMENTS.md#34-gateway-container-docker-composeoverrideyml) for full rationale
+- See [REQUIREMENTS.md § 3.1](../REQUIREMENTS.md#31-gateway-container) for gateway container rationale

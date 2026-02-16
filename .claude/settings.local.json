@@ -34,7 +34,13 @@
       "Bash(until ssh:*)",
       "Bash(do sleep 10)",
       "mcp__plugin_claude-mem_mcp-search__search",
-      "mcp__plugin_claude-mem_mcp-search__save_memory"
+      "mcp__plugin_claude-mem_mcp-search__save_memory",
+      "Bash(bash scripts/view-session.sh --list)",
+      "Bash(bash scripts/view-session.sh --agent code --list)",
+      "Bash(bash scripts/view-session.sh --agent main --list)",
+      "Bash(bash scripts/view-session.sh)",
+      "Bash(bash scripts/view-session.sh:*)",
+      "Bash(chmod:*)"
     ]
   }
 }

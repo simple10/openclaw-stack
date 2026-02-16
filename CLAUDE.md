@@ -139,7 +139,7 @@ sudo ufw reload    # Reload
 
 ## Security Model
 
-See [REQUIREMENTS.md § 2.2](REQUIREMENTS.md#22-two-user-security-model) for the two-user security model (`adminclaw` for admin, `openclaw` for runtime).
+See [REQUIREMENTS.md § 2.1](REQUIREMENTS.md#21-two-user-model) for the two-user security model (`adminclaw` for admin, `openclaw` for runtime).
 
 ---
 
