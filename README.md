@@ -13,7 +13,7 @@ This repo wraps OpenClaw with production-grade infrastructure: SSH hardening, fi
 **Use claude to setup your env & clone this repo** (recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/simple10/openclawde/main/docs/CLAUDE_INSTALL.md -o CLAUDE.md
+curl -fsSL https://raw.githubusercontent.com/simple10/openclaude/main/docs/CLAUDE_INSTALL.md -o CLAUDE.md
 claude "start"
 ```
 
@@ -105,7 +105,7 @@ See [docs/CLOUDFLARE-TUNNEL.md](docs/CLOUDFLARE-TUNNEL.md) for detailed instruct
 
 ```bash
 # Clone the repo
-git clone git@github.com:simple10/claudiusmaximus.git openclaw-vps
+git clone git@github.com:simple10/openclaude.git openclaw-vps
 cd openclaw-vps
 
 # Create your config file (only VPS_IP and CF_TUNNEL_TOKEN are required to start)

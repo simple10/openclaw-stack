@@ -15,5 +15,5 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - run: |
-          git remote add public-repo https://x-access-token:${{ secrets.PUBLIC_REPO_TOKEN }}@github.com/simple10/openclawde.git
+          git remote add public-repo https://x-access-token:${{ secrets.PUBLIC_REPO_TOKEN }}@github.com/simple10/openclaude.git
           git push public-repo public:main
