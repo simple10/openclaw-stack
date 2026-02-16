@@ -460,7 +460,7 @@ If not installed:
 ### 5.2 Clone the Repository
 
 ```bash
-git clone https://github.com/simple10/openclawde.git openclaw-vps && cd openclaw-vps
+git clone https://github.com/simple10/openclaude.git openclaw-vps && cd openclaw-vps
 ```
 
 If the clone fails (private repo), ask the user if they have access and help them authenticate with GitHub.
