@@ -30,7 +30,9 @@ From `../openclaw-config.env`:
 - `AI_GATEWAY_AUTH_TOKEN` - Required, AI Gateway auth token
 - `LOG_WORKER_URL` - Required, Log Receiver Worker URL
 - `LOG_WORKER_TOKEN` - Required, Log Receiver auth token
-- `HOSTALERT_TELEGRAM_BOT_TOKEN` - Optional (for host alerter)
+- `YOUR_TELEGRAM_ID` - Required, numeric Telegram user ID (for `tools.elevated` access gating)
+- `OPENCLAW_TELEGRAM_BOT_TOKEN` - Required, Telegram bot token for OpenClaw channel (see `docs/TELEGRAM.md`)
+- `HOSTALERT_TELEGRAM_BOT_TOKEN` - Optional (for host alerter; can reuse `OPENCLAW_TELEGRAM_BOT_TOKEN`)
 - `HOSTALERT_TELEGRAM_CHAT_ID` - Optional (for host alerter)
 - `HOSTALERT_DAILY_REPORT_TIME` - Optional, daily health report time (default: `9:00 AM UTC`)
 - `OPENCLAW_DOMAIN_PATH` - URL subpath for the gateway UI (default: `/_openclaw`)
@@ -213,6 +215,9 @@ OPENCLAW_GATEWAY_TOKEN=${GATEWAY_TOKEN}
 AI_GATEWAY_WORKER_URL=${AI_GATEWAY_WORKER_URL}
 AI_GATEWAY_AUTH_TOKEN=${AI_GATEWAY_AUTH_TOKEN}
 
+# Telegram channel — OpenClaw bot for chatting via Telegram
+OPENCLAW_TELEGRAM_BOT_TOKEN=${OPENCLAW_TELEGRAM_BOT_TOKEN:-}
+
 # Host alerter (Telegram notifications — see docs/TELEGRAM.md)
 HOSTALERT_TELEGRAM_BOT_TOKEN=${HOSTALERT_TELEGRAM_BOT_TOKEN:-}
 HOSTALERT_TELEGRAM_CHAT_ID=${HOSTALERT_TELEGRAM_CHAT_ID:-}
@@ -318,7 +323,7 @@ sudo -u openclaw mkdir -p /home/openclaw/openclaw/data/vector
 # See REQUIREMENTS.md § 3.2 for sandbox config rationale.
 #
 # Tiered sandbox architecture (config-driven via deploy/sandbox-toolkit.yaml):
-#   defaults → base sandbox (openclaw-sandbox:bookworm-slim), no network — lightweight for main agent
+#   defaults → base sandbox (openclaw-sandbox:bookworm-slim), no network — used for non-operator sessions (group chats, spawned sessions)
 #   "skills" agent → common sandbox (openclaw-sandbox-common:bookworm-slim), bridge network — runs skill binaries
 #   "code" agent → common sandbox (openclaw-sandbox-common:bookworm-slim), bridge network, Claude Code CLI
 #   All tools (gifgrep, claude-code, ffmpeg, etc.) are installed in sandbox-common via sandbox-toolkit.yaml.
@@ -330,7 +335,7 @@ sudo -u openclaw mkdir -p /home/openclaw/openclaw/data/vector
 GATEWAY_TOKEN=$(sudo grep OPENCLAW_GATEWAY_TOKEN /home/openclaw/openclaw/.env | cut -d= -f2)
 
 # SOURCE: deploy/openclaw.json (template) → /home/openclaw/.openclaw/openclaw.json
-# VARS: GATEWAY_TOKEN (from .env on VPS), OPENCLAW_DOMAIN_PATH (from openclaw-config.env)
+# VARS: GATEWAY_TOKEN (from .env on VPS), OPENCLAW_DOMAIN_PATH (from openclaw-config.env), YOUR_TELEGRAM_ID (from openclaw-config.env)
 sudo tee /home/openclaw/.openclaw/openclaw.json << 'JSONEOF'
 # <<< deploy/openclaw.json (template) >>>
 JSONEOF

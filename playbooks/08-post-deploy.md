@@ -260,6 +260,16 @@ If the device shows as approved but the browser still can't connect, ask the use
 
 ---
 
+## 8.5.1 Telegram Pairing
+
+If `OPENCLAW_TELEGRAM_BOT_TOKEN` is set in `openclaw-config.env`, the gateway is already connected to Telegram. Tell the user:
+
+> **Telegram:** Your bot is live. Open Telegram and send a message to your bot. If the gateway prompts for device approval, run `openclaw devices approve <requestId>` the same way you approved the browser.
+
+If the bot token is empty, skip this step — Telegram was not configured.
+
+---
+
 ## 8.6 Deployment Report
 
 **IMPORTANT:** After the user confirms the chat interface is working, output a complete deployment report. This is the final step — do NOT skip it.

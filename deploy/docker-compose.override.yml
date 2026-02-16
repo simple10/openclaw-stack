@@ -95,6 +95,8 @@ services:
       # noVNC proxy base path — set when browser VNC is served under a URL subpath
       # (e.g., /browser). Empty = serve at root. Set from OPENCLAW_BROWSER_DOMAIN_PATH.
       - NOVNC_BASE_PATH=${NOVNC_BASE_PATH:-}
+      # Telegram channel — enables chatting with OpenClaw via Telegram bot
+      - TELEGRAM_BOT_TOKEN=${OPENCLAW_TELEGRAM_BOT_TOKEN:-}
       - TZ=UTC
     networks:
       - openclaw-gateway-net

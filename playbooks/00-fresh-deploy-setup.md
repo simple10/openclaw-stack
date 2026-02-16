@@ -44,6 +44,8 @@ Validate all of these fields:
 4. **`OPENCLAW_BROWSER_DOMAIN`** — Must not be a placeholder.
 5. **`OPENCLAW_BROWSER_DOMAIN_PATH`** — Validated (can be empty for separate subdomain, or a path like `/browser`).
 6. **`OPENCLAW_DOMAIN_PATH`** — Validated (can be empty for root).
+7. **`YOUR_TELEGRAM_ID`** — Must be set and numeric (Telegram user IDs are integers). If empty, warn the user: "Send a message to @userinfobot on Telegram to get your numeric user ID."
+8. **`OPENCLAW_TELEGRAM_BOT_TOKEN`** — Must be set. If empty, warn the user: "Create a Telegram bot via @BotFather and paste the token here. See `docs/TELEGRAM.md`."
 
 ### If any fields are invalid or missing
 
@@ -58,6 +60,9 @@ Report **all** issues at once (don't stop at the first one). Present them as:
 >   (e.g., `openclaw.yourdomain.com`). You need to configure Cloudflare Tunnel
 >   public hostname routes first (see [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md))
 > - `OPENCLAW_BROWSER_DOMAIN` is still a placeholder — same as above
+> - `YOUR_TELEGRAM_ID` is empty — send a message to @userinfobot on Telegram to get your ID
+> - `OPENCLAW_TELEGRAM_BOT_TOKEN` is empty — create a bot via @BotFather and paste the token
+>   (see [`docs/TELEGRAM.md`](../docs/TELEGRAM.md))
 >
 > Update `openclaw-config.env` and let me know when ready.
 

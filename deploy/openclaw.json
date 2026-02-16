@@ -7,6 +7,7 @@
 // This file is what controls the core setup of OpenClaw. It's loaded by the OpenClaw Gateway.
 //
 // Some settings can be changed and hot-reloaded without a gateway restart.
+// Ask claude to deploy config changes.
 //
 // Hot-reloadable (no restart needed):
 //   - hooks — reloads hook handlers
@@ -84,7 +85,9 @@
     // Agent sandbox default settings - all agents inherit these settings & can override per agent
     "defaults": {
       "sandbox": {
-        "mode": "all", // All agents run in sandbox containers
+        // non-main: operator DM session runs on host (gateway restart, docker mgmt, full filesystem).
+        // All other sessions (group chats, channel sessions, subagent spawns) stay sandboxed.
+        "mode": "non-main",
         "scope": "agent",
         "docker": {
           "image": "openclaw-sandbox:bookworm-slim",
@@ -128,7 +131,7 @@
             "/home/node/.openclaw/workspace/host-status:/workspace/host-status:ro"
           ]
         },
-        // Each agent has it's browser container - requires the "browser" tool
+        // Each agent has its browser container - requires the "browser" tool
         // Browsers are run in separate sandbox containers, not inside the agent sandbox
         // Move browser settings to individual agent to restrict browser use or enforce single browser container
         // Browser sessions are accessible to users via the novnc-proxy at OPENCLAW_BROWSER_DOMAIN after deploy
@@ -145,10 +148,10 @@
           "autoStart": true,
           "autoStartTimeoutMs": 12000
         },
-        // Default sandbox pruning - kill agent containers after 24 hours of idle or every 7 days
+        // Default sandbox pruning
         // Sandbox workspace is persistent by default - pruning just helps keep resources tidy
         // Openclaw does not gracefully shutdown sandbox containers - it just kills them and re-spawns.
-        // Override pruning settings per agent to prevent killing a sandbox mid task - e.g. during a long claude code session
+        // Override pruning settings per agent to prevent killing a sandbox mid task
         "prune": {
           "idleHours": 24,
           "maxAgeDays": 7
@@ -157,14 +160,13 @@
     },
     // List of agents
     // Agents inherit the default sandbox settings above - the configs in list are the overrides
-    // Main agent is required when mode:all scope:agent is enabled
+    // With mode:non-main, main operator DM runs on host; all other sessions are sandboxed
     // All other agents should be customized as needed - the default list config is just to get you started with examples
     "list": [
       // MAIN AGENT
       {
-        // Main inherits docker.image from defaults: openclaw-sandbox:bookworm-slim
-        // It has limited capabilities - no sandbox-toolkit, only bin shims
-        // Main is a pure coordinator — it has no skills of its own and delegates
+        // Main runs on host for operator DMs (non-main mode).
+        // It is a pure coordinator — it has no skills of its own and delegates
         // all skill-based tasks to sub-agents via sessions_spawn.
         // The coordinator plugin auto-discovers routes from agent configs and writes
         // a routing table to AGENTS.md (loaded into system prompt).
@@ -174,10 +176,10 @@
         "id": "main",
         "default": true,
         "skills": [],
-        "sandbox": {
-          "docker": {
-            "network": "bridge" // Set network to "none" to fully restrict main agent, forcing other agents to handle requests
-          }
+        "tools": {
+          // Main operator session gets gateway control (restart, config, channels)
+          // This only applies on the host — sandboxed sessions still inherit the global deny
+          "allow": ["gateway"]
         },
         "subagents": {
           // Main agent can spawn other agents to complete tasks
@@ -186,12 +188,6 @@
             "skills"
           ]
         }
-        // Example tool override settings
-        // "tools": {
-        //   "deny": [
-        //     "browser", // Deny browser use
-        //   ]
-        // }
       },
       // CODING AGENT
       {
@@ -199,20 +195,26 @@
         "name": "Code Agent",
         "skills": ["coding-agent", "github", "clawhub", "skill-creator"],
         "sandbox": {
+          "workspaceAccess": "rw", // Code agent needs persistent read/write access to workspace
           "docker": {
             "image": "openclaw-sandbox-common:bookworm-slim", // sandbox-common has the full sandbox-toolkit bins
             "network": "bridge", // enable network access for claude code, codex, etc. to work
-            "memory": "2g",
-            "memorySwap": "4g",
-            "cpus": 2,
+            "memory": "4g", // Coding tasks need more headroom (claude code, LSPs, builds)
+            "memorySwap": "8g",
+            "cpus": 4,
             "binds": [
               // Repeat defaults — per-agent binds replace (not merge) the defaults array
               "/opt/skill-bins:/opt/skill-bins:ro",
               "/app/docs:/workspace/docs:ro",
               "/home/node/.openclaw/workspace/host-status:/workspace/host-status:ro",
-              // Code agent specific
+              // Code agent specific - persistent home for tool configs, shell history, etc.
               "/home/node/sandboxes-home/code:/home/sandbox"
             ]
+          },
+          // Long prune window — don't kill a sandbox mid-way through a coding session
+          "prune": {
+            "idleHours": 168, // 7 days idle
+            "maxAgeDays": 30
           }
         }
       },
@@ -239,10 +241,17 @@
           "wacli",
           "weather"
         ],
+        "tools": {
+          // Skills agent doesn't need to browse or spawn other agents — that's main's job
+          "deny": ["browser", "sessions_spawn"]
+        },
         "sandbox": {
           "docker": {
             "image": "openclaw-sandbox-common:bookworm-slim",
             "network": "bridge",
+            "memory": "1g", // Most skills are API-based, lightweight
+            "memorySwap": "2g",
+            "cpus": 1,
             "pidsLimit": 256
           }
         }
@@ -273,6 +282,18 @@
   // Add agent specific overrides in the agents list above
   // It's highly recommended to restrict tool usage per agent in production to protect against prompt injection attacks
   "tools": {
+    // Elevated mode — escape hatch for running exec on host from a sandboxed session
+    // Gated to specific sender IDs. Use /elevated on in chat to activate, /elevated off to deactivate.
+    // /elevated full skips exec approval prompts — use sparingly.
+    "elevated": {
+      "enabled": true,
+      "allowFrom": {
+        "telegram": ["{{YOUR_TELEGRAM_ID}}"]
+        // Add other channels as needed:
+        // "discord": ["your-discord-id"],
+        // "whatsapp": ["+15555550123"]
+      }
+    },
     "sandbox": {
       "tools": {
         // Comment out tools if you don't need them
@@ -296,7 +317,7 @@
           "canvas",
           "nodes",
           "discord",
-          "gateway" // Prevent agents from manipulating the gateway - denying will require manual restart of the gateway
+          "gateway" // Prevent sandboxed agents from manipulating the gateway — main gets it via per-agent allow
         ]
       }
     }

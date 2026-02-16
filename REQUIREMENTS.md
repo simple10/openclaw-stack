@@ -58,7 +58,8 @@ Single VPS running the OpenClaw gateway and sandboxes. Observability is handled 
 
 | Setting | Rationale |
 |---------|-----------|
-| `sandbox.mode: "all"` | All agents in Docker sandboxes. Requires Docker inside container (build patch #1). Without Docker, `spawn docker` crashes with EACCES. |
+| `sandbox.mode: "non-main"` | Main agent operator DM runs on host (gateway control, CLI access). All other sessions/agents run in Docker sandboxes. Requires Docker inside container (build patch #1). |
+| `tools.elevated.allowFrom.telegram` | Gates host exec access from sandboxed sessions to specific Telegram sender IDs. Only listed user IDs can trigger elevated tool use (e.g., shell commands on the gateway host). |
 | `sandbox.docker.network` default `"none"` | No network by default. Per-agent override to `"bridge"` required for browser tool (CDP) and internet access. |
 | `readOnlyRoot: true` | Read-only sandbox filesystem. Home dir writable via tmpfs. |
 | `tmpfs /home/linuxbrew:uid=1000,gid=1000` | Writable `$HOME`. The `:uid=1000,gid=1000` is critical — without it, tmpfs mounts as root-owned. |
