@@ -1,6 +1,6 @@
 # What is this project?
 
-It's a set of carefully designed [](playbooks/) & tools that instruct `Claude Code` how to deploy, secure, and maintain
+It's a set of carefully designed [playbooks](playbooks/) & tools that instruct `Claude Code` how to deploy, secure, and maintain
 [OpenClaw](https://docs.openclaw.ai) on your own VPS.
 
 It wraps OpenClaw with production-grade infrastructure: SSH hardening, firewall rules, Docker-in-Docker sandboxing via [Sysbox](https://github.com/nestybox/sysbox), Cloudflare Tunnel for zero-exposed-port networking, and a Cloudflare Worker proxy that keeps your real API keys off the server entirely.
@@ -114,15 +114,15 @@ Then just chat with claude...
 The playbooks instruct claude on how to detect if you already deployment your VPS.
 There are also explicit claude instructions for verifying & maintaining deployments.
 
-If you want more control, see [](scripts/) dir for CLI helper scripts without using claude.
+If you want more control, see [scripts/](scripts/) dir for CLI helper scripts without using claude.
 
 ## Detailed Guides
 
-- **[](docs/VPS-SETUP-GUIDE.md)** - guidance on VPS setup
-- **[](docs/CLOUDFLARE-TUNNEL.md)** - details on Cloudflare Access & Tunnel setup
-- **[](docs/TELEGRAM.md)** - guide for setting up Telegram bots to use with OpenClaw
+- **[VPS Setup Guide](docs/VPS-SETUP-GUIDE.md)** - guidance on VPS setup
+- **[Cloudflare Tunnel](docs/CLOUDFLARE-TUNNEL.md)** - details on Cloudflare Access & Tunnel setup
+- **[Telegram](docs/TELEGRAM.md)** - guide for setting up Telegram bots to use with OpenClaw
 - **[Claude Subscription](docs/CLAUDE-SUBSCRIPTION.md)** - info on using OpenClaw with a claude subscription
-- See [](docs/) for more guides
+- See [docs/](docs/) for more guides
 
 ## Key Features
 
