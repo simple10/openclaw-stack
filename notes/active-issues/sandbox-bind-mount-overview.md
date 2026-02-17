@@ -487,3 +487,49 @@ Here are the definitive results:
   Also a bonus finding from this test: the read tool executes inside the sandbox container, not on the gateway
   filesystem. The gateway-side docs/ dir is completely empty, yet reads succeed because the bind mount provides
   content inside the container.
+
+---
+
+## Linuxbrew Issues
+
+> let's give it some more thought. the original reason /home/linuxbrew was added to tmpfs we to allow rapidly
+> updating tools like claude code to be able to auto update. How can we solve both problems? Isn't there a way to
+> make /home/linuxbrew an overlay instead of replace?
+
+⏺ Good instinct. Let me think through this properly.
+
+  The tmpfs on /home/linuxbrew doesn't actually achieve what it's meant to. Here's why:
+
+  Why tmpfs doesn't enable auto-updates:
+
+- readOnlyRoot: true means the entire image filesystem is read-only
+- The tmpfs gives a writable but empty /home/linuxbrew — so any "update" means installing from scratch into empty
+  tmpfs RAM, on every container start
+- Claude Code auto-update (npm install -g) writes to /usr/local/ which is on the read-only root — it would fail
+  regardless of the linuxbrew tmpfs
+- Any runtime install into tmpfs is lost on restart anyway
+
+  So the tmpfs is causing breakage without actually enabling the feature it was added for.
+
+  Can we do an overlay instead of a replace? Docker's --mount only supports bind, tmpfs, and volume — no native overlay
+   option. To get overlay behavior:
+
+  ┌───────────────────────────────────────────────┬────────────────────────────┬──────────────────────────────────────┐
+  │                   Approach                    │            Pros            │                 Cons                 │
+  ├───────────────────────────────────────────────┼────────────────────────────┼──────────────────────────────────────┤
+  │ fuse-overlayfs in entrypoint                  │ True overlay, writable +   │ Needs /dev/fuse, may not work with   │
+  │                                               │ base content               │ capDrop: ALL                         │
+  ├───────────────────────────────────────────────┼────────────────────────────┼──────────────────────────────────────┤
+  │ Entrypoint copies brew from /opt/linuxbrew/   │ Writable + base content    │ Slow startup, uses 500MB+ RAM per    │
+  │ snapshot into tmpfs                           │                            │ container                            │
+  ├───────────────────────────────────────────────┼────────────────────────────┼──────────────────────────────────────┤
+  │ Entrypoint symlinks tmpfs → /opt/linuxbrew/   │ Fast, base content works   │ Runtime brew install fails           │
+  │                                               │                            │ (read-only target)                   │
+  ├───────────────────────────────────────────────┼────────────────────────────┼──────────────────────────────────────┤
+  │ Remove tmpfs entirely                         │ Simplest, everything works │ No runtime installs (but those don't │
+  │                                               │                            │  work now either)                    │
+  └───────────────────────────────────────────────┴────────────────────────────┴──────────────────────────────────────┘
+
+  The last option is the right one. The tmpfs was well-intentioned but counterproductive given readOnlyRoot: true. If
+  we ever need runtime tool updates, the right mechanism is rebuilding the sandbox image or setting tool-specific
+  writable prefixes (e.g., NPM_CONFIG_PREFIX=/tmp/npm).

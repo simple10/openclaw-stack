@@ -2,6 +2,8 @@
 
 The sandbox toolkit defines what tools are available inside agent sandbox containers. All configuration lives in `deploy/sandbox-toolkit.yaml` — adding, updating, or removing a tool is a config edit + rebuild.
 
+See also [SKILL-ROUTING.md](SKILL-ROUTING.md)
+
 ## How It Works
 
 ```
@@ -37,6 +39,7 @@ tools:
 ```
 
 Available variables in `install` commands:
+
 - `${BIN_DIR}` — `/usr/local/bin` (where binaries should be placed)
 - `${VERSION}` — value from the `version` field
 
@@ -117,6 +120,7 @@ scripts/update-sandbox-toolkit.sh --dry-run    # preview without executing
 ```
 
 Steps:
+
 1. Syncs `sandbox-toolkit.yaml`, `parse-toolkit.mjs`, and `rebuild-sandboxes.sh` to VPS
 2. Regenerates `/opt/skill-bins/` shims inside the gateway (new binaries only, idempotent)
 3. Runs `rebuild-sandboxes.sh --force` inside the gateway container
