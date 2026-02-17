@@ -6,12 +6,17 @@
 // Reads browsers.json on each request to discover sandbox containers and
 // their dynamically-mapped noVNC ports. Zero dependencies (Node.js built-ins only).
 //
-// Security: All requests must pass Cloudflare Access JWT verification.
-// The JWT signature is cryptographically verified against Cloudflare's
-// published public keys. Requests without a valid JWT are rejected with 403.
+// Security: Two-layer authentication:
+//   1. Cloudflare Access JWT — all requests must carry a valid Cf-Access-Jwt-Assertion header
+//   2. Gateway device pairing — users must have a paired device in the gateway's device registry
+// The JWT signature is cryptographically verified against Cloudflare's published public keys.
+// Device pairing is verified against paired.json using HMAC-signed session cookies.
+// If OPENCLAW_GATEWAY_TOKEN is not set, layer 2 is disabled (CF Access only).
 //
 // URL routing (all paths below are relative to DASHBOARD_BASE_PATH if set):
 //   GET /                     → index page listing active sessions + dashboard links
+//   GET /_auth                → device pairing auth gate page
+//   POST /_auth               → validate device token, set session cookie
 //   GET /media/               → directory listing of media files
 //   GET /media/<path>         → serve static file from ~/.openclaw/media/
 //   GET /<agent-id>/          → redirect to noVNC client
@@ -19,10 +24,10 @@
 //   WS  /<agent-id>/websockify → WebSocket proxy for VNC stream
 
 import { createServer, request as httpRequest } from 'node:http';
-import { readFileSync, createReadStream, readdirSync, lstatSync } from 'node:fs';
+import { readFileSync, createReadStream, readdirSync, lstatSync, watch, watchFile } from 'node:fs';
 import { connect } from 'node:net';
 import { resolve, extname, join } from 'node:path';
-import { createPublicKey, verify as cryptoVerify } from 'node:crypto';
+import { createPublicKey, verify as cryptoVerify, createHmac, timingSafeEqual } from 'node:crypto';
 
 const PORT = 6090;
 const BROWSERS_JSON = '/home/node/.openclaw/sandbox/browsers.json';
@@ -40,6 +45,19 @@ const BP = BASE_PATH && !BASE_PATH.startsWith('/') ? `/${BASE_PATH}` : BASE_PATH
 // the first path segment doesn't match any known agent or reserved route.
 // Once detected, used for URL generation (links, redirects) in all responses.
 let effectiveBP = BP;
+
+// ── Gateway device pairing auth ─────────────────────────────────────
+// Second auth layer: only users with a paired gateway device can access
+// the dashboard. Uses HMAC-signed stateless cookies keyed on the gateway token.
+// Disabled when OPENCLAW_GATEWAY_TOKEN is not set.
+const PAIRED_JSON = '/home/node/.openclaw/devices/paired.json';
+const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || '';
+const SESSION_MAX_AGE = parseInt(process.env.DASHBOARD_SESSION_MAX_AGE || '86400', 10);
+const SESSION_COOKIE = 'openclaw-dashboard';
+const PAIRING_AUTH_ENABLED = !!GATEWAY_TOKEN;
+
+// Map<deviceId, Set<tokenString>> — loaded from paired.json
+let pairedDevices = new Map();
 
 // ── Cloudflare Access JWT verification ──────────────────────────────
 // Every request (HTTP and WebSocket) must carry a valid Cf-Access-Jwt-Assertion
@@ -156,6 +174,237 @@ function accessDeniedPage() {
   <p>If you should have access, ensure you are accessing this service<br>through the configured domain and have completed authentication.</p>
 </body>
 </html>`;
+}
+
+// ── Paired device loading + file watching ────────────────────────────
+
+let lastPairedJson = '';
+
+function loadPairedDevices() {
+  try {
+    const raw = readFileSync(PAIRED_JSON, 'utf8');
+    if (raw === lastPairedJson) return; // No change
+    lastPairedJson = raw;
+    const data = JSON.parse(raw);
+    const map = new Map();
+    // paired.json is an object keyed by deviceId:
+    // { "<deviceId>": { deviceId, tokens: { <role>: { token, ... } }, ... } }
+    for (const [id, entry] of Object.entries(data)) {
+      if (!entry.tokens) continue;
+      const tokenSet = new Set();
+      for (const roleEntry of Object.values(entry.tokens)) {
+        if (roleEntry.token) tokenSet.add(roleEntry.token);
+      }
+      if (tokenSet.size > 0) map.set(id, tokenSet);
+    }
+    pairedDevices = map;
+    console.log(`[dashboard] Loaded ${map.size} paired device(s)`);
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      console.log(`[dashboard] Error reading paired.json: ${err.message}`);
+    }
+    lastPairedJson = '';
+    pairedDevices = new Map();
+  }
+}
+
+function watchPairedDevices() {
+  let debounceTimer = null;
+  const reload = () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => loadPairedDevices(), 500);
+  };
+
+  // fs.watch for immediate inotify events (may not fire on all platforms/filesystems)
+  try {
+    watch(PAIRED_JSON, reload);
+  } catch { /* file may not exist yet */ }
+
+  // fs.watchFile as reliable fallback (stat-based polling)
+  watchFile(PAIRED_JSON, { interval: 5000 }, reload);
+}
+
+function isDeviceTokenValid(deviceId, token) {
+  const tokens = pairedDevices.get(deviceId);
+  return !!tokens && tokens.has(token);
+}
+
+// ── Session cookie (HMAC-signed, stateless) ──────────────────────────
+
+function signSessionCookie(deviceId) {
+  const ts = Date.now().toString();
+  const hmac = createHmac('sha256', GATEWAY_TOKEN)
+    .update(`${deviceId}.${ts}`)
+    .digest('hex');
+  return `${deviceId}.${ts}.${hmac}`;
+}
+
+function verifySessionCookie(cookieValue) {
+  const parts = cookieValue.split('.');
+  if (parts.length !== 3) return null;
+  const [deviceId, ts, hmac] = parts;
+
+  const elapsed = Date.now() - parseInt(ts, 10);
+  if (isNaN(elapsed) || elapsed < 0 || elapsed > SESSION_MAX_AGE * 1000) return null;
+
+  const expected = createHmac('sha256', GATEWAY_TOKEN)
+    .update(`${deviceId}.${ts}`)
+    .digest('hex');
+
+  // Constant-time comparison
+  if (expected.length !== hmac.length) return null;
+  const a = Buffer.from(expected, 'hex');
+  const b = Buffer.from(hmac, 'hex');
+  if (a.length !== b.length) return null;
+  if (!timingSafeEqual(a, b)) return null;
+
+  return { deviceId };
+}
+
+function getSessionCookie(req) {
+  const header = req.headers.cookie || '';
+  for (const pair of header.split(';')) {
+    const [name, ...rest] = pair.trim().split('=');
+    if (name === SESSION_COOKIE) return rest.join('=');
+  }
+  return null;
+}
+
+function sessionCookieHeader(value) {
+  const cookiePath = effectiveBP || '/';
+  return `${SESSION_COOKIE}=${value}; HttpOnly; SameSite=Strict; Path=${cookiePath}; Max-Age=${SESSION_MAX_AGE}`;
+}
+
+// ── Auth gate page ───────────────────────────────────────────────────
+
+function authGatePage() {
+  const gatewayUrl = effectiveBP ? effectiveBP.replace(/\/[^/]+$/, '/') || '/' : '/';
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Dashboard — Device Pairing Required</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 80px auto; padding: 0 20px; color: #e0e0e0; background: #1a1a2e; text-align: center; }
+    h1 { color: #f0f0f0; font-size: 1.6em; margin-bottom: 10px; }
+    p { color: #aaa; line-height: 1.6; }
+    a { color: #64b5f6; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .icon { font-size: 4em; margin-bottom: 20px; }
+    .status { margin-top: 20px; padding: 12px; border-radius: 6px; }
+    .status.checking { background: #1a2a3e; color: #64b5f6; }
+    .status.error { background: #2e1a1a; color: #f44336; }
+    .status.not-paired { background: #2e2a1a; color: #ffa726; }
+  </style>
+</head>
+<body>
+  <div class="icon">&#128279;</div>
+  <h1>Device Pairing Required</h1>
+  <div id="status" class="status checking">Checking device pairing...</div>
+  <script>
+    (function() {
+      var status = document.getElementById('status');
+      var authKey = 'openclaw.device.auth.v1';
+      var stored = null;
+      try { stored = JSON.parse(localStorage.getItem(authKey)); } catch(e) {}
+
+      // Extract first available token from the role-keyed tokens object
+      // Format: { version: 1, deviceId: "...", tokens: { "<role>": { token: "..." } } }
+      var deviceToken = null;
+      if (stored && stored.tokens) {
+        var roles = Object.keys(stored.tokens);
+        for (var i = 0; i < roles.length; i++) {
+          if (stored.tokens[roles[i]] && stored.tokens[roles[i]].token) {
+            deviceToken = stored.tokens[roles[i]].token;
+            break;
+          }
+        }
+      }
+
+      if (!stored || !stored.deviceId || !deviceToken) {
+        status.className = 'status not-paired';
+        status.innerHTML = '<p>No paired device found.</p>' +
+          '<p>Pair a device with the gateway first, then revisit this page.</p>' +
+          '<p><a href="${gatewayUrl}">Go to Gateway Control UI</a></p>';
+        return;
+      }
+
+      status.textContent = 'Authenticating with gateway...';
+
+      fetch('${effectiveBP}/_auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceId: stored.deviceId, token: deviceToken }),
+        credentials: 'same-origin'
+      }).then(function(res) {
+        if (res.ok) {
+          window.location.reload();
+        } else if (res.status === 403) {
+          status.className = 'status error';
+          status.innerHTML = '<p>Device not recognized. Your device may have been revoked.</p>' +
+            '<p>Re-pair with the gateway and try again.</p>' +
+            '<p><a href="${gatewayUrl}">Go to Gateway Control UI</a></p>';
+        } else {
+          status.className = 'status error';
+          status.innerHTML = '<p>Authentication error (HTTP ' + res.status + '). Try refreshing.</p>';
+        }
+      }).catch(function(err) {
+        status.className = 'status error';
+        status.innerHTML = '<p>Network error: ' + err.message + '</p>';
+      });
+    })();
+  </script>
+</body>
+</html>`;
+}
+
+// ── Auth endpoint handler ────────────────────────────────────────────
+
+function handleAuthPost(req, res) {
+  let body = '';
+  let aborted = false;
+  req.on('data', chunk => {
+    body += chunk;
+    if (body.length > 4096) {
+      aborted = true;
+      res.writeHead(413, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Request too large' }));
+      req.destroy();
+    }
+  });
+  req.on('end', () => {
+    if (aborted) return;
+    let parsed;
+    try {
+      parsed = JSON.parse(body);
+    } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid JSON' }));
+      return;
+    }
+
+    const { deviceId, token } = parsed;
+    if (!deviceId || !token) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing deviceId or token' }));
+      return;
+    }
+
+    if (!isDeviceTokenValid(deviceId, token)) {
+      console.log(`[dashboard] Auth failed: device ${deviceId} not found or token mismatch`);
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Device not recognized' }));
+      return;
+    }
+
+    const cookie = signSessionCookie(deviceId);
+    console.log(`[dashboard] Auth success: device ${deviceId}`);
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Set-Cookie': sessionCookieHeader(cookie),
+    });
+    res.end(JSON.stringify({ ok: true }));
+  });
 }
 
 const MIME_TYPES = {
@@ -413,7 +662,7 @@ const server = createServer(async (req, res) => {
   // Cloudflare Tunnel sends /dashboard/... but DASHBOARD_BASE_PATH wasn't configured.
   if (!BP) {
     const seg = path.match(/^\/([^/]+)(\/.*)?$/);
-    if (seg && seg[1] !== 'media' && !findEntry(seg[1])) {
+    if (seg && seg[1] !== 'media' && seg[1] !== '_auth' && !findEntry(seg[1])) {
       const detected = `/${seg[1]}`;
       if (!effectiveBP) {
         effectiveBP = detected;
@@ -428,6 +677,30 @@ const server = createServer(async (req, res) => {
         }
         path = seg[2]; // Strip prefix, continue routing remainder
       }
+    }
+  }
+
+  // ── Device pairing auth ───────────────────────────────────────────
+  if (PAIRING_AUTH_ENABLED) {
+    // Handle /_auth routes (exempt from cookie check)
+    if (path === '/_auth') {
+      if (req.method === 'POST') {
+        handleAuthPost(req, res);
+        return;
+      }
+      // GET /_auth — serve auth gate page directly
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(authGatePage());
+      return;
+    }
+
+    // Check session cookie for all other routes
+    const cookieVal = getSessionCookie(req);
+    const session = cookieVal ? verifySessionCookie(cookieVal) : null;
+    if (!session) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(authGatePage());
+      return;
     }
   }
 
@@ -517,6 +790,17 @@ server.on('upgrade', async (req, socket, head) => {
     return;
   }
 
+  // ── Device pairing auth for WebSocket ──────────────────────────────
+  if (PAIRING_AUTH_ENABLED) {
+    const cookieVal = getSessionCookie(req);
+    const session = cookieVal ? verifySessionCookie(cookieVal) : null;
+    if (!session) {
+      console.log(`[dashboard] WS pairing auth denied: no valid session cookie (${req.socket.remoteAddress})`);
+      socket.destroy();
+      return;
+    }
+  }
+
   const url = new URL(req.url, `http://${req.headers.host}`);
   let wsPath = url.pathname;
 
@@ -558,6 +842,14 @@ server.on('upgrade', async (req, socket, head) => {
   backend.on('error', () => socket.destroy());
   socket.on('error', () => backend.destroy());
 });
+
+// ── Startup ──────────────────────────────────────────────────────────
+if (PAIRING_AUTH_ENABLED) {
+  loadPairedDevices();
+  watchPairedDevices();
+} else {
+  console.log('[dashboard] OPENCLAW_GATEWAY_TOKEN not set — device pairing auth disabled');
+}
 
 server.listen(PORT, () => {
   console.log(`[dashboard] Listening on port ${PORT}${BP ? `, base path: ${BP}` : ' (no base path — will auto-detect from first request if needed)'}`);
