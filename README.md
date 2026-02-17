@@ -361,6 +361,9 @@ openclaw doctor --deep
 ./scripts/logs-llm.sh # All LLM request & response messages (from llm-logger plugin)
 ./scripts/logs-session.sh # OpenClaw chat session logs - one of the most useful debugging logs
 
+# Browser
+./scripts/start-browser.sh # Start a browser container for an agent, print dashboard URL for pre-auth
+
 # Sync browser downloaded media to local host
 # Screenshots, PDFs etc. - whatever the agents or browser have downloaded
 # Same files visible at /dashboard/media endpoint in web dashboard UI
