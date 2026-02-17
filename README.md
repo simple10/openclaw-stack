@@ -133,6 +133,7 @@ If you want more control, see [scripts/](scripts/) dir for CLI helper scripts wi
 - **[Cloudflare Tunnel](docs/CLOUDFLARE-TUNNEL.md)** - details on Cloudflare Access & Tunnel setup
 - **[Telegram](docs/TELEGRAM.md)** - guide for setting up Telegram bots to use with OpenClaw
 - **[Claude Subscription](docs/CLAUDE-SUBSCRIPTION.md)** - info on using OpenClaw with a claude subscription
+- **[Security](docs/SECURITY.md)** - in depth details on the security layers
 - See [docs/](docs/) for more guides
 
 ## What happens during deploy
