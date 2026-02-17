@@ -259,7 +259,7 @@ These keys are stored only in Cloudflare and never touch the VPS. See [docs/POST
 There are two main UIs provided by this setup:
 
 1. OpenClaw Control UI: `https://openclaw.YOURDOMAIN.com/chat` - chat or change OpenClaw configs
-2. Browser Proxy: `https://openclaw.YOURDOMAIN.com/browser` - to access the agent browsers or downloaded media files
+2. Dashboard UI: `https://openclaw.YOURDOMAIN.com/dashboard` - to access the agent browsers or downloaded media files
 
 If you get a `disconnected` error when viewing the Control UI, that means your browser
 is not properly paired with OpenClaw. It's a security feature.
@@ -278,15 +278,15 @@ This opens the OpenClaw web UI where you can start chatting with your agents.
 
 ### Remote browser viewing
 
-Agents with browser access run a real Chrome instance (not headless) in a separate container.
+Agents with browser access run a real Chrome instance (not just headless) in a separate container.
 
 You can watch and control their browser sessions remotely via noVNC:
 
 ```
-https://openclaw.YOURDOMAIN.com/browser
+https://openclaw.YOURDOMAIN.com/dashboard
 ```
 
-See [docs/BROWSER-VNC.md](docs/BROWSER-VNC.md) for details.
+See [docs/DASHBOARD.md](docs/DASHBOARD.md) for details.
 
 ## Testing
 
@@ -362,8 +362,8 @@ openclaw doctor --deep
 ./scripts/logs-session.sh # OpenClaw chat session logs - one of the most useful debugging logs
 
 # Sync browser downloaded media to local host
-# Screenshots, PDFs etc. - whatever the browser containers have downloaded
-# Same files visible at /browser endpoint in web Control UI
+# Screenshots, PDFs etc. - whatever the agents or browser have downloaded
+# Same files visible at /dashboard/media endpoint in web dashboard UI
 ./scripts/sync-media.sh
 
 #
@@ -497,7 +497,7 @@ openclaw-vps/
 │   ├── entrypoint-gateway.sh         # Container init (dockerd, sandboxes, privilege drop)
 │   ├── rebuild-sandboxes.sh          # Layered sandbox image builder with split config detection
 │   ├── host-alert.sh                 # Host monitoring + Telegram alerts
-│   ├── dashboard.mjs                # Dashboard server — browser sessions, media, logs
+│   ├── dashboard.mjs                 # Dashboard server — browser sessions, media, logs
 │   └── logrotate-openclaw            # Log rotation config
 │
 ├── workers/                          # Cloudflare Workers (deployed via wrangler)
@@ -512,7 +512,7 @@ openclaw-vps/
 ├── docs/
 │   ├── VPS-SETUP-GUIDE.md            # VPS provisioning instructions
 │   ├── CLOUDFLARE-TUNNEL.md          # Tunnel and Access setup
-│   ├── BROWSER-VNC.md                # Remote browser viewing via noVNC
+│   ├── DASHBOARD.md                  # Details on web server sidecar (noVNC browser, etc.)
 │   ├── SANDBOX-TOOLKIT.md            # How to add/manage sandbox tools
 │   ├── TELEGRAM.md                   # Telegram integration guide
 │   └── TESTING.md                    # End-to-end testing instructions

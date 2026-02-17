@@ -19,9 +19,9 @@
 //   POST /_auth               → validate device token, set session cookie
 //   GET /media/               → directory listing of media files
 //   GET /media/<path>         → serve static file from ~/.openclaw/media/
-//   GET /<agent-id>/          → redirect to noVNC client
-//   GET /<agent-id>/*         → proxy to browser container's noVNC
-//   WS  /<agent-id>/websockify → WebSocket proxy for VNC stream
+//   GET /browser/<agent-id>/          → redirect to noVNC client
+//   GET /browser/<agent-id>/*         → proxy to browser container's noVNC
+//   WS  /browser/<agent-id>/websockify → WebSocket proxy for VNC stream
 
 import { createServer, request as httpRequest } from 'node:http';
 import { readFileSync, createReadStream, readdirSync, lstatSync, watch, watchFile } from 'node:fs';
@@ -489,7 +489,7 @@ async function indexPage() {
     const up = await isPortOpen(e.noVncPort);
     const statusDot = `<span class="status ${up ? 'up' : 'down'}"></span>`;
     const link = up
-      ? `<a href="${effectiveBP}/${id}/vnc.html?path=${wsPrefix ? wsPrefix + '/' : ''}${id}/websockify">${id}</a>`
+      ? `<a href="${effectiveBP}/browser/${id}/vnc.html?path=${wsPrefix ? wsPrefix + '/' : ''}browser/${id}/websockify">${id}</a>`
       : `${id}`;
     return `<tr>
       <td>${statusDot}${link}</td>
@@ -662,7 +662,7 @@ const server = createServer(async (req, res) => {
   // Cloudflare Tunnel sends /dashboard/... but DASHBOARD_BASE_PATH wasn't configured.
   if (!BP) {
     const seg = path.match(/^\/([^/]+)(\/.*)?$/);
-    if (seg && seg[1] !== 'media' && seg[1] !== '_auth' && !findEntry(seg[1])) {
+    if (seg && seg[1] !== 'media' && seg[1] !== '_auth' && seg[1] !== 'browser' && !findEntry(seg[1])) {
       const detected = `/${seg[1]}`;
       if (!effectiveBP) {
         effectiveBP = detected;
@@ -719,8 +719,15 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  // Parse /<agent-id>/... pattern
-  const match = path.match(/^\/([^/]+)(\/.*)?$/);
+  // Bare /browser or /browser/ → redirect to index
+  if (path === '/browser' || path === '/browser/') {
+    res.writeHead(302, { Location: `${effectiveBP}/` });
+    res.end();
+    return;
+  }
+
+  // Parse /browser/<agent-id>/... pattern
+  const match = path.match(/^\/browser\/([^/]+)(\/.*)?$/);
   if (!match) {
     res.writeHead(404);
     res.end('Not found');
@@ -730,11 +737,11 @@ const server = createServer(async (req, res) => {
   const agentId = match[1];
   const subPath = match[2] || '/';
 
-  // Bare /<agent-id> or /<agent-id>/ → redirect to vnc.html
+  // Bare /browser/<agent-id> or /browser/<agent-id>/ → redirect to vnc.html
   if (subPath === '/') {
     // WebSocket path param is relative (no leading /) — include effectiveBP without leading /
     const wsPrefix = effectiveBP.startsWith('/') ? effectiveBP.slice(1) : effectiveBP;
-    res.writeHead(302, { Location: `${effectiveBP}/${agentId}/vnc.html?path=${wsPrefix ? wsPrefix + '/' : ''}${agentId}/websockify` });
+    res.writeHead(302, { Location: `${effectiveBP}/browser/${agentId}/vnc.html?path=${wsPrefix ? wsPrefix + '/' : ''}browser/${agentId}/websockify` });
     res.end();
     return;
   }
@@ -811,7 +818,7 @@ server.on('upgrade', async (req, socket, head) => {
     wsPath = wsPath.slice(effectiveBP.length);
   }
 
-  const match = wsPath.match(/^\/([^/]+)(\/.*)?$/);
+  const match = wsPath.match(/^\/browser\/([^/]+)(\/.*)?$/);
   if (!match) {
     socket.destroy();
     return;

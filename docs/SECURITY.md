@@ -506,7 +506,7 @@ noVNC browser sessions use WebSocket connections that are also protected by both
 ```
 Browser                              Dashboard Server
    |                                       |
-   |══ WS Upgrade /dashboard/<agent>/websockify ══>
+   |══ WS Upgrade /dashboard/browser/<agent>/websockify ══>
    |                                       |
    |   1. Verify CF Access JWT header      |
    |      ❌ → socket.destroy()            |

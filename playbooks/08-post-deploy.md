@@ -434,3 +434,43 @@ Check `HOSTALERT_TELEGRAM_BOT_TOKEN` and `HOSTALERT_TELEGRAM_CHAT_ID` in `opencl
 - Hard-refresh the browser page.
 - Check gateway logs for errors after the approval.
 - Verify the gateway container hasn't restarted: `sudo docker ps | grep openclaw-gateway`
+
+### Control UI shows "unauthorized" or "disconnected" (was working before)
+
+This happens when the browser has a stale device token — typically after a gateway restart,
+token rotation, or paired.json change. The gateway logs will show repeating
+`device_token_mismatch` warnings every few seconds.
+
+**Fix:** Give the user the token URL. This forces the browser to clear its stale device
+identity and generate a fresh keypair:
+
+```
+https://<OPENCLAW_DOMAIN><OPENCLAW_DOMAIN_PATH>/?token=<GATEWAY_TOKEN>
+```
+
+Read the token from VPS if needed:
+
+```bash
+ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
+  "sudo grep OPENCLAW_GATEWAY_TOKEN /home/openclaw/openclaw/.env | cut -d= -f2"
+```
+
+After the user clicks the URL:
+
+1. Check gateway logs for a new `pairing required` / `not-paired` entry with a **new** `deviceId`
+   (confirms the browser cleared its old identity)
+2. Approve the pending request:
+
+   ```bash
+   ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> "openclaw devices approve <requestId>"
+   ```
+
+3. The browser auto-retries every few seconds — the user should see "connected" within ~15 seconds
+
+**Why this works:** The `?token=` parameter in the URL triggers the Control UI to reset its
+`localStorage` device identity. Without this, the browser keeps sending the old device token
+on every reconnect attempt, which the gateway rejects as `device_token_mismatch`. Editing
+`paired.json` alone doesn't fix it because the browser-side token is stale.
+
+**Do NOT** try to fix this by editing `paired.json` or restarting the gateway — the problem
+is browser-side, not server-side.

@@ -63,16 +63,16 @@ All paths below are relative to `DASHBOARD_BASE_PATH` (empty = root):
 |-----|----------|
 | `/` | Index page listing active browser sessions with live status |
 | `/media/` | Directory listing of agent media files |
-| `/<agent-id>/` | Redirects to noVNC client |
-| `/<agent-id>/vnc.html?path=...` | noVNC client (proxied from browser container) |
-| `/<agent-id>/*` | HTTP proxy to browser container's noVNC static files |
-| `/<agent-id>/websockify` (WebSocket) | VNC stream proxy |
+| `/browser/<agent-id>/` | Redirects to noVNC client |
+| `/browser/<agent-id>/vnc.html?path=...` | noVNC client (proxied from browser container) |
+| `/browser/<agent-id>/*` | HTTP proxy to browser container's noVNC static files |
+| `/browser/<agent-id>/websockify` (WebSocket) | VNC stream proxy |
 
 The `?path=` query parameter tells the noVNC client where to connect the WebSocket. It includes the base path when set.
 
 **Examples:**
-- Subdomain: `https://dashboard-openclaw.example.com/main/vnc.html?path=main/websockify`
-- Subpath: `https://openclaw.example.com/dashboard/main/vnc.html?path=dashboard/main/websockify`
+- Subdomain: `https://dashboard-openclaw.example.com/browser/main/vnc.html?path=browser/main/websockify`
+- Subpath: `https://openclaw.example.com/dashboard/browser/main/vnc.html?path=dashboard/browser/main/websockify`
 
 ## Components
 
@@ -202,7 +202,7 @@ sudo docker exec openclaw-gateway curl -s http://127.0.0.1:6090/dashboard/
 sudo docker logs openclaw-gateway 2>&1 | grep 'dashboard'
 
 # After a browser task runs, check session routing
-sudo docker exec openclaw-gateway curl -s http://127.0.0.1:6090/dashboard/main/vnc.html
+sudo docker exec openclaw-gateway curl -s http://127.0.0.1:6090/dashboard/browser/main/vnc.html
 
 # External access via tunnel
 curl -s https://<OPENCLAW_DASHBOARD_DOMAIN><OPENCLAW_DASHBOARD_DOMAIN_PATH>/
@@ -216,7 +216,7 @@ The browser container isn't active. Send a browser task to the agent to start it
 
 ### noVNC loads but "Failed to connect to server"
 
-The noVNC WebSocket path is wrong. Ensure the URL includes `?path=<agent-id>/websockify`. The index page links include this automatically.
+The noVNC WebSocket path is wrong. Ensure the URL includes `?path=browser/<agent-id>/websockify`. The index page links include this automatically.
 
 ### Bad Gateway (Cloudflare error page)
 
