@@ -249,10 +249,16 @@ build_common() {
     return 1
   fi
 
-  # Step 2: Run upstream script with BASE_IMAGE override + config-driven packages
-  BASE_IMAGE=openclaw-sandbox-base-root:bookworm-slim \
-  PACKAGES="$toolkit_packages" \
-  /app/scripts/sandbox-common-setup.sh || true
+  # Step 2: Run upstream script with BASE_IMAGE override + config-driven packages.
+  # Build from /tmp/sandbox-build to avoid /app/.env permission issue (Sysbox maps
+  # .env to nobody:600, Docker can't read it when scanning build context).
+  # The Dockerfile has no COPY instructions so the context dir doesn't matter.
+  mkdir -p /tmp/sandbox-build
+  ln -sf /app/Dockerfile.sandbox-common /tmp/sandbox-build/Dockerfile.sandbox-common
+  (cd /tmp/sandbox-build && \
+    BASE_IMAGE=openclaw-sandbox-base-root:bookworm-slim \
+    PACKAGES="$toolkit_packages" \
+    /app/scripts/sandbox-common-setup.sh) || true
 
   if ! image_exists "openclaw-sandbox-common:bookworm-slim"; then
     log "ERROR: Common sandbox image build failed — upstream script did not produce image"
