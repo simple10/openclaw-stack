@@ -19,6 +19,11 @@ OpenClaw gets wrapped with production-grade infrastructure: SSH hardening, firew
 >
 > **Just clone the repo & run `claude "start"`**
 >
+> Or have claude do it all for you:
+>
+> `curl -fsSL https://raw.githubusercontent.com/simple10/openclaude/main/docs/CLAUDE_INSTALL.md -o CLAUDE.md`
+> `claude "start"`
+>
 
 ## Is this better than one-click VPS installs?
 
