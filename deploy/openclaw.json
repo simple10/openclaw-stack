@@ -136,7 +136,9 @@
             // Skill bins shims — pass through to real binaries inside sandboxes,
             // satisfy gateway preflight checks on the host.
             // Note: only truly needed when main runs in sandbox mode. Revisit in a second pass.
-            "/opt/skill-bins:/opt/skill-bins:ro"
+            "/opt/skill-bins:/opt/skill-bins:ro",
+            // OpenClaw docs — accessible via read tool at /workspace/docs/
+            "/app/docs:/workspace/docs:ro"
           ]
         },
         // Each agent has its browser container - requires the "browser" tool
@@ -188,10 +190,12 @@
           // Group chats and subagent spawns still get sandboxed.
           "mode": "non-main",
           "docker": {
+            // Per-agent binds replace (not merge) defaults — repeat all needed binds
             "binds": [
+              "/opt/skill-bins:/opt/skill-bins:ro",
+              "/app/docs:/workspace/docs:ro", // Needed for main sandbox to read docs without making extra exec tool call
               // Make host-status reports available to any main agent sandbox tool
-              "/home/node/.openclaw/workspace/host-status:/workspace/host-status:ro",
-              "/opt/skill-bins:/opt/skill-bins:ro"
+              "/home/node/.openclaw/workspace/host-status:/workspace/host-status:ro"
             ]
           }
         },
@@ -220,8 +224,9 @@
             "memorySwap": "8g",
             "cpus": 4,
             "binds": [
-              // Per-agent binds replace (not merge) the defaults array — repeat skill-bins
+              // Per-agent binds replace (not merge) defaults — repeat all needed binds
               "/opt/skill-bins:/opt/skill-bins:ro",
+              "/app/docs:/workspace/docs:ro",
               // Code agent specific - persistent home for tool configs, shell history, etc.
               "/home/node/sandboxes-home/code:/home/sandbox"
             ]
