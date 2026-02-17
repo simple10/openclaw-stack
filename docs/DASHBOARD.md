@@ -43,7 +43,7 @@ The dashboard URL is configured via two variables in `openclaw-config.env`:
 
 | Variable | Purpose | Example |
 |----------|---------|---------|
-| `OPENCLAW_BROWSER_DOMAIN` | Dashboard hostname | `openclaw.example.com` |
+| `OPENCLAW_DASHBOARD_DOMAIN` | Dashboard hostname | `openclaw.example.com` |
 | `OPENCLAW_DASHBOARD_DOMAIN_PATH` | Dashboard base path | `/dashboard` (or empty for subdomain) |
 
 | Setup | Domain | Path | `DASHBOARD_BASE_PATH` |
@@ -63,16 +63,16 @@ All paths below are relative to `DASHBOARD_BASE_PATH` (empty = root):
 |-----|----------|
 | `/` | Index page listing active browser sessions with live status |
 | `/media/` | Directory listing of agent media files |
-| `/<agent-id>/` | Redirects to noVNC client |
-| `/<agent-id>/vnc.html?path=...` | noVNC client (proxied from browser container) |
-| `/<agent-id>/*` | HTTP proxy to browser container's noVNC static files |
-| `/<agent-id>/websockify` (WebSocket) | VNC stream proxy |
+| `/browser/<agent-id>/` | Redirects to noVNC client |
+| `/browser/<agent-id>/vnc.html?path=...` | noVNC client (proxied from browser container) |
+| `/browser/<agent-id>/*` | HTTP proxy to browser container's noVNC static files |
+| `/browser/<agent-id>/websockify` (WebSocket) | VNC stream proxy |
 
 The `?path=` query parameter tells the noVNC client where to connect the WebSocket. It includes the base path when set.
 
 **Examples:**
-- Subdomain: `https://dashboard-openclaw.example.com/main/vnc.html?path=main/websockify`
-- Subpath: `https://openclaw.example.com/dashboard/main/vnc.html?path=dashboard/main/websockify`
+- Subdomain: `https://dashboard-openclaw.example.com/browser/main/vnc.html?path=browser/main/websockify`
+- Subpath: `https://openclaw.example.com/dashboard/browser/main/vnc.html?path=dashboard/browser/main/websockify`
 
 ## Components
 
@@ -112,7 +112,7 @@ Add a route on the existing `openclaw` tunnel. Two approaches:
 |-----------|--------|------|---------|
 | `dashboard-openclaw` | `yourdomain.com` | *(empty)* | `http://localhost:6090` |
 
-Set `OPENCLAW_BROWSER_DOMAIN=dashboard-openclaw.yourdomain.com` and `OPENCLAW_DASHBOARD_DOMAIN_PATH=` (empty → `DASHBOARD_BASE_PATH` is empty).
+Set `OPENCLAW_DASHBOARD_DOMAIN=dashboard-openclaw.yourdomain.com` and `OPENCLAW_DASHBOARD_DOMAIN_PATH=` (empty → `DASHBOARD_BASE_PATH` is empty).
 
 **Option B: Subpath on main domain** (e.g., `openclaw.yourdomain.com/dashboard`)
 
@@ -120,7 +120,7 @@ Set `OPENCLAW_BROWSER_DOMAIN=dashboard-openclaw.yourdomain.com` and `OPENCLAW_DA
 |-----------|--------|------|---------|
 | `openclaw` | `yourdomain.com` | `/dashboard` | `http://localhost:6090` |
 
-Set `OPENCLAW_BROWSER_DOMAIN=openclaw.yourdomain.com` and `OPENCLAW_DASHBOARD_DOMAIN_PATH=/dashboard` (→ `DASHBOARD_BASE_PATH=/dashboard`).
+Set `OPENCLAW_DASHBOARD_DOMAIN=openclaw.yourdomain.com` and `OPENCLAW_DASHBOARD_DOMAIN_PATH=/dashboard` (→ `DASHBOARD_BASE_PATH=/dashboard`).
 
 No new tunnel needed — just add a public hostname to the existing tunnel in the Dashboard.
 
@@ -188,7 +188,7 @@ This avoids the concurrency problems of a shared browser sidecar approach.
 2. Click your tunnel → **Configure** → **Public Hostname** tab
 3. Add a new public hostname pointing to `http://localhost:6090` (see "Cloudflare Tunnel Route" above for subdomain vs subpath options)
 4. Add a Cloudflare Access policy to restrict who can view browser sessions
-5. Set `OPENCLAW_BROWSER_DOMAIN` and `OPENCLAW_DASHBOARD_DOMAIN_PATH` in `openclaw-config.env` to match your chosen URL
+5. Set `OPENCLAW_DASHBOARD_DOMAIN` and `OPENCLAW_DASHBOARD_DOMAIN_PATH` in `openclaw-config.env` to match your chosen URL
 
 ### Verification
 
@@ -202,10 +202,10 @@ sudo docker exec openclaw-gateway curl -s http://127.0.0.1:6090/dashboard/
 sudo docker logs openclaw-gateway 2>&1 | grep 'dashboard'
 
 # After a browser task runs, check session routing
-sudo docker exec openclaw-gateway curl -s http://127.0.0.1:6090/dashboard/main/vnc.html
+sudo docker exec openclaw-gateway curl -s http://127.0.0.1:6090/dashboard/browser/main/vnc.html
 
 # External access via tunnel
-curl -s https://<OPENCLAW_BROWSER_DOMAIN><OPENCLAW_DASHBOARD_DOMAIN_PATH>/
+curl -s https://<OPENCLAW_DASHBOARD_DOMAIN><OPENCLAW_DASHBOARD_DOMAIN_PATH>/
 ```
 
 ## Troubleshooting
@@ -216,7 +216,7 @@ The browser container isn't active. Send a browser task to the agent to start it
 
 ### noVNC loads but "Failed to connect to server"
 
-The noVNC WebSocket path is wrong. Ensure the URL includes `?path=<agent-id>/websockify`. The index page links include this automatically.
+The noVNC WebSocket path is wrong. Ensure the URL includes `?path=browser/<agent-id>/websockify`. The index page links include this automatically.
 
 ### Bad Gateway (Cloudflare error page)
 

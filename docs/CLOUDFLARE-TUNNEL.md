@@ -210,7 +210,7 @@ Then set in `openclaw-config.env`:
 
 ```
 OPENCLAW_DOMAIN=openclaw.yourdomain.com
-OPENCLAW_BROWSER_DOMAIN=openclaw.yourdomain.com
+OPENCLAW_DASHBOARD_DOMAIN=openclaw.yourdomain.com
 OPENCLAW_DASHBOARD_DOMAIN_PATH=/dashboard
 ```
 
@@ -260,7 +260,7 @@ Then set in `openclaw-config.env`:
 
 ```
 OPENCLAW_DOMAIN=openclaw.yourdomain.com
-OPENCLAW_BROWSER_DOMAIN=dashboard-openclaw.yourdomain.com
+OPENCLAW_DASHBOARD_DOMAIN=dashboard-openclaw.yourdomain.com
 OPENCLAW_DASHBOARD_DOMAIN_PATH=
 ```
 

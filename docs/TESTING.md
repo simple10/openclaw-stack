@@ -116,11 +116,11 @@ mcp__chrome-devtools__take_snapshot()
 
 ### 2.5 Test Dashboard Access (Optional)
 
-If `OPENCLAW_BROWSER_DOMAIN` is configured:
+If `OPENCLAW_DASHBOARD_DOMAIN` is configured:
 
 ```
 # Navigate to dashboard — may hit Cloudflare Access login
-mcp__chrome-devtools__navigate_page(url="https://<OPENCLAW_BROWSER_DOMAIN><OPENCLAW_DASHBOARD_DOMAIN_PATH>/")
+mcp__chrome-devtools__navigate_page(url="https://<OPENCLAW_DASHBOARD_DOMAIN><OPENCLAW_DASHBOARD_DOMAIN_PATH>/")
 mcp__chrome-devtools__take_snapshot()
 ```
 

@@ -298,13 +298,13 @@ Set the domain config values:
 
 ```
 OPENCLAW_DOMAIN=openclaw.yourdomain.com
-OPENCLAW_BROWSER_DOMAIN=openclaw.yourdomain.com
+OPENCLAW_DASHBOARD_DOMAIN=openclaw.yourdomain.com
 OPENCLAW_DASHBOARD_DOMAIN_PATH=/dashboard
 ```
 
 Ask the user to confirm they've completed these steps and tell you their exact subdomain/domain.
 
-Save `OPENCLAW_DOMAIN`, `OPENCLAW_BROWSER_DOMAIN`, and `OPENCLAW_DASHBOARD_DOMAIN_PATH=/dashboard`.
+Save `OPENCLAW_DOMAIN`, `OPENCLAW_DASHBOARD_DOMAIN`, and `OPENCLAW_DASHBOARD_DOMAIN_PATH=/dashboard`.
 
 Leave `OPENCLAW_DOMAIN_PATH` empty (gateway at root).
 
@@ -335,7 +335,7 @@ curl -sI --connect-timeout 10 "https://<OPENCLAW_DOMAIN>/" 2>&1 | head -10
 Also test the dashboard path:
 
 ```bash
-curl -sI --connect-timeout 10 "https://<OPENCLAW_BROWSER_DOMAIN>/dashboard/" 2>&1 | head -10
+curl -sI --connect-timeout 10 "https://<OPENCLAW_DASHBOARD_DOMAIN>/dashboard/" 2>&1 | head -10
 ```
 
 Same expected result — Access login redirect.
@@ -435,7 +435,7 @@ At this point you should have collected all required values:
 - `SSH_KEY_PATH`
 - `CF_TUNNEL_TOKEN`
 - `OPENCLAW_DOMAIN`
-- `OPENCLAW_BROWSER_DOMAIN`
+- `OPENCLAW_DASHBOARD_DOMAIN`
 - `OPENCLAW_DASHBOARD_DOMAIN_PATH`
 - `YOUR_TELEGRAM_ID`
 - `OPENCLAW_TELEGRAM_BOT_TOKEN`
@@ -487,7 +487,7 @@ HOSTALERT_TELEGRAM_BOT_TOKEN=<collected value>
 HOSTALERT_TELEGRAM_CHAT_ID=<collected value>
 HOSTALERT_DAILY_REPORT_TIME=<collected value>
 OPENCLAW_DOMAIN=<collected value>
-OPENCLAW_BROWSER_DOMAIN=<collected value>
+OPENCLAW_DASHBOARD_DOMAIN=<collected value>
 OPENCLAW_DASHBOARD_DOMAIN_PATH=<collected value>
 ```
 
@@ -499,7 +499,7 @@ After writing, show the user a summary:
 >
 > - VPS: `<SSH_USER>@<VPS1_IP>` (SSH key: `<SSH_KEY_PATH>`)
 > - Domain: `<OPENCLAW_DOMAIN>` (protected by Cloudflare Access)
-> - Browser: `<OPENCLAW_BROWSER_DOMAIN><OPENCLAW_DASHBOARD_DOMAIN_PATH>`
+> - Browser: `<OPENCLAW_DASHBOARD_DOMAIN><OPENCLAW_DASHBOARD_DOMAIN_PATH>`
 > - Tunnel: Configured (token saved)
 > - Telegram: Bot configured, user ID set
 > - Host Alerts: Configured (daily report at `<HOSTALERT_DAILY_REPORT_TIME>`)

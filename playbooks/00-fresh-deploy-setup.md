@@ -4,7 +4,7 @@ Validation and overview for starting a fresh VPS deployment. All required config
 
 ## Overview
 
-This playbook validates the configuration needed to deploy OpenClaw on a fresh Ubuntu VPS. Domain settings (`OPENCLAW_DOMAIN`, `OPENCLAW_BROWSER_DOMAIN`, `OPENCLAW_DASHBOARD_DOMAIN_PATH`, `OPENCLAW_DOMAIN_PATH`) and Cloudflare Access protection are required upfront so the full deployment can run end-to-end without interruption.
+This playbook validates the configuration needed to deploy OpenClaw on a fresh Ubuntu VPS. Domain settings (`OPENCLAW_DOMAIN`, `OPENCLAW_DASHBOARD_DOMAIN`, `OPENCLAW_DASHBOARD_DOMAIN_PATH`, `OPENCLAW_DOMAIN_PATH`) and Cloudflare Access protection are required upfront so the full deployment can run end-to-end without interruption.
 
 ## Prerequisites
 
@@ -41,7 +41,7 @@ Validate all of these fields:
 1. **`VPS1_IP`** — Must be set and not a placeholder (not `15.x.x.1` or containing `<`).
 2. **`CF_TUNNEL_TOKEN`** — Must not be empty.
 3. **`OPENCLAW_DOMAIN`** — Must not be a placeholder (no `<example>` or angle brackets).
-4. **`OPENCLAW_BROWSER_DOMAIN`** — Must not be a placeholder.
+4. **`OPENCLAW_DASHBOARD_DOMAIN`** — Must not be a placeholder.
 5. **`OPENCLAW_DASHBOARD_DOMAIN_PATH`** — Validated (can be empty for separate subdomain, or a path like `/browser`).
 6. **`OPENCLAW_DOMAIN_PATH`** — Validated (can be empty for root).
 7. **`YOUR_TELEGRAM_ID`** — Must be set and numeric (Telegram user IDs are integers). If empty, warn the user: "Send a message to @userinfobot on Telegram to get your numeric user ID."
@@ -59,7 +59,7 @@ Report **all** issues at once (don't stop at the first one). Present them as:
 > - `OPENCLAW_DOMAIN` is still a placeholder — set it to your actual domain
 >   (e.g., `openclaw.yourdomain.com`). You need to configure Cloudflare Tunnel
 >   public hostname routes first (see [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md))
-> - `OPENCLAW_BROWSER_DOMAIN` is still a placeholder — same as above
+> - `OPENCLAW_DASHBOARD_DOMAIN` is still a placeholder — same as above
 > - `YOUR_TELEGRAM_ID` is empty — send a message to @userinfobot on Telegram to get your ID
 > - `OPENCLAW_TELEGRAM_BOT_TOKEN` is empty — create a bot via @BotFather and paste the token
 >   (see [`docs/TELEGRAM.md`](../docs/TELEGRAM.md))
@@ -206,7 +206,7 @@ Wait for user. Re-check.
 ### Also verify the browser VNC domain:
 
 ```bash
-curl -sI --connect-timeout 10 https://<OPENCLAW_BROWSER_DOMAIN><OPENCLAW_DASHBOARD_DOMAIN_PATH>/ 2>&1 | head -10
+curl -sI --connect-timeout 10 https://<OPENCLAW_DASHBOARD_DOMAIN><OPENCLAW_DASHBOARD_DOMAIN_PATH>/ 2>&1 | head -10
 ```
 
 Same logic: expect 302/403. If not, guide user to fix.

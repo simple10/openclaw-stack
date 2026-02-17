@@ -146,7 +146,7 @@
         // Each agent has its browser container - requires the "browser" tool
         // Browsers are run in separate sandbox containers, not inside the agent sandbox
         // Move browser settings to individual agent to restrict browser use or enforce single browser container
-        // Browser sessions are accessible to users via the dashboard server at OPENCLAW_BROWSER_DOMAIN after deploy
+        // Browser sessions are accessible to users via the dashboard server at OPENCLAW_DASHBOARD_DOMAIN after deploy
         // Browser containers inherit the default CPU and memory settings of their associated agent
         "browser": {
           "enabled": true,
