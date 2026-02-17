@@ -1,23 +1,26 @@
-# What is this project?
+# Claude => OpenClaw => VPS
 
-It's a set of carefully designed [playbooks](playbooks/) & tools that instruct `Claude Code` how to deploy, secure, and maintain
-[OpenClaw](https://docs.openclaw.ai) on your own VPS.
+**About this project:**
 
-It wraps OpenClaw with production-grade infrastructure: SSH hardening, firewall rules, Docker-in-Docker sandboxing via [Sysbox](https://github.com/nestybox/sysbox), Cloudflare Tunnel for zero-exposed-port networking, and a Cloudflare Worker proxy that keeps your real API keys off the server entirely.
+This repo enables `claude code` to securely deploy & maintain [OpenClaw](https://docs.openclaw.ai) on your own VPS.
 
-Claude automates it all for you - just clone the repo & run `claude "start"`
+**What's included:**
 
-## What is OpenClaw?
+- [CLAUDE.md](CLAUDE.md) & [playbooks](playbooks/) - carefully designed instructions for claude to follow
+- [Tools](deploy/) & [script](scripts/) - OpenClaw plugins & build scripts
+- [Cloudflare Workers](workers/) - for logging & LLLM proxy (no API keys stored on the VPS)
 
-[OpenClaw](https://docs.openclaw.ai) is an open-source AI agent platform. It provides a gateway that manages multiple AI agents, each running in isolated sandbox containers. Agents can use tools (shell, browser, file I/O), delegate tasks to sub-agents, and interact with users through a web dashboard or messaging channels like Telegram and Discord.
+OpenClaw gets wrapped with production-grade infrastructure: SSH hardening, firewall rules, Docker-in-Docker sandboxing via [Sysbox](https://github.com/nestybox/sysbox), Cloudflare Tunnel for zero-exposed-port networking, and a Cloudflare Worker proxy that keeps your real API keys off the server entirely.
 
-## Why should I use project instead of one-click VPS installs?
+Claude automates it all for you.
 
-If you're asking the question, then you probably shouldn't use it.
+**Just clone the repo & run `claude "start"`**
 
-But if you already use claude code, care about security, or like to tinker, this project is worth your time.
+## Is this better than one-click VPS installs?
 
-The project tackles a lot of security & observability pain points of OpenClaw while automating everything with claude.
+If you already use `claude`, care about security, or like to tinker, this project is worth your time.
+
+There are a LOT of power-ups stashed in this repo. It's a batteries included OpenClaw & devops framework.
 
 One-click VPS installs are a great way to get up and running quickly. But then you're left running a fairly insecure
 or an overly locked-down OpenClaw setup. This project helps strike a nice balance between the two.
