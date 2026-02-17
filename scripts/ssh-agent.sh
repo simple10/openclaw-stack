@@ -149,7 +149,7 @@ if [[ "$CONTAINER_STATUS" == "none" ]]; then
   printf '\033[33mNo sandbox for agent "%s" — triggering creation...\033[0m\n' "$AGENT"
 
   # Send a message to the agent to trigger sandbox creation.
-  # The agent loop creates the sandbox container at attempt start (sandbox.mode = "all").
+  # The agent loop creates the sandbox container when a tool is needed (requires sandbox.mode = "all" per agent).
   # Stdout suppressed (agent response not needed); stderr preserved so errors are visible.
   ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
     "sudo docker exec --user node $GATEWAY openclaw agent --agent $AGENT --message ping --timeout 60" \

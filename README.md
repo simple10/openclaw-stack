@@ -314,8 +314,8 @@ These keys are stored only in Cloudflare and never touch the VPS. See [docs/POST
 
 There are two main UI's provided by this setup:
 
-1. OpenClaw Control UI: <https://openclaw.yourdomain.com/chat> - chat or change OpenClaw configs
-2. Browser Proxy: <https://openclaw.yourdomain.com/browser> - to access the agent browsers or downloaded media files
+1. OpenClaw Control UI: `https://openclaw.YOURDOMAIN.com/chat` - chat or change OpenClaw configs
+2. Browser Proxy: `https://openclaw.YOURDOMAIN.com/browser` - to access the agent browsers or downloaded media files
 
 If you get a `disconnected` error when viewing the Control UI, that means your browser
 is not properly paired with OpenClaw. It's a security feature.
@@ -328,7 +328,7 @@ If you need to re-pair your browser, just ask claude for the URL:
 > I need to repair my device with OpenClaw. Please give me the link.
 ```
 
-You'll get something like: `https://openclaw.yourdomain.com/chat?token=GATEWAY_TOKEN`
+You'll get something like: `https://openclaw.YOURDOMAIN.com/chat?token=GATEWAY_TOKEN`
 
 This opens the OpenClaw web UI where you can start chatting with your agents.
 
@@ -339,7 +339,7 @@ Agents with browser access run a real Chrome instance (not headless) in a separa
 You can watch and control their browser sessions remotely via noVNC:
 
 ```
-https://openclaw.yourdomain.com/browser
+https://openclaw.YOURDOMAIN.com/browser
 ```
 
 See [docs/BROWSER-VNC.md](docs/BROWSER-VNC.md) for details.
@@ -368,7 +368,7 @@ Then if there's a problem, use claude to fix it.
 > Show me the last 50 lines of gateway logs
 ```
 
-### Manually Managing the Gateway
+### Manually Managing VPS & Gateway
 
 ```bash
 # SSH into the VPS (port changes during hardening — check your config)
@@ -380,17 +380,86 @@ sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose logs -f' 
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart openclaw-gateway'  # Restart
 ```
 
+**Or use the helper scripts:**
+
+```bash
+# Most of the helper scripts have optional params like `--all` or `--dry-run`
+# See comments at the top of each script for details
+
+# Run OpenClaw CLI commands
+# SSH's into gateway container to run `openclaw ...`
+# Supports all of the openclaw CLI commands
+./scripts/openclaw.sh
+./scripts/openclaw.sh doctor --deep
+
+# If any OpenClaw CLI commands don't work as expected,
+# SSH into the gateway first then run `openclaw`
+# Interactive commands sometimes have trouble with SSH -> Docker exec TTY -> openclaw
+./scripts/gateway.sh
+openclaw doctor --deep
+
+# Health Checks
+./health-check.sh # Show OpenClaw and docker containers health
+
+# SSH
+./scripts/ssh-vps.sh # SSH into VPS host
+./scripts/ssh-gateway.sh # SSH into VPS -> exec bash into gateway container
+./scripts/ssh-agent.sh # SSH into an agent sandbox - auto starts if not currently running
+
+# Restart
+./scripts/restart-gateway.sh
+./scripts/restart-sandboxes.sh
+
+# Logs
+./scripts/logs-openclaw.sh # Logs from OpenClaw command logger (built-in plugin)
+./scripts/logs-docker.sh # Docker container logs, including gateway
+./scripts/logs-debug.sh # Logs from custom debug-logger OpenClaw plugin, similar to logs-openclaw but all messages
+./scripts/logs-llm.sh # All LLM request & response messages (from llm-logger plugin)
+./scripts/logs-session.sh # OpenClaw chat session logs - one of the most useful debugging logs
+
+# Sync browser downloaded media to local host
+# Screenshots, PDFs etc. - whatever the browser containers have downloaded
+# Same files visible at /browser endpoint in web Control UI
+./scripts/sync-media.sh
+
+#
+# Update Containers
+#
+
+# Update OpenClaw gateway container
+# Pulls latest openclaw source & rebuilds & restarts gateway container
+# Expect 5-10 seconds of downtime for the gateway and agent sandboxes
+./scripts/update-openclaw.sh
+
+# Update sandbox-toolkit bins to latest versions for sandboxes
+# Equivalent to running `apt-get upgrade` or `npm update`
+# See deploy/sandbox-toolkit.yaml for bins config
+# Does not resync deploy/sandbox-toolkit.yaml to VPS
+# Only runs update for version already on VPS
+./scripts/update-sandbox-toolkit.sh
+
+# Update and rebuild sandbox containers
+./scripts/update-sandboxes.sh
+```
+
 ### Updating OpenClaw
 
-Updates are done via `git pull` and rebuild on the VPS (the container's `openclaw update` command doesn't work because the `.git` directory isn't inside the container).
+Updates are done via `git pull` and rebuilding the gateway container on the VPS.
+OpenClaw's `openclaw update` command does not work (by design) because the `.git`
+directory is not inside the container. It's safer to rebuild on host.
 
 Just tell `claude`:
 
-```
+```text
 > Update openclaw to the latest version
 ```
 
 Claude will pull the latest code, rebuild the Docker image with auto-patching, and restart the gateway.
+
+```bash
+# OR use the update script
+./scripts/update-openclaw.sh
+```
 
 ### Managing sandbox tools
 
@@ -449,6 +518,7 @@ See also [scripts/](./scripts/) for bash utils for SSHing, showing logs, etc.
 ## File Structure Highlights
 
 ```
+
 openclaw-vps/
 ├── README.md                         # This file
 ├── CLAUDE.md                         # Deployment orchestration instructions (for Claude)
@@ -497,6 +567,7 @@ openclaw-vps/
     ├── 07-verification.md            # Security audit and service verification
     ├── 08-post-deploy.md             # Domain, tunnel routes, device pairing
     └── maintenance.md                # Token rotation and maintenance procedures
+
 ```
 
 ---
