@@ -36,7 +36,7 @@ From `../openclaw-config.env`:
 - `HOSTALERT_TELEGRAM_CHAT_ID` - Optional (for host alerter)
 - `HOSTALERT_DAILY_REPORT_TIME` - Optional, daily health report time (default: `9:00 AM UTC`)
 - `OPENCLAW_DOMAIN_PATH` - URL subpath for the gateway UI (default: `/_openclaw`)
-- `OPENCLAW_BROWSER_DOMAIN_PATH` - Base path for the noVNC proxy (e.g., `/browser`), empty if using a separate subdomain
+- `OPENCLAW_DASHBOARD_DOMAIN_PATH` - Base path for the dashboard server (e.g., `/dashboard`), empty if using a separate subdomain
 
 ---
 
@@ -204,8 +204,8 @@ EOF
 # Generate gateway token
 GATEWAY_TOKEN=$(openssl rand -hex 32)
 
-# noVNC proxy base path — direct from config, no parsing needed
-NOVNC_BASE_PATH="${OPENCLAW_BROWSER_DOMAIN_PATH:-}"
+# Dashboard base path — direct from config, no parsing needed
+DASHBOARD_BASE_PATH="${OPENCLAW_DASHBOARD_DOMAIN_PATH:-}"
 
 sudo -u openclaw tee /home/openclaw/openclaw/.env << EOF
 # Gateway authentication
@@ -226,9 +226,9 @@ LOG_WORKER_URL=${LOG_WORKER_URL}
 LOG_WORKER_TOKEN=${LOG_WORKER_TOKEN}
 VPS1_IP=${VPS1_IP}
 
-# noVNC proxy base path — from OPENCLAW_BROWSER_DOMAIN_PATH
-# Empty = proxy serves at root (e.g., browser on a separate subdomain)
-NOVNC_BASE_PATH=${NOVNC_BASE_PATH}
+# Dashboard base path — from OPENCLAW_DASHBOARD_DOMAIN_PATH
+# Empty = dashboard serves at root (e.g., dashboard on a separate subdomain)
+DASHBOARD_BASE_PATH=${DASHBOARD_BASE_PATH}
 
 # Gateway Control UI subpath — must match gateway.controlUi.basePath in openclaw.json.
 # Used by Docker healthcheck and playbook verification commands.
@@ -256,8 +256,8 @@ echo ""
 echo "========================================="
 echo "Generated Credentials (save these):"
 echo "  Gateway Token: ${GATEWAY_TOKEN}"
-if [ -n "${NOVNC_BASE_PATH}" ]; then
-  echo "  noVNC Base Path: ${NOVNC_BASE_PATH}"
+if [ -n "${DASHBOARD_BASE_PATH}" ]; then
+  echo "  Dashboard Base Path: ${DASHBOARD_BASE_PATH}"
 fi
 echo "========================================="
 ```

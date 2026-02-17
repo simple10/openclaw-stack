@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
-// noVNC reverse proxy + media file server — routes browser sandbox noVNC UIs
-// and serves agent-generated media files on a fixed port.
+// Dashboard server — browser sessions, media files, and future log viewer.
+// Routes browser sandbox noVNC UIs, serves agent-generated media files,
+// and will host additional dashboard features on a fixed port.
 // Reads browsers.json on each request to discover sandbox containers and
 // their dynamically-mapped noVNC ports. Zero dependencies (Node.js built-ins only).
 //
@@ -9,8 +10,8 @@
 // The JWT signature is cryptographically verified against Cloudflare's
 // published public keys. Requests without a valid JWT are rejected with 403.
 //
-// URL routing (all paths below are relative to NOVNC_BASE_PATH if set):
-//   GET /                     → index page listing active sessions
+// URL routing (all paths below are relative to DASHBOARD_BASE_PATH if set):
+//   GET /                     → index page listing active sessions + dashboard links
 //   GET /media/               → directory listing of media files
 //   GET /media/<path>         → serve static file from ~/.openclaw/media/
 //   GET /<agent-id>/          → redirect to noVNC client
@@ -27,10 +28,10 @@ const PORT = 6090;
 const BROWSERS_JSON = '/home/node/.openclaw/sandbox/browsers.json';
 const MEDIA_ROOT = '/home/node/.openclaw/media';
 
-// Base path for running behind a Cloudflare Tunnel path prefix (e.g., "/browser").
+// Base path for running behind a Cloudflare Tunnel path prefix (e.g., "/dashboard").
 // When set, all incoming requests must start with this prefix (stripped before routing)
 // and all generated URLs include it.
-const RAW_BASE = process.env.NOVNC_BASE_PATH || '';
+const RAW_BASE = process.env.DASHBOARD_BASE_PATH || '';
 const BASE_PATH = RAW_BASE === '/' ? '' : RAW_BASE.replace(/\/+$/, '');
 // Ensure it starts with / if non-empty
 const BP = BASE_PATH && !BASE_PATH.startsWith('/') ? `/${BASE_PATH}` : BASE_PATH;
@@ -226,8 +227,8 @@ async function indexPage() {
   const entries = readBrowsers();
   const mediaLink = `<p style="margin-top: 16px;"><a href="${effectiveBP}/media/">&#128196; Media Files</a> — screenshots, PDFs, and downloads from agents</p>`;
   if (entries.length === 0) {
-    return htmlPage('OpenClaw Browser Sessions',
-      `<h1>OpenClaw Browser Sessions</h1>
+    return htmlPage('OpenClaw Dashboard',
+      `<h1>OpenClaw Dashboard</h1>
        <p class="empty">No active browser sessions. Browser containers are created on-demand when agents use the browser tool.</p>
        ${mediaLink}`);
   }
@@ -248,8 +249,8 @@ async function indexPage() {
     </tr>`;
   }));
 
-  return htmlPage('OpenClaw Browser Sessions',
-    `<h1>OpenClaw Browser Sessions</h1>
+  return htmlPage('OpenClaw Dashboard',
+    `<h1>OpenClaw Dashboard</h1>
      <table>
        <thead><tr><th>Agent</th><th>Container</th><th>Status</th></tr></thead>
        <tbody>${rows.join('\n')}</tbody>
@@ -379,7 +380,7 @@ const server = createServer(async (req, res) => {
   // ── Cloudflare Access gate ─────────────────────────────────────────
   const auth = await verifyCfAccess(req);
   if (!auth.valid) {
-    console.log(`[novnc-proxy] Access denied: ${auth.reason} (${req.socket.remoteAddress})`);
+    console.log(`[dashboard] Access denied: ${auth.reason} (${req.socket.remoteAddress})`);
     res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(accessDeniedPage());
     return;
@@ -406,17 +407,17 @@ const server = createServer(async (req, res) => {
     // Route as-is — internal routing is the same either way.
   }
 
-  // Auto-detect base path when NOVNC_BASE_PATH is not set.
+  // Auto-detect base path when DASHBOARD_BASE_PATH is not set.
   // If the first path segment isn't a known agent or "media", treat it as
   // a base path prefix — strip it for routing. This handles the case where
-  // Cloudflare Tunnel sends /browser/... but NOVNC_BASE_PATH wasn't configured.
+  // Cloudflare Tunnel sends /dashboard/... but DASHBOARD_BASE_PATH wasn't configured.
   if (!BP) {
     const seg = path.match(/^\/([^/]+)(\/.*)?$/);
     if (seg && seg[1] !== 'media' && !findEntry(seg[1])) {
       const detected = `/${seg[1]}`;
       if (!effectiveBP) {
         effectiveBP = detected;
-        console.log(`[novnc-proxy] Auto-detected base path: ${effectiveBP} (set NOVNC_BASE_PATH=${effectiveBP} to make this explicit)`);
+        console.log(`[dashboard] Auto-detected base path: ${effectiveBP} (set DASHBOARD_BASE_PATH=${effectiveBP} to make this explicit)`);
       }
       if (effectiveBP === detected) {
         if (!seg[2]) {
@@ -511,7 +512,7 @@ server.on('upgrade', async (req, socket, head) => {
   // ── Cloudflare Access gate ─────────────────────────────────────────
   const auth = await verifyCfAccess(req);
   if (!auth.valid) {
-    console.log(`[novnc-proxy] WS access denied: ${auth.reason} (${req.socket.remoteAddress})`);
+    console.log(`[dashboard] WS access denied: ${auth.reason} (${req.socket.remoteAddress})`);
     socket.destroy();
     return;
   }
@@ -559,5 +560,5 @@ server.on('upgrade', async (req, socket, head) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`[novnc-proxy] Listening on port ${PORT}${BP ? `, base path: ${BP}` : ' (no base path — will auto-detect from first request if needed)'}`);
+  console.log(`[dashboard] Listening on port ${PORT}${BP ? `, base path: ${BP}` : ' (no base path — will auto-detect from first request if needed)'}`);
 });

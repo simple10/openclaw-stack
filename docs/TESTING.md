@@ -114,13 +114,13 @@ mcp__chrome-devtools__take_snapshot()
 
 **Success criteria**: Random paths return one of: (a) the OpenClaw SPA (gateway catch-all — normal for SPAs), (b) 404, or (c) Cloudflare Access login. The key check is that no unexpected backend content or error details are leaked.
 
-### 2.5 Test Browser VNC Access (Optional)
+### 2.5 Test Dashboard Access (Optional)
 
 If `OPENCLAW_BROWSER_DOMAIN` is configured:
 
 ```
-# Navigate to browser VNC — may hit Cloudflare Access login
-mcp__chrome-devtools__navigate_page(url="https://<OPENCLAW_BROWSER_DOMAIN><OPENCLAW_BROWSER_DOMAIN_PATH>/")
+# Navigate to dashboard — may hit Cloudflare Access login
+mcp__chrome-devtools__navigate_page(url="https://<OPENCLAW_BROWSER_DOMAIN><OPENCLAW_DASHBOARD_DOMAIN_PATH>/")
 mcp__chrome-devtools__take_snapshot()
 ```
 
@@ -128,7 +128,7 @@ If Cloudflare Access login appears, ask the user to authenticate (may be automat
 
 **Success criteria**:
 
-- Page shows the noVNC proxy index page ("OpenClaw Browser Sessions")
+- Page shows the dashboard index page ("OpenClaw Dashboard")
 - Links include the correct base path (if subpath URL is used)
 
 ---

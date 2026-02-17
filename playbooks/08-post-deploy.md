@@ -351,7 +351,7 @@ ssh -i <SSH_KEY_PATH> -p <SSH_PORT> adminclaw@<VPS1_IP>
 |---------|-----|
 | **Chat** | `https://<DOMAIN><PATH>/chat?token=<TOKEN>` |
 | **Control UI** | `https://<DOMAIN><PATH>/?token=<TOKEN>` |
-| **Browser VNC** | `https://<OPENCLAW_BROWSER_DOMAIN><OPENCLAW_BROWSER_DOMAIN_PATH>/` |
+| **Dashboard** | `https://<OPENCLAW_BROWSER_DOMAIN><OPENCLAW_DASHBOARD_DOMAIN_PATH>/` |
 
 All URLs are protected by Cloudflare Access.
 

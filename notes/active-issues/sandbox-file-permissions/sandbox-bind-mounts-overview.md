@@ -19,7 +19,7 @@ Layer 1: Host -> Gateway Container (docker-compose.override.yml)
   ├─────────────────────────────────┼────────────────────────────────────┼──────┼─────────────────────────────────┤
   │ ./deploy/rebuild-sandboxes.sh   │ /app/deploy/rebuild-sandboxes.sh   │ ro   │ Sandbox builder                 │
   ├─────────────────────────────────┼────────────────────────────────────┼──────┼─────────────────────────────────┤
-  │ ./deploy/novnc-proxy.mjs        │ /app/deploy/novnc-proxy.mjs        │ ro   │ noVNC proxy                     │
+  │ ./deploy/dashboard.mjs           │ /app/deploy/dashboard.mjs           │ ro   │ Dashboard server                │
   └─────────────────────────────────┴────────────────────────────────────┴──────┴─────────────────────────────────┘
 
   Plus the upstream compose (not in override) mounts:

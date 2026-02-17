@@ -50,7 +50,7 @@ IMPORTANT: Read configuration from `openclaw-config.env`:
 ```bash
 # See openclaw-config.env.example for all fields and documentation.
 # VPS1_IP, CF_TUNNEL_TOKEN, and domain config are required to start a fresh deployment.
-# Domain config (OPENCLAW_DOMAIN, OPENCLAW_BROWSER_DOMAIN, OPENCLAW_BROWSER_DOMAIN_PATH, OPENCLAW_DOMAIN_PATH)
+# Domain config (OPENCLAW_DOMAIN, OPENCLAW_BROWSER_DOMAIN, OPENCLAW_DASHBOARD_DOMAIN_PATH, OPENCLAW_DOMAIN_PATH)
 # is validated during fresh deploy setup (00-fresh-deploy-setup.md).
 ```
 

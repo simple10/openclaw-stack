@@ -146,7 +146,7 @@ No gateway restart needed — builds happen inside the running container's neste
 
 Several deploy files are bind-mounted read-only into the gateway container. These can be updated without a full image rebuild — just SCP the file and restart the gateway.
 
-**Bind-mounted files:** `novnc-proxy.mjs`, `entrypoint-gateway.sh`, `rebuild-sandboxes.sh`, `parse-toolkit.mjs`, `sandbox-toolkit.yaml`, `plugins/`, `hooks/`
+**Bind-mounted files:** `dashboard.mjs`, `entrypoint-gateway.sh`, `rebuild-sandboxes.sh`, `parse-toolkit.mjs`, `sandbox-toolkit.yaml`, `plugins/`, `hooks/`
 
 ```bash
 # From local machine

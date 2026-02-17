@@ -2,8 +2,8 @@
 
 AGENTS: IGNORE THIS TODO LIST - for development only
 
-- [ ] After fresh deploy, try starting agent sandbox via CLI then accessing /browser after CF Access
-  - Does noVNC block access since it's not paired?
+- [ ] After fresh deploy, try starting agent sandbox via CLI then accessing /dashboard after CF Access
+  - Does the dashboard block access since it's not paired?
 
 - [x] Add tagging to sandbox common builds to allow for layered builds instead of full rebuilds
 
@@ -16,7 +16,7 @@ AGENTS: IGNORE THIS TODO LIST - for development only
   - Coordinator might be solving the issue without shimming
   - At a minimum, needs to be renamed to tool-bin to avoid confusion
 
-- [ ] Rename novnc-proxy to something more generic - it will end up doing more like showing logs, etc
+- [x] Rename novnc-proxy to dashboard
   - [ ] Add pairing test
 
 - [ ] Verify if the health cron in log worker can reach the VPS over the tunnel, if not, remove from README

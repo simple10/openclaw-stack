@@ -185,7 +185,7 @@ User --> openclaw.yourdomain.com --> Cloudflare Edge
                                     VPS (Origin)
                                          |
                    cloudflared --> localhost:18789 (Gateway)
-                               --> localhost:6090  (Browser VNC)
+                               --> localhost:6090  (Dashboard)
 ```
 
 > The tunnel is **outbound-only** from your VPS — no inbound ports need to be open. All traffic goes through Cloudflare, and Cloudflare Access protects the domain so only you can access it.
@@ -270,17 +270,17 @@ Ask the user to paste the token. Validate it starts with `ey` (JWT format). Save
 > 2. Click your tunnel -> **Configure**
 > 3. Add **two** public hostname rules **in this order** (order matters!):
 
-> **Rule 1 — Browser VNC** (must be listed first):
+> **Rule 1 — Dashboard** (must be listed first):
 >
 > | Field | Value |
 > |-------|-------|
 > | **Subdomain** | `openclaw` (or your chosen subdomain) |
 > | **Domain** | Select your domain |
-> | **Path** | `browser` |
+> | **Path** | `dashboard` |
 > | **Service Type** | `HTTP` |
 > | **URL** | `localhost:6090` |
 
-> **Rule 2 — Gateway** (catch-all, must be after the browser rule):
+> **Rule 2 — Gateway** (catch-all, must be after the dashboard rule):
 >
 > | Field | Value |
 > |-------|-------|
@@ -290,7 +290,7 @@ Ask the user to paste the token. Validate it starts with `ey` (JWT format). Save
 > | **Service Type** | `HTTP` |
 > | **URL** | `localhost:18789` |
 
-> **Why this order?** Cloudflare evaluates rules top-to-bottom and uses the first match. The `/browser` rule must come first so browser VNC traffic is routed correctly. The catch-all gateway rule handles everything else.
+> **Why this order?** Cloudflare evaluates rules top-to-bottom and uses the first match. The `/dashboard` rule must come first so dashboard traffic is routed correctly. The catch-all gateway rule handles everything else.
 
 > 1. Save the tunnel configuration.
 
@@ -299,12 +299,12 @@ Set the domain config values:
 ```
 OPENCLAW_DOMAIN=openclaw.yourdomain.com
 OPENCLAW_BROWSER_DOMAIN=openclaw.yourdomain.com
-OPENCLAW_BROWSER_DOMAIN_PATH=/browser
+OPENCLAW_DASHBOARD_DOMAIN_PATH=/dashboard
 ```
 
 Ask the user to confirm they've completed these steps and tell you their exact subdomain/domain.
 
-Save `OPENCLAW_DOMAIN`, `OPENCLAW_BROWSER_DOMAIN`, and `OPENCLAW_BROWSER_DOMAIN_PATH=/browser`.
+Save `OPENCLAW_DOMAIN`, `OPENCLAW_BROWSER_DOMAIN`, and `OPENCLAW_DASHBOARD_DOMAIN_PATH=/dashboard`.
 
 Leave `OPENCLAW_DOMAIN_PATH` empty (gateway at root).
 
@@ -332,10 +332,10 @@ curl -sI --connect-timeout 10 "https://<OPENCLAW_DOMAIN>/" 2>&1 | head -10
 >
 > If you're getting a DNS error (like NXDOMAIN), wait a few minutes for DNS propagation after adding the tunnel route.
 
-Also test the browser VNC path:
+Also test the dashboard path:
 
 ```bash
-curl -sI --connect-timeout 10 "https://<OPENCLAW_BROWSER_DOMAIN>/browser/" 2>&1 | head -10
+curl -sI --connect-timeout 10 "https://<OPENCLAW_BROWSER_DOMAIN>/dashboard/" 2>&1 | head -10
 ```
 
 Same expected result — Access login redirect.
@@ -436,7 +436,7 @@ At this point you should have collected all required values:
 - `CF_TUNNEL_TOKEN`
 - `OPENCLAW_DOMAIN`
 - `OPENCLAW_BROWSER_DOMAIN`
-- `OPENCLAW_BROWSER_DOMAIN_PATH`
+- `OPENCLAW_DASHBOARD_DOMAIN_PATH`
 - `YOUR_TELEGRAM_ID`
 - `OPENCLAW_TELEGRAM_BOT_TOKEN`
 - `HOSTALERT_TELEGRAM_BOT_TOKEN`
@@ -488,7 +488,7 @@ HOSTALERT_TELEGRAM_CHAT_ID=<collected value>
 HOSTALERT_DAILY_REPORT_TIME=<collected value>
 OPENCLAW_DOMAIN=<collected value>
 OPENCLAW_BROWSER_DOMAIN=<collected value>
-OPENCLAW_BROWSER_DOMAIN_PATH=<collected value>
+OPENCLAW_DASHBOARD_DOMAIN_PATH=<collected value>
 ```
 
 Leave `OPENCLAW_DOMAIN_PATH` empty (default) and leave the Cloudflare Workers and optional sections as-is (they'll be handled during deployment).
@@ -499,7 +499,7 @@ After writing, show the user a summary:
 >
 > - VPS: `<SSH_USER>@<VPS1_IP>` (SSH key: `<SSH_KEY_PATH>`)
 > - Domain: `<OPENCLAW_DOMAIN>` (protected by Cloudflare Access)
-> - Browser: `<OPENCLAW_BROWSER_DOMAIN><OPENCLAW_BROWSER_DOMAIN_PATH>`
+> - Browser: `<OPENCLAW_BROWSER_DOMAIN><OPENCLAW_DASHBOARD_DOMAIN_PATH>`
 > - Tunnel: Configured (token saved)
 > - Telegram: Bot configured, user ID set
 > - Host Alerts: Configured (daily report at `<HOSTALERT_DAILY_REPORT_TIME>`)

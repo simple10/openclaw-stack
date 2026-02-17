@@ -206,15 +206,15 @@ else
   echo "[entrypoint] Docker not installed, skipping sandbox bootstrap"
 fi
 
-# ── 2b. Start noVNC reverse proxy ────────────────────────────────────
-# Exposes browser sandbox noVNC UIs on a fixed port. Reads browsers.json
-# dynamically to discover sandbox browser containers and their mapped ports.
+# ── 2b. Start dashboard server ───────────────────────────────────────
+# Exposes browser sessions, media files, and dashboard features on a fixed port.
+# Reads browsers.json dynamically to discover sandbox browser containers and their mapped ports.
 # Run as node to avoid creating root-owned jiti cache files in /tmp/jiti/
 # that would block the gateway (also node) from writing cache entries.
-NOVNC_PROXY="/app/deploy/novnc-proxy.mjs"
-if [ -f "$NOVNC_PROXY" ]; then
-  gosu node node "$NOVNC_PROXY" &
-  echo "[entrypoint] noVNC proxy started on port 6090 (as node)"
+DASHBOARD_SERVER="/app/deploy/dashboard.mjs"
+if [ -f "$DASHBOARD_SERVER" ]; then
+  gosu node node "$DASHBOARD_SERVER" &
+  echo "[entrypoint] Dashboard server started on port 6090 (as node)"
 fi
 
 # ── 2c. Fix jiti cache permissions ─────────────────────────────────

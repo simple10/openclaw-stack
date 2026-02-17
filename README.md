@@ -494,7 +494,7 @@ openclaw-vps/
 │   ├── entrypoint-gateway.sh         # Container init (dockerd, sandboxes, privilege drop)
 │   ├── rebuild-sandboxes.sh          # Layered sandbox image builder with split config detection
 │   ├── host-alert.sh                 # Host monitoring + Telegram alerts
-│   ├── novnc-proxy.mjs              # Browser session reverse proxy
+│   ├── dashboard.mjs                # Dashboard server — browser sessions, media, logs
 │   └── logrotate-openclaw            # Log rotation config
 │
 ├── workers/                          # Cloudflare Workers (deployed via wrangler)

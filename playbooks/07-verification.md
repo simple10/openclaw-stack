@@ -234,7 +234,7 @@ curl -sk --connect-timeout 5 https://<VPS1_IP>/ || echo "Direct access blocked (
 ```bash
 # Both should return 302/403 (Cloudflare Access redirect)
 curl -sI --connect-timeout 10 https://<OPENCLAW_DOMAIN><OPENCLAW_DOMAIN_PATH>/ 2>&1 | head -5
-curl -sI --connect-timeout 10 https://<OPENCLAW_BROWSER_DOMAIN><OPENCLAW_BROWSER_DOMAIN_PATH>/ 2>&1 | head -5
+curl -sI --connect-timeout 10 https://<OPENCLAW_BROWSER_DOMAIN><OPENCLAW_DASHBOARD_DOMAIN_PATH>/ 2>&1 | head -5
 ```
 
 **Expected:** 302 or 403 with `Location` header pointing to Cloudflare Access.

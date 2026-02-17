@@ -38,7 +38,7 @@ This document describes how to secure OpenClaw behind Cloudflare Tunnel, elimina
 │                                              ▼               │
 │    cloudflared ◄─────────────────────────────┘               │
 │        │                                                     │
-│        ├── /browser/* ──► localhost:6090 (noVNC proxy)        │
+│        ├── /dashboard/* ──► localhost:6090 (dashboard)        │
 │        │                                                     │
 │        └── * (catch-all) ──► localhost:18789 (Gateway)        │
 │                                                              │
@@ -169,32 +169,32 @@ Now that Access is configured, add the public hostname route(s) to make the doma
 
 There are two approaches for routing the gateway and browser VNC:
 
-- **Same subdomain (recommended):** Both gateway and browser VNC share one subdomain with path-based rules. Simpler DNS and Access configuration.
-- **Separate subdomains:** Gateway and browser VNC each get their own subdomain. Requires separate DNS entries and Access applications.
+- **Same subdomain (recommended):** Both gateway and dashboard share one subdomain with path-based rules. Simpler DNS and Access configuration.
+- **Separate subdomains:** Gateway and dashboard each get their own subdomain. Requires separate DNS entries and Access applications.
 
 ---
 
 #### Option A: Same Subdomain (Recommended)
 
-Both the gateway and browser VNC share a single subdomain. The tunnel uses path-based routing to send `/browser` traffic to the noVNC proxy and everything else to the gateway.
+Both the gateway and dashboard share a single subdomain. The tunnel uses path-based routing to send `/dashboard` traffic to the dashboard server and everything else to the gateway.
 
-**Important:** The gateway's WebSocket client connects to `wss://<host>/` (root path), so the gateway rule **must be a catch-all** (no path filter). The `/browser` path rule must be listed **before** the catch-all gateway rule — Cloudflare evaluates rules in order and uses the first match.
+**Important:** The gateway's WebSocket client connects to `wss://<host>/` (root path), so the gateway rule **must be a catch-all** (no path filter). The `/dashboard` path rule must be listed **before** the catch-all gateway rule — Cloudflare evaluates rules in order and uses the first match.
 
 1. Go to **Zero Trust Dashboard** → **Networks** → **Tunnels**
 2. Click your tunnel → **Configure**
 3. Add **two** public hostname rules in this order:
 
-**Rule 1 — Browser VNC** (must be first):
+**Rule 1 — Dashboard** (must be first):
 
 | Field | Value |
 |-------|-------|
 | **Subdomain** | `openclaw` (or your choice) |
 | **Domain** | Select your domain (e.g., `example.com`) |
-| **Path** | `browser` |
+| **Path** | `dashboard` |
 | **Service Type** | `HTTP` |
 | **URL** | `localhost:6090` |
 
-**Rule 2 — Gateway** (catch-all, must be after browser rule):
+**Rule 2 — Gateway** (catch-all, must be after dashboard rule):
 
 | Field | Value |
 |-------|-------|
@@ -211,7 +211,7 @@ Then set in `openclaw-config.env`:
 ```
 OPENCLAW_DOMAIN=openclaw.yourdomain.com
 OPENCLAW_BROWSER_DOMAIN=openclaw.yourdomain.com
-OPENCLAW_BROWSER_DOMAIN_PATH=/browser
+OPENCLAW_DASHBOARD_DOMAIN_PATH=/dashboard
 ```
 
 > **Why catch-all routing?** The OpenClaw Control UI opens a WebSocket connection to
@@ -222,15 +222,15 @@ OPENCLAW_BROWSER_DOMAIN_PATH=/browser
 > WebSocket traffic reach the gateway regardless of path.
 
 > **Rule order matters.** Cloudflare evaluates tunnel rules top-to-bottom and uses the
-> first match. If the catch-all gateway rule is listed before the `/browser` rule, all
-> traffic (including `/browser/*`) will be sent to the gateway instead of the noVNC proxy.
+> first match. If the catch-all gateway rule is listed before the `/dashboard` rule, all
+> traffic (including `/dashboard/*`) will be sent to the gateway instead of the dashboard server.
 > Always place more-specific path rules above less-specific ones.
 
 ---
 
 #### Option B: Separate Subdomains
 
-Gateway and browser VNC each get their own subdomain. No rule ordering concerns since each subdomain is independent.
+Gateway and dashboard each get their own subdomain. No rule ordering concerns since each subdomain is independent.
 
 1. Go to **Zero Trust Dashboard** → **Networks** → **Tunnels**
 2. Click your tunnel → **Configure**
@@ -245,11 +245,11 @@ Gateway and browser VNC each get their own subdomain. No rule ordering concerns 
 | **Service Type** | `HTTP` |
 | **URL** | `localhost:18789` |
 
-**Browser VNC:**
+**Dashboard:**
 
 | Field | Value |
 |-------|-------|
-| **Subdomain** | `browser-openclaw` (or your choice) |
+| **Subdomain** | `dashboard-openclaw` (or your choice) |
 | **Domain** | Select your domain |
 | **Service Type** | `HTTP` |
 | **URL** | `localhost:6090` |
@@ -260,28 +260,28 @@ Then set in `openclaw-config.env`:
 
 ```
 OPENCLAW_DOMAIN=openclaw.yourdomain.com
-OPENCLAW_BROWSER_DOMAIN=browser-openclaw.yourdomain.com
-OPENCLAW_BROWSER_DOMAIN_PATH=
+OPENCLAW_BROWSER_DOMAIN=dashboard-openclaw.yourdomain.com
+OPENCLAW_DASHBOARD_DOMAIN_PATH=
 ```
 
 > With separate subdomains, you may want a second Cloudflare Access application
-> to protect the browser subdomain, or extend the existing application to cover both.
+> to protect the dashboard subdomain, or extend the existing application to cover both.
 
 > **Multi-instance hardening:** If you run multiple OpenClaw instances behind the same
-> Cloudflare account, set `CF_ACCESS_AUD` on each noVNC proxy to its Access application's
+> Cloudflare account, set `CF_ACCESS_AUD` on each dashboard server to its Access application's
 > AUD tag. This prevents users from one instance accessing another instance's browser
-> sessions via a valid-but-wrong JWT. See [BROWSER-VNC.md § Security](BROWSER-VNC.md#security).
+> sessions via a valid-but-wrong JWT. See [DASHBOARD.md § Security](DASHBOARD.md#security).
 
 ---
 
 #### Config Notes
 
-`OPENCLAW_BROWSER_DOMAIN_PATH` is passed directly to the noVNC proxy as `NOVNC_BASE_PATH` in the `.env` file — no URL parsing needed. The proxy uses this to strip/add the path prefix so URLs work correctly through the tunnel.
+`OPENCLAW_DASHBOARD_DOMAIN_PATH` is passed directly to the dashboard server as `DASHBOARD_BASE_PATH` in the `.env` file — no URL parsing needed. The server uses this to strip/add the path prefix so URLs work correctly through the tunnel.
 
-- `OPENCLAW_BROWSER_DOMAIN_PATH=/browser` → `NOVNC_BASE_PATH=/browser`
-- `OPENCLAW_BROWSER_DOMAIN_PATH=` (empty) → `NOVNC_BASE_PATH=` (empty)
+- `OPENCLAW_DASHBOARD_DOMAIN_PATH=/dashboard` → `DASHBOARD_BASE_PATH=/dashboard`
+- `OPENCLAW_DASHBOARD_DOMAIN_PATH=` (empty) → `DASHBOARD_BASE_PATH=` (empty)
 
-See [BROWSER-VNC.md](BROWSER-VNC.md) for details on URL routing and base path behavior.
+See [DASHBOARD.md](DASHBOARD.md) for details on URL routing and base path behavior.
 
 The domain is now routable — and protected by Cloudflare Access from the first request.
 
