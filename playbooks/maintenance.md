@@ -63,10 +63,10 @@ NEW_TOKEN=$(openssl rand -hex 32)
 cd workers/log-receiver
 echo "$NEW_TOKEN" | npx wrangler secret put AUTH_TOKEN
 
-# 3. Update VPS .env — change LOG_WORKER_TOKEN value
+# 3. Update VPS vector/.env — change LOG_WORKER_TOKEN value
 
 # 4. Recreate Vector to pick up new .env values (see CLAUDE.md: restart vs up -d)
-sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d vector'
+sudo -u openclaw bash -c 'cd /home/openclaw/vector && docker compose up -d'
 ```
 
 #### Provider API Keys

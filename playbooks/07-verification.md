@@ -147,14 +147,14 @@ echo "Results: $PASS passed, $FAIL failed, $TOTAL total"
 ## 7.2 Verify Vector (Log Shipping)
 
 ```bash
-# Check Vector is running
-sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose ps vector'
+# Check Vector is running (separate compose project)
+sudo -u openclaw bash -c 'cd /home/openclaw/vector && docker compose ps'
 
 # Check Vector logs for errors
 sudo docker logs --tail 20 vector
 
 # Check checkpoint data exists
-sudo ls -la /home/openclaw/openclaw/data/vector/
+sudo ls -la /home/openclaw/vector/data/
 ```
 
 **Expected:** Vector running, no errors in logs, checkpoint files present.
@@ -487,9 +487,8 @@ free -h
 # Check Vector logs
 sudo docker logs --tail 50 vector
 
-# Restart Vector
-# Restart Vector (use `up -d vector` instead if .env values changed)
-sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart vector'
+# Restart Vector (use `up -d` instead if .env values changed)
+sudo -u openclaw bash -c 'cd /home/openclaw/vector && docker compose restart'
 
 # Check if Worker endpoint is reachable (strip /logs suffix for base URL)
 curl -s https://<LOG_WORKER_BASE_URL>/health

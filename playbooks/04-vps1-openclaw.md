@@ -28,8 +28,8 @@ From `../openclaw-config.env`:
 - `VPS1_IP` - Required, public IP of VPS-1
 - `AI_GATEWAY_WORKER_URL` - Required, AI Gateway Worker URL
 - `AI_GATEWAY_AUTH_TOKEN` - Required, AI Gateway auth token
-- `LOG_WORKER_URL` - Required, Log Receiver Worker URL
-- `LOG_WORKER_TOKEN` - Required, Log Receiver auth token
+- `LOG_WORKER_URL` - Optional, Log Receiver Worker URL (for Vector log shipping)
+- `LOG_WORKER_TOKEN` - Optional, Log Receiver auth token (for Vector log shipping)
 - `YOUR_TELEGRAM_ID` - Required, numeric Telegram user ID (for `tools.elevated` access gating)
 - `OPENCLAW_TELEGRAM_BOT_TOKEN` - Required, Telegram bot token for OpenClaw channel (see `docs/TELEGRAM.md`)
 - `HOSTALERT_TELEGRAM_BOT_TOKEN` - Optional (for host alerter; can reuse `OPENCLAW_TELEGRAM_BOT_TOKEN`)
@@ -172,9 +172,8 @@ sudo -u openclaw bash << 'EOF'
 cd /home/openclaw
 git clone https://github.com/openclaw/openclaw.git openclaw
 
-# Create data directories for bind mounts (not tracked by git)
+# Create data directory for bind mounts (not tracked by git)
 mkdir -p /home/openclaw/openclaw/data/docker
-mkdir -p /home/openclaw/openclaw/data/vector
 EOF
 ```
 
@@ -221,10 +220,6 @@ OPENCLAW_TELEGRAM_BOT_TOKEN=${OPENCLAW_TELEGRAM_BOT_TOKEN:-}
 # Host alerter (Telegram notifications — see docs/TELEGRAM.md)
 HOSTALERT_TELEGRAM_BOT_TOKEN=${HOSTALERT_TELEGRAM_BOT_TOKEN:-}
 HOSTALERT_TELEGRAM_CHAT_ID=${HOSTALERT_TELEGRAM_CHAT_ID:-}
-# Log shipping to Cloudflare Worker
-LOG_WORKER_URL=${LOG_WORKER_URL}
-LOG_WORKER_TOKEN=${LOG_WORKER_TOKEN}
-VPS1_IP=${VPS1_IP}
 
 # Dashboard base path — from OPENCLAW_DASHBOARD_DOMAIN_PATH
 # Empty = dashboard serves at root (e.g., dashboard on a separate subdomain)
@@ -288,21 +283,36 @@ EOF
 
 ---
 
-## 4.7 Create Vector Config
+## 4.7 Set Up Vector Log Shipper (Standalone Project)
 
-Ships Docker container logs to the Cloudflare Log Receiver Worker.
+Ships Docker container logs to the Cloudflare Log Receiver Worker. Vector runs as a separate Docker Compose project — independent of the gateway lifecycle.
 
-Vector Alpine image defaults to `vector.yaml`, so we use YAML format to avoid needing a `command` override in compose.
+> **Skip this section** if `LOG_WORKER_URL` and `LOG_WORKER_TOKEN` are not set in `openclaw-config.env`. Vector is optional.
 
 ```bash
 #!/bin/bash
-# SOURCE: deploy/vector.yaml → /home/openclaw/openclaw/vector.yaml
-sudo -u openclaw tee /home/openclaw/openclaw/vector.yaml << 'EOF'
-# <<< deploy/vector.yaml >>>
+# Create Vector project directory
+sudo -u openclaw mkdir -p /home/openclaw/vector/data
+
+# SOURCE: deploy/vector/docker-compose.yml → /home/openclaw/vector/docker-compose.yml
+sudo -u openclaw tee /home/openclaw/vector/docker-compose.yml << 'EOF'
+# <<< deploy/vector/docker-compose.yml >>>
 EOF
 
-# Create data directory for Vector state
-sudo -u openclaw mkdir -p /home/openclaw/openclaw/data/vector
+# SOURCE: deploy/vector/vector.yaml → /home/openclaw/vector/vector.yaml
+sudo -u openclaw tee /home/openclaw/vector/vector.yaml << 'EOF'
+# <<< deploy/vector/vector.yaml >>>
+EOF
+
+# Create Vector .env with log shipping credentials
+sudo -u openclaw tee /home/openclaw/vector/.env << EOF
+# Vector log shipping — Cloudflare Log Receiver Worker
+LOG_WORKER_URL=${LOG_WORKER_URL}
+LOG_WORKER_TOKEN=${LOG_WORKER_TOKEN}
+VPS1_IP=${VPS1_IP}
+EOF
+
+sudo chmod 600 /home/openclaw/vector/.env
 ```
 
 ---
@@ -631,8 +641,13 @@ To add a new hook: create `deploy/hooks/<name>/` with HOOK.md + handler.js, add 
 # Build image with auto-patching
 sudo -u openclaw /home/openclaw/scripts/build-openclaw.sh
 
-# Start services
+# Start gateway
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'
+
+# Start Vector (separate compose project — skip if not configured)
+if [ -f /home/openclaw/vector/.env ]; then
+  sudo -u openclaw bash -c 'cd /home/openclaw/vector && docker compose up -d'
+fi
 
 # Check status
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose ps'
@@ -853,8 +868,8 @@ sudo docker logs --tail 50 openclaw-gateway
 # Test internal endpoint (must include basePath if controlUi.basePath is set)
 curl -s http://localhost:18789<OPENCLAW_DOMAIN_PATH>/ | head -5
 
-# Check Vector is running
-sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose ps vector'
+# Check Vector is running (separate compose project)
+sudo -u openclaw bash -c 'cd /home/openclaw/vector && docker compose ps'
 
 # Check Vector logs
 sudo docker logs --tail 10 vector
@@ -993,9 +1008,8 @@ sudo docker exec vector ls -la /etc/vector/
 # Test the Worker endpoint is reachable from within the container
 sudo docker exec vector wget -q -O- <LOG_WORKER_URL_WITHOUT_PATH>/health
 
-# Restart Vector after fixing
-# Restart Vector (use `up -d vector` instead if .env values changed)
-sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart vector'
+# Restart Vector after fixing (use `up -d` instead if .env values changed)
+sudo -u openclaw bash -c 'cd /home/openclaw/vector && docker compose restart'
 ```
 
 ### CLI Pairing Lost

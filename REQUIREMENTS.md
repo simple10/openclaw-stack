@@ -70,7 +70,7 @@ Single VPS running the OpenClaw gateway and sandboxes. Observability is handled 
 
 | Network | Subnet | Flags | Purpose |
 |---------|--------|-------|---------|
-| `openclaw-gateway-net` | `172.30.0.0/24` | external | Gateway, cloudflared, Vector |
+| `openclaw-gateway-net` | `172.30.0.0/24` | external | Gateway, cloudflared |
 | `openclaw-sandbox-net` | `172.31.0.0/24` | internal | Agent sandboxes (no outbound internet) |
 
 Subnets use `172.30.x.x` / `172.31.x.x` to avoid conflicts with Docker's default `172.17.0.0/16`.
@@ -109,12 +109,15 @@ All provider API keys are set to `AI_GATEWAY_AUTH_TOKEN` and base URLs to `AI_GA
 │   ├── docker-compose.yml       # Upstream
 │   ├── docker-compose.override.yml  # Our customizations
 │   ├── .env                     # Environment variables
-│   ├── vector.yaml              # Log shipper config
 │   ├── data/
-│   │   ├── docker/              # Persistent nested Docker storage
-│   │   └── vector/              # Vector checkpoint data
+│   │   └── docker/              # Persistent nested Docker storage
 │   └── scripts/
 │       └── entrypoint-gateway.sh
+├── vector/                      # Vector log shipper (separate compose project)
+│   ├── docker-compose.yml
+│   ├── vector.yaml
+│   ├── .env                     # LOG_WORKER_URL, LOG_WORKER_TOKEN, VPS1_IP
+│   └── data/                    # Vector checkpoint data
 ├── .openclaw/                   # Gateway config & state (owned by uid 1000)
 │   ├── openclaw.json            # Gateway configuration (chmod 600)
 │   ├── workspace/               # Agent template workspaces
@@ -165,5 +168,6 @@ All provider API keys are set to `AI_GATEWAY_AUTH_TOKEN` and base URLs to `AI_GA
 
 ### Vector
 
+- **Separate compose project** — Vector runs independently in `openclaw/vector/`. Start/stop with `cd vector && docker compose up -d`. Does not affect the gateway lifecycle.
 - **`LOG_WORKER_URL` must include `/logs` path** — Vector sends to this URL directly
-- If `./data/vector/` is deleted, Vector re-ships all logs from the beginning (safe but bursty)
+- If `vector/data/` is deleted, Vector re-ships all logs from the beginning (safe but bursty)

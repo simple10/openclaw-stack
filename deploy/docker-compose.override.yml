@@ -27,7 +27,7 @@ services:
           # Kernel handles CPU sharing & won't crash if over-provisioned
           cpus: "6"
           # IMPORTANT: Set memory to 500M-1GB less than total available: `free -h`
-          # vector needs ~128M, system needs ~500M
+          # System needs ~500M — Vector runs separately (see vector/docker-compose.yml)
           # This is the max memory openclaw can use for all agents, including browsers.
           # If container runs out of memory & swap, it will crash with OOM.
           memory: 10.5G
@@ -121,26 +121,6 @@ services:
     # Same image as gateway, built by scripts/build-openclaw.sh
     image: openclaw:local
     runtime: sysbox-runc
-    networks:
-      - openclaw-gateway-net
-
-  vector:
-    image: timberio/vector:0.43.1-alpine
-    container_name: vector
-    restart: always
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./vector.yaml:/etc/vector/vector.yaml:ro
-      - ./data/vector:/var/lib/vector
-    environment:
-      - LOG_WORKER_URL=${LOG_WORKER_URL}
-      - LOG_WORKER_TOKEN=${LOG_WORKER_TOKEN}
-      - VPS1_IP=${VPS1_IP}
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: 128M
     networks:
       - openclaw-gateway-net
 

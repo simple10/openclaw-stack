@@ -195,7 +195,7 @@ ssh -p 222 adminclaw@<VPS1_IP> "sudo -u openclaw bash -c 'cd /home/openclaw/open
 
 ### No Logs in Cloudflare
 
-1. Check Vector logs: `sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose logs vector'`
+1. Check Vector logs: `sudo -u openclaw bash -c 'cd /home/openclaw/vector && docker compose logs'`
 2. Verify LOG_WORKER_URL includes `/logs` path
 3. Check Log Receiver Worker health (strip `/logs` suffix): `curl -s https://<LOG_WORKER_BASE_URL>/health`
 

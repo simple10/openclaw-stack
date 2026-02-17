@@ -205,7 +205,7 @@ Each agent runs tools inside an isolated Docker container (via Sysbox for secure
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | Gateway | VPS (Sysbox container) | OpenClaw runtime — manages agents, makes LLM calls, runs tools in sandboxes |
-| Vector | VPS (container) | Ships container logs to Cloudflare Log Receiver Worker |
+| Vector | VPS (separate compose project) | Ships container logs to Cloudflare Log Receiver Worker (optional) |
 | AI Gateway Worker | Cloudflare | Proxies LLM requests, injects API keys, provides analytics |
 | Log Receiver Worker | Cloudflare | Captures and stores container logs |
 | Cloudflare Tunnel | VPS -> Cloudflare | Outbound-only connection — no exposed ports, hidden origin IP |
@@ -490,7 +490,9 @@ openclaw-vps/
 │   ├── openclaw.json                 # Gateway config (agents, plugins, security)
 │   ├── models.json                   # AI provider routing (baseUrl overrides)
 │   ├── sandbox-toolkit.yaml          # Sandbox tool definitions
-│   ├── vector.yaml                   # Log shipper config
+│   ├── vector/                        # Vector log shipper (standalone compose project)
+│   │   ├── docker-compose.yml        # Independent of gateway — start/stop separately
+│   │   └── vector.yaml               # Log shipper config
 │   ├── build-openclaw.sh             # Docker image builder with auto-patching
 │   ├── entrypoint-gateway.sh         # Container init (dockerd, sandboxes, privilege drop)
 │   ├── rebuild-sandboxes.sh          # Layered sandbox image builder with split config detection

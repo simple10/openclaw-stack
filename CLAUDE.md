@@ -116,12 +116,16 @@ sudo su - openclaw
 All docker compose commands run as openclaw (adminclaw can't cd into openclaw's home):
 
 ```bash
+# Gateway (main compose project):
 # Pattern: sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose <cmd>'
-# Examples:
-sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'       # Start all
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'       # Start gateway
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose ps'           # Status
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose logs -f'      # Follow logs
-# Per-service: append service name (e.g., restart openclaw-gateway, logs vector)
+
+# Vector (separate compose project — independent lifecycle):
+sudo -u openclaw bash -c 'cd /home/openclaw/vector && docker compose up -d'       # Start Vector
+sudo -u openclaw bash -c 'cd /home/openclaw/vector && docker compose ps'          # Status
+sudo -u openclaw bash -c 'cd /home/openclaw/vector && docker compose logs -f'     # Follow logs
 ```
 
 > **Note:** Docker Compose warns about unset `CLAUDE_AI_SESSION_KEY`/`CLAUDE_WEB_SESSION_KEY`/`CLAUDE_WEB_COOKIE` — harmless, these are optional.
