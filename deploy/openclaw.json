@@ -36,7 +36,7 @@
     "mode": "local",
     "auth": {
       "mode": "token",
-      "token": "{{GATEWAY_TOKEN}}",
+      "token": "{{GATEWAY_TOKEN}}", // TEMPLATE: replace with 64-char hex token from VPS .env
       "rateLimit": {
         "maxAttempts": 10,
         "windowMs": 60000,
@@ -44,12 +44,14 @@
       }
     },
     "remote": {
-      "token": "{{GATEWAY_TOKEN}}"
+      "token": "{{GATEWAY_TOKEN}}" // TEMPLATE: same token as auth.token above
     },
     "trustedProxies": [
       "172.30.0.1"
     ],
     "controlUi": {
+      // TEMPLATE: replace with value from OPENCLAW_DOMAIN_PATH in openclaw-config.env
+      // Use "" (empty string) for root path, or "/subpath" for a subpath — never leave as {{...}}
       "basePath": "{{OPENCLAW_DOMAIN_PATH}}"
     }
   },
@@ -317,7 +319,7 @@
     "elevated": {
       "enabled": true,
       "allowFrom": {
-        "telegram": ["{{YOUR_TELEGRAM_ID}}"]
+        "telegram": ["{{YOUR_TELEGRAM_ID}}"] // TEMPLATE: replace with numeric Telegram user ID from openclaw-config.env
         // Add other channels as needed:
         // "discord": ["your-discord-id"],
         // "whatsapp": ["+15555550123"]

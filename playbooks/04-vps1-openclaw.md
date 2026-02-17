@@ -336,6 +336,8 @@ GATEWAY_TOKEN=$(sudo grep OPENCLAW_GATEWAY_TOKEN /home/openclaw/openclaw/.env | 
 
 # SOURCE: deploy/openclaw.json (template) → /home/openclaw/.openclaw/openclaw.json
 # VARS: GATEWAY_TOKEN (from .env on VPS), OPENCLAW_DOMAIN_PATH (from openclaw-config.env), YOUR_TELEGRAM_ID (from openclaw-config.env)
+# IMPORTANT: ALL {{VAR}} placeholders must be substituted — including empty strings.
+# OPENCLAW_DOMAIN_PATH="" is valid (serves UI at root). Never leave literal {{...}} in output.
 sudo tee /home/openclaw/.openclaw/openclaw.json << 'JSONEOF'
 # <<< deploy/openclaw.json (template) >>>
 JSONEOF
