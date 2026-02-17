@@ -1,4 +1,4 @@
-# Claude => OpenClaw => VPS
+# Claude > OpenClaw > VPS
 
 **About this project:**
 
@@ -6,15 +6,19 @@ This repo enables `claude code` to securely deploy & maintain [OpenClaw](https:/
 
 **What's included:**
 
-- [CLAUDE.md](CLAUDE.md) & [playbooks](playbooks/) - carefully designed instructions for claude to follow
-- [Tools](deploy/) & [script](scripts/) - OpenClaw plugins & build scripts
-- [Cloudflare Workers](workers/) - for logging & LLLM proxy (no API keys stored on the VPS)
+- [CLAUDE.md](CLAUDE.md) & [playbooks](playbooks/)
+  - Carefully designed instructions for claude to follow
+- [Tools](deploy/) & [script](scripts/)
+  - OpenClaw plugins & build scripts
+- [Cloudflare Workers](workers/)
+  - for logging & LLM proxy (no API keys stored on the VPS)
 
 OpenClaw gets wrapped with production-grade infrastructure: SSH hardening, firewall rules, Docker-in-Docker sandboxing via [Sysbox](https://github.com/nestybox/sysbox), Cloudflare Tunnel for zero-exposed-port networking, and a Cloudflare Worker proxy that keeps your real API keys off the server entirely.
 
-Claude automates it all for you.
-
-**Just clone the repo & run `claude "start"`**
+> Claude automates it all for you.
+>
+> **Just clone the repo & run `claude "start"`**
+>
 
 ## Is this better than one-click VPS installs?
 
@@ -23,7 +27,7 @@ If you already use `claude`, care about security, or like to tinker, this projec
 There are a LOT of power-ups stashed in this repo. It's a batteries included OpenClaw & devops framework.
 
 One-click VPS installs are a great way to get up and running quickly. But then you're left running a fairly insecure
-or an overly locked-down OpenClaw setup. This project helps strike a nice balance between the two.
+or an overly locked-down OpenClaw setup. This project strike a nice balance between the two.
 
 Check out this guide on [OpenClaw hosting](https://proclaw.co/resources/openclaw-hosting) for more details.
 
@@ -73,7 +77,9 @@ curl -fsSL https://raw.githubusercontent.com/simple10/openclaude/main/docs/CLAUD
 claude "start"
 ```
 
-That's it. The [CLAUDE_INSTALL.md](docs/CLAUDE_INSTALL.md) file instructs claude on how to walk you through the
+That's it.
+
+The [CLAUDE_INSTALL.md](docs/CLAUDE_INSTALL.md) file instructs claude on how to walk you through the
 required config setup, git clone this repo, and automate the deploy.
 
 ### Manual Steps
