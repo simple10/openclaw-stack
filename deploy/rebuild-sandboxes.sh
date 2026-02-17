@@ -284,6 +284,16 @@ build_common() {
           let cmd = t.install;
           if (t.version) cmd = cmd.replaceAll('\${VERSION}', t.version);
           cmd = cmd.replaceAll('\${BIN_DIR}', '$bin_dir');
+          // Auto-wrap 'brew install ...' — brew refuses to run as root, so we
+          // switch to the linuxbrew user with the full brew path and suppress auto-update.
+          // Handles optional leading env vars: 'FOO=bar brew install pkg'
+          const brewMatch = cmd.match(/^((?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*)brew\s+install\s+(.*)/);
+          if (brewMatch) {
+            const envVars = brewMatch[1].trim();
+            const envPrefix = envVars ? envVars + ' ' : '';
+            const args = brewMatch[2];
+            cmd = \"su -s /bin/bash linuxbrew -c '\" + envPrefix + \"HOMEBREW_NO_AUTO_UPDATE=1 /home/linuxbrew/.linuxbrew/bin/brew install \" + args + \"'\";
+          }
           console.log('RUN ' + cmd);
         }
       });

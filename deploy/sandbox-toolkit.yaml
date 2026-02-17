@@ -7,6 +7,8 @@
 
 # Apt packages installed in sandbox-common image.
 # These are system-level dependencies — compilers, libraries, CLI tools.
+# NOTE: Debian bookworm apt packages are often significantly behind upstream.
+# Prefer brew or direct installs for tools where version matters.
 packages:
   - curl
   - wget
@@ -25,9 +27,11 @@ packages:
   - build-essential
   - file
 
-# Tools installed via custom scripts. Each tool:
-#   apt      — apt package name; all apt tools are batched into one layer (optional)
-#   install  — shell command run as root in sandbox-common (optional)
+# Tools installed via custom scripts. Each tool needs at least `apt` or `install`:
+#   apt      — apt package name; all apt tools are batched into one layer.
+#              Debian bookworm apt repo is significantly behind the latest versions for most bins.
+#              Use apt if latest version is not needed, otherwise use install.
+#   install  — shell command run as root in sandbox-common
 #   version  — substituted as ${VERSION} in install script (optional)
 #   bins     — binary names this tool provides (default: [tool name])
 #
@@ -52,14 +56,6 @@ tools:
     bins: [claude]
 
   # --- Skills: apt tools ---
-
-  ffmpeg:
-    apt: ffmpeg
-    bins: [ffmpeg, ffprobe]
-
-  imagemagick:
-    apt: imagemagick
-    bins: [convert, identify, mogrify]
 
   tmux:
     apt: tmux
@@ -100,45 +96,54 @@ tools:
   amp:
     install: npm install -g @sourcegraph/amp
 
+  # URL summarizer
+  # https://github.com/steipete/summarize
+  summarize:
+    install: npm i -g @steipete/summarize
+
   # --- Skills: brew tools ---
-  # Brew refuses to run as root. Install via su to linuxbrew user,
-  # then symlink binaries to BIN_DIR for gateway shim + PATH availability.
+  # Just use `brew install <pkg>` — the build script (rebuild-sandboxes.sh) auto-wraps
+  # it to run as the linuxbrew user with HOMEBREW_NO_AUTO_UPDATE=1.
+  # /home/linuxbrew/.linuxbrew/bin is on PATH (set in openclaw.json sandbox env).
+
+  # apt has ffmpeg 5.1 (3 major versions behind) and imagemagick 6.9 (IM6, not IM7)
+  ffmpeg:
+    install: brew install ffmpeg
+    bins: [ffmpeg, ffprobe]
+
+  imagemagick:
+    install: brew install imagemagick
+    bins: [convert, identify, mogrify, magick]
 
   gh:
-    install: >-
-      su -s /bin/bash linuxbrew -c 'HOMEBREW_NO_AUTO_UPDATE=1 /home/linuxbrew/.linuxbrew/bin/brew install gh'
-      && ln -sf /home/linuxbrew/.linuxbrew/bin/gh ${BIN_DIR}/
+    install: brew install gh
 
   himalaya:
-    install: >-
-      su -s /bin/bash linuxbrew -c 'HOMEBREW_NO_AUTO_UPDATE=1 /home/linuxbrew/.linuxbrew/bin/brew install himalaya'
-      && ln -sf /home/linuxbrew/.linuxbrew/bin/himalaya ${BIN_DIR}/
-
-  # summarize: removed — arm64-only brew formula, VPS is amd64
+    install: brew install himalaya
 
   gemini-cli:
-    install: >-
-      su -s /bin/bash linuxbrew -c 'HOMEBREW_NO_AUTO_UPDATE=1 /home/linuxbrew/.linuxbrew/bin/brew install gemini-cli'
-      && ln -sf /home/linuxbrew/.linuxbrew/bin/gemini ${BIN_DIR}/
+    install: brew install gemini-cli
     bins: [gemini]
 
+  # TTS
+  # https://github.com/steipete/sag
   sag:
-    install: >-
-      su -s /bin/bash linuxbrew -c 'HOMEBREW_NO_AUTO_UPDATE=1 /home/linuxbrew/.linuxbrew/bin/brew install steipete/tap/sag'
-      && ln -sf /home/linuxbrew/.linuxbrew/bin/sag ${BIN_DIR}/
+    install: brew install steipete/tap/sag
 
+  # Google Places CLI in Go
+  # https://github.com/steipete/goplaces
   goplaces:
-    install: >-
-      su -s /bin/bash linuxbrew -c 'HOMEBREW_NO_AUTO_UPDATE=1 /home/linuxbrew/.linuxbrew/bin/brew install steipete/tap/goplaces'
-      && ln -sf /home/linuxbrew/.linuxbrew/bin/goplaces ${BIN_DIR}/
+    install: brew install steipete/tap/goplaces
+
+  # Terminal screen recording — brew gives 3.x (Rust rewrite), apt has 2.2 (old Python version)
+  asciinema:
+    install: brew install asciinema
 
   # --- Skills: uv + Python tools ---
-  # uv installed via brew; nano-pdf via uv tool install (must come after uv).
+  # uv installed via brew; nano-pdf via uv tool install (must come after uv in this file).
 
   uv:
-    install: >-
-      su -s /bin/bash linuxbrew -c 'HOMEBREW_NO_AUTO_UPDATE=1 /home/linuxbrew/.linuxbrew/bin/brew install uv'
-      && ln -sf /home/linuxbrew/.linuxbrew/bin/uv /home/linuxbrew/.linuxbrew/bin/uvx ${BIN_DIR}/
+    install: brew install uv
     bins: [uv, uvx]
 
   nano-pdf:
