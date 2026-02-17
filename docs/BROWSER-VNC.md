@@ -124,6 +124,39 @@ Set `OPENCLAW_BROWSER_DOMAIN=openclaw.yourdomain.com` and `OPENCLAW_BROWSER_DOMA
 
 No new tunnel needed — just add a public hostname to the existing tunnel in the Dashboard.
 
+## Security
+
+### Cloudflare Access JWT Verification
+
+Every request to the noVNC proxy (HTTP and WebSocket) must carry a valid `Cf-Access-Jwt-Assertion` header. The proxy verifies:
+
+- **Signature**: cryptographically verified against Cloudflare's published public keys (fetched from the issuer's `/cdn-cgi/access/certs` endpoint, cached 1 hour)
+- **Expiration**: rejected if `exp` claim is in the past
+- **Issuer**: must be a `*.cloudflareaccess.com` domain
+- **Audience** (optional): if `CF_ACCESS_AUD` is set, the JWT's `aud` claim must match
+
+Requests without a valid JWT get a 403 page. WebSocket upgrades without a valid JWT are silently destroyed.
+
+### Audience Verification (`CF_ACCESS_AUD`)
+
+Each Cloudflare Access application has a unique **Application Audience (AUD) tag**. Setting `CF_ACCESS_AUD` on the noVNC proxy ensures it only accepts JWTs issued for that specific application.
+
+**When to use it:** Multi-instance setups where multiple OpenClaw deployments share a Cloudflare account. Without audience verification, a user authenticated for Instance A could access Instance B's browser sessions if Cloudflare Access path rules are misconfigured. The audience check provides defense-in-depth against upstream misconfiguration.
+
+**How to configure:**
+
+1. Find your AUD tag: **Cloudflare Dashboard** > **Zero Trust** > **Access** > **Applications** > your app > **Overview** > **Application Audience (AUD) Tag**
+2. Add `CF_ACCESS_AUD` to the gateway's environment in `docker-compose.override.yml`:
+
+```yaml
+environment:
+  - CF_ACCESS_AUD=<your-application-aud-tag>
+```
+
+3. Restart the gateway (`docker compose up -d`)
+
+For single-instance deployments behind a properly configured Cloudflare Access application, the JWT signature and issuer checks alone provide sufficient protection.
+
 ## Container Lifecycle
 
 Browser containers are **started on-demand** when an agent uses the browser tool and persist across agent turns within a session. They are **stopped** when:

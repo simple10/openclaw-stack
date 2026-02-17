@@ -267,6 +267,11 @@ OPENCLAW_BROWSER_DOMAIN_PATH=
 > With separate subdomains, you may want a second Cloudflare Access application
 > to protect the browser subdomain, or extend the existing application to cover both.
 
+> **Multi-instance hardening:** If you run multiple OpenClaw instances behind the same
+> Cloudflare account, set `CF_ACCESS_AUD` on each noVNC proxy to its Access application's
+> AUD tag. This prevents users from one instance accessing another instance's browser
+> sessions via a valid-but-wrong JWT. See [BROWSER-VNC.md § Security](BROWSER-VNC.md#security).
+
 ---
 
 #### Config Notes
