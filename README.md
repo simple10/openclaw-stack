@@ -8,76 +8,67 @@ This repo enables `claude code` to securely deploy & maintain [OpenClaw](https:/
 
 - [CLAUDE.md](CLAUDE.md) & [playbooks](playbooks/)
   - Carefully designed instructions for claude to follow
-- [Tools](deploy/) & [script](scripts/)
+- [Tools](deploy/) & [scripts](scripts/)
   - OpenClaw plugins & build scripts
 - [Cloudflare Workers](workers/)
   - for logging & LLM proxy (no API keys stored on the VPS)
 
 OpenClaw gets wrapped with production-grade infrastructure: SSH hardening, firewall rules, Docker-in-Docker sandboxing via [Sysbox](https://github.com/nestybox/sysbox), Cloudflare Tunnel for zero-exposed-port networking, and a Cloudflare Worker proxy that keeps your real API keys off the server entirely.
 
-> Claude automates it all for you.
->
-> **Just clone the repo & run `claude "start"`**
->
-
-**Or have claude do it all for you:**
+**Quick install:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/simple10/openclaude/main/docs/CLAUDE_INSTALL.md -o CLAUDE.md`
-claude "start"`
+# Interactive claude setup:
+curl -fsSL https://raw.githubusercontent.com/simple10/openclaude/main/docs/CLAUDE_INSTALL.md -o CLAUDE.md && claude "start"
 ```
+
+> Or clone this repo and run `claude "start"`.
 
 ## Is this better than one-click VPS installs?
 
 If you already use `claude`, care about security, or like to tinker, this project is worth your time.
 
-There are a LOT of power-ups stashed in this repo. It's a batteries included OpenClaw & devops framework.
+There are a lot of power-ups stashed in this repo. It's a batteries included OpenClaw & devops framework.
 
 One-click VPS installs are a great way to get up and running quickly. But then you're left running a fairly insecure
-or an overly locked-down OpenClaw setup. This project strike a nice balance between the two.
+or an overly locked-down OpenClaw setup. This project strikes a nice balance between the two.
 
 Check out this guide on [OpenClaw hosting](https://proclaw.co/resources/openclaw-hosting) for more details.
 
 ## What do I need to get started?
 
-- Claude Code subscription
-- Cloudflare Account (free)
-- 30 min of free time - claude does a LOT of work on your VPS to get OpenClaw securely deployed
+1. Claude subscription - Pro/Max for Claude Code
+2. Cloudflare Account (free)
+
+About 30 min for the first deploy. Claude does a LOT of work on your VPS to get OpenClaw securely deployed.
 
 ## What gets deployed?
 
 A secure OpenClaw instance that doesn't limit OpenClaw's ability to function.
 
-- Hardened VPS with no exposed public ports other than SSH
-- Cloudflare Tunnel + Cloudflare Access to easily & securely connect to your OpenClaw
-- OpenClaw Gateway running in a Docker container
-- Agents run in their own container sandboxes (can be locked down per agent)
-- No LLM API Keys stored on the VPS or OpenClaw
-- Coordinator plugin that assists OpenClaw in routing to agents per skill or capabilities
-- Debugging hooks that assists Claude Code in debugging everything
-- Lightweight node server for securely accessing agent browser sessions and downloaded media
-- Full lightweight observability stack:
-  - Vector for log shipping
-  - Cloudflare Workers:
-    - AI Gateway Proxy Worker - stores your LLM API keys & can log all LLM traffic
-    - Log Receiver Worker to receive system logs from multiple VPS (optional)
-  - Host alerter script
-    - Monitors VPS health - sends you daily reports over Telegram, detects if OpenClaw is down
-    - Shares reports with your OpenClaw
-    - OpenClaw cron job runs daily to read reports:
-      - Notifies you of issues like outdated packages
-      - Includes instructions how to fix them - you can also just chat with OpenClaw about the issue
+**Infrastructure**
 
-OpenClaw gateway runs inside of it's own Docker container and uses sysbox to properly spawn agent containers.
+- **Zero exposed ports** — Cloudflare Tunnel + Access for secure connectivity, SSH is the only open port
+- **Hardened VPS** — non-standard SSH port, key-only auth, fail2ban, UFW firewall, kernel tuning
+- **Docker-in-Docker sandboxing** — gateway & agent tools run in their own isolated container via [Sysbox](https://github.com/nestybox/sysbox)
+- **API key isolation** — LLM keys stored as Cloudflare Worker secrets, never in OpenClaw or on the VPS
 
-The gateway can auto update it's container contents (update or repair OpenClaw code & agent sandboxes)
-but has no root access to the VPS. i.e. It can't jailbreak itself.
+**Multi-Agent**
 
-You can also easily customize or lockdown the gateway and individual agent sandboxes.
+- **Coordinator plugin** — auto-discovers agent skills and routes tasks to the right agent
+- **Per-agent sandboxes** — custom images, network rules, memory limits, and tool permissions per agent
+- **Remote browser viewing** — watch and control agent browser sessions via noVNC
+
+**Observability**
+
+- **AI Gateway Worker** — proxies all LLM requests through Cloudflare for analytics and key management
+- **Log shipping** — Vector ships container logs to a Cloudflare Log Receiver Worker
+- **Host monitoring** — cron-based health checks with Telegram alerts, shared with your OpenClaw so it can self-diagnose
+- **Debugging hooks** — Claude Code can read command logs, session transcripts, and LLM traces to troubleshoot issues
 
 ## Quick Start
 
-**Use claude to setup your env & clone this repo** (recommended)
+**Use claude to set up your env & clone this repo** (recommended)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/simple10/openclaude/main/docs/CLAUDE_INSTALL.md -o CLAUDE.md
@@ -96,7 +87,7 @@ required config setup, git clone this repo, and automate the deploy.
 3. Run `claude` in this repo dir, just say `start`
 
    ```bash
-   git clone <git@github.com>:simple10/openclaude.git openclaw-vps
+   git clone git@github.com:simple10/openclaude.git openclaw-vps
    cd openclaw-vps
 
    # Run claude with skip permissions if you want a more automated deploy
@@ -127,7 +118,7 @@ Then just chat with claude...
 
 > The agent routing doesn't seem to be working properly. Please check the debug logs and help me fix it.
 
-The playbooks instruct claude on how to detect if you already deployment your VPS.
+The playbooks instruct claude on how to detect if you already deployed your VPS.
 There are also explicit claude instructions for verifying & maintaining deployments.
 
 If you want more control, see [scripts/](scripts/) dir for CLI helper scripts without using claude.
@@ -139,27 +130,6 @@ If you want more control, see [scripts/](scripts/) dir for CLI helper scripts wi
 - **[Telegram](docs/TELEGRAM.md)** - guide for setting up Telegram bots to use with OpenClaw
 - **[Claude Subscription](docs/CLAUDE-SUBSCRIPTION.md)** - info on using OpenClaw with a claude subscription
 - See [docs/](docs/) for more guides
-
-## Key Features
-
-- **Fully automated deployment**
-   — Claude Code runs modular playbooks to set up the entire VPS from scratch
-- **Single VPS**
-   — gateway, sandboxes, and log shipping all run on one server
-- **Cloudflare Tunnel**
-   — zero exposed ports, hidden origin IP, no SSL certificates to manage
-- **AI Gateway Worker**
-   — all LLM requests proxy through a worker for observability & API key management; real API keys never touch the VPS
-- **Log shipping**
-   — Vector ships container logs to a Cloudflare Log Receiver Worker
-- **Host monitoring**
-   — cron-based alerts for disk, memory, and CPU via Telegram
-- **Automated backups**
-   — scheduled backup scripts with cron
-- **Browser viewing**
-   — view and control agent browser sessions remotely via [noVNC proxy](docs/BROWSER-VNC.md)
-- **Ongoing management**
-   — use Claude Code for day-to-day VPS operations after deploy
 
 ## Security
 
@@ -214,15 +184,7 @@ User message
 
 **Agents are not separate processes.** An "agent" is a configuration profile — a sandbox image, network rules, memory limits, and tool permissions. The gateway process makes all LLM API calls itself and runs tool calls inside the agent's sandbox container via `docker exec`.
 
-### Sandbox isolation
-
-Each agent runs tools inside an isolated Docker container (via Sysbox for secure Docker-in-Docker):
-
-For details on how requests flow through the system, see [docs/REQUEST-FLOW.md](docs/REQUEST-FLOW.md).
-
-### API key isolation
-
-LLM provider API keys (Anthropic, OpenAI) are securely stored as secrets on your Cloudflare Worker — they never touch the VPS. All AI requests route through the AI Gateway Worker proxy, which injects the real API key before forwarding to the provider.
+Each agent runs tools inside an isolated Docker container (via Sysbox for secure Docker-in-Docker). LLM provider API keys are stored as Cloudflare Worker secrets — they never touch the VPS. For details on how requests flow through the system, see [docs/REQUEST-FLOW.md](docs/REQUEST-FLOW.md).
 
 ---
 
@@ -312,7 +274,7 @@ These keys are stored only in Cloudflare and never touch the VPS. See [docs/POST
 
 ## Accessing OpenClaw Control UI (chat & config dashboard)
 
-There are two main UI's provided by this setup:
+There are two main UIs provided by this setup:
 
 1. OpenClaw Control UI: `https://openclaw.YOURDOMAIN.com/chat` - chat or change OpenClaw configs
 2. Browser Proxy: `https://openclaw.YOURDOMAIN.com/browser` - to access the agent browsers or downloaded media files
@@ -320,12 +282,12 @@ There are two main UI's provided by this setup:
 If you get a `disconnected` error when viewing the Control UI, that means your browser
 is not properly paired with OpenClaw. It's a security feature.
 
-Claude guides you through pair your device during initial deployment.
+Claude guides you through pairing your device during initial deployment.
 
 If you need to re-pair your browser, just ask claude for the URL:
 
 ```
-> I need to repair my device with OpenClaw. Please give me the link.
+> I need to re-pair my device with OpenClaw. Please give me the link.
 ```
 
 You'll get something like: `https://openclaw.YOURDOMAIN.com/chat?token=GATEWAY_TOKEN`
@@ -344,7 +306,7 @@ https://openclaw.YOURDOMAIN.com/browser
 
 See [docs/BROWSER-VNC.md](docs/BROWSER-VNC.md) for details.
 
-## 4. Testing
+## Testing
 
 Optionally run end-to-end tests with claude:
 
@@ -387,7 +349,7 @@ sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart o
 # See comments at the top of each script for details
 
 # Run OpenClaw CLI commands
-# SSH's into gateway container to run `openclaw ...`
+# SSHs into gateway container to run `openclaw ...`
 # Supports all of the openclaw CLI commands
 ./scripts/openclaw.sh
 ./scripts/openclaw.sh doctor --deep
@@ -399,7 +361,7 @@ sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart o
 openclaw doctor --deep
 
 # Health Checks
-./health-check.sh # Show OpenClaw and docker containers health
+./scripts/health-check.sh # Show OpenClaw and docker containers health
 
 # SSH
 ./scripts/ssh-vps.sh # SSH into VPS host
@@ -509,7 +471,7 @@ This deployment implements defense-in-depth with multiple independent security l
 
 ## Troubleshooting
 
-In general, just chat with claude to troubleshoot. Claude is fully context aware thanks to the CLAUDE.md and playbooks/
+In general, just chat with claude to troubleshoot. Claude is fully context-aware thanks to the CLAUDE.md and playbooks/
 
 See also [scripts/](./scripts/) for bash utils for SSHing, showing logs, etc.
 
