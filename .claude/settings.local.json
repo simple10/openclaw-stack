@@ -20,7 +20,12 @@
       "Bash(openssl rand:*)",
       "WebFetch(domain:docs.openclaw.ai)",
       "mcp__plugin_claude-mem_mcp-search__search",
-      "mcp__plugin_claude-mem_mcp-search__save_memory"
+      "mcp__plugin_claude-mem_mcp-search__save_memory",
+      "mcp__chrome-devtools__take_screenshot",
+      "mcp__chrome-devtools__take_snapshot",
+      "mcp__chrome-devtools__click",
+      "mcp__chrome-devtools__evaluate_script",
+      "mcp__chrome-devtools__navigate_page"
     ]
   }
 }
