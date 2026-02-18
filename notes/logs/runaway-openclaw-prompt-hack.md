@@ -2,20 +2,52 @@
 
 Feb 17 2026
 
-This is without a doubt the most surreal & dumbfounding debugging
-session of my 20+ year career as a software & devops engineer.
+> This is without a doubt the most surreal & dumbfounding debugging
+> session of my 20+ year career as a software & devops engineer.
+
+It goes to show the crazy power & risk of agentic AI systems like OpenClaw.
+
+If you you're not using OpenClaw, you're falling behind.
+
+If you are using it, you should try to understand how it works - so at the very least, you know how to navigate the security risks.
+
+## TL;DR
+
+- One simple request to take a screenshot of a website
+- One restrictive file access policy in a sandbox agent
+- One insanely powerful frontier model (Open 4.6)
+- One eager helper (OpenClaw) giving Opus whatever tools it needs
+
+### The results
+
+- **Total:** 138 LLM turns with 133 tool calls ~**28M tokens**
+- $20 USD in API token usage
+- Opus sucessfully jail-breaking its container
+
+All this to screenshot one website and save it as a file!
+
+And the best part...
+
+Opus got real creative and showed just how good it is at hacking it's way out of any limitation.
+
+---
 
 What literally started as one small prompt to OpenClaw, spiraled into...
 
-- 138 LLM turns
-- $20 API charge from Anthropic
-- Opus 4.6 successfully jail-breaking its security container
+- 28M tokens spread over 133 tool calls across 5 sessions
+- 4 sessions exceeded 200k input context window
+- 138 Opus API calls in total
+- 2.43MB of prompts text
 - 3 hour debugging session with claude code
-- Gaining a huge amount of insight into the intricacies of OpenClaw
 
-It shows the power & risk of running OpenClaw - or any agentic AI system.
+I gained a huge amount of insight into the intricacies of OpenClaw and
+am dumping them here for your pleasure.
+
+It all shows the **power & risk** of running OpenClaw - or any agentic AI system.
 
 My test was a simple multi-agent OpenClaw setup with container isolation.
+
+Just take a screenshot using my Personal Agent's sandbox browser and send it to me.
 
 Chat with main agent...
 
@@ -23,18 +55,11 @@ Chat with main agent...
 - use the Personal Agent's sandbox browser to do stuff
 - return the results to me over chat
 
-Just take a screenshot using my Personal Agent's sandbox browser and send it to me.
-
 **Simple, right?**
 
 I certainly wasn't expecting it to lead down this crazy rabbit hole.
 
-At least not yet. I thought it would come later during more intensive security testing.
-
-OpenClaw and agentic AI systems are crazy powerful, and mind-blowingly fun to use!
-
-If you you're not using them, you're falling behind. If you are using them, you should try to
-understand how they work - so at the very least, you know how to navigate the security risks.
+At least not yet.
 
 Over the past two weeks, I've been working night and day on security systems for OpenClaw
 and similar agents. This comes on the heels of decades of software engineering and two+ years
@@ -42,36 +67,13 @@ dedicated to AI.
 
 I'd like to think I know a bit about what I'm doing.
 
-Yet, the details captured in this session make it clear...
+Yet, the details here make it clear...
 
-1. I have to start thinking differently about how these AI agent systems work
-2. Whenever I think I understand, that's exactly when something like this happens
+1. I have to think differently about how AI agent systems work
+2. Whenever I think I understand, that's exactly when something goes wrong
 3. I can't rely on what I think, only on what I test
 
 **And testing AI systems is more art than science.**
-
-## TL;DR
-
-- One simple request to take a screenshot of a website
-- One restrictive file access policy in a sandbox agent
-- One insanely powerful frontier model (Open 4.6)
-- One over eager helper (OpenClaw) giving Opus whatever tools it needs
-
-**The results:**
-
-- Total: 138 LLM turns
-- 133 tool calls across 5 sessions
-- $20 USD in API token usage
-- And a complete mind shift in how I approach OpenClaw security
-
-All this to screenshot one website and save it as a file.
-
-And the best part...
-
-Opus got real creative and showed just how good it is at hacking it's way out of jails.
-
-In the end, it only "failed" to succeed in the jailbreak because OpenClaw kept blowing
-out the context window with it's massive prompts.
 
 Just to be clear, I love OpenClaw.
 
