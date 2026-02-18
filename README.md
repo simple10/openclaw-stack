@@ -1,5 +1,17 @@
 # Claude > OpenClaw > VPS
 
+STATUS: THIS PROJECT IS NOT YET PRODUCTION READY
+
+It's what I'm running for my personal setup - with some config changes.
+
+It's fantastic for hacking on OpenClaw in a secure environment.
+
+It's packed full of useful tools.
+
+But the openclaw.json config is in rapid development. Star the project to follow along. It will be more fully baked by Feb 28.
+
+---
+
 **About this project:**
 
 This repo enables `claude code` to securely deploy & maintain [OpenClaw](https://docs.openclaw.ai) on your own VPS.
