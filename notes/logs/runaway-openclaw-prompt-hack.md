@@ -163,6 +163,7 @@ The session trace is complete. Here's the full picture of what happened across a
 
   Session Timeline
 
+```text
   ┌─────┬──────────┬─────────┬──────────────────────┬───────────────────────────────┬──────────────────────────────┐
   │  #  │ Session  │  Time   │         Size         │             Task              │           Outcome            │
   │     │          │  (UTC)  │                      │                               │                              │
@@ -183,6 +184,7 @@ The session trace is complete. Here's the full picture of what happened across a
   │ 5   │ ec36dec8 │ 02:33   │ "Use exec/CDP, avoid │ 185KB                         │ Failed — CDP not accessible  │
   │     │          │         │  browser tool"       │                               │ from sandbox                 │
   └─────┴──────────┴─────────┴──────────────────────┴───────────────────────────────┴──────────────────────────────┘
+```
 
   The Core Problem Chain
 
@@ -283,6 +285,7 @@ Bash(Trace browser screenshot save flow)
 
 Now I can answer your questions precisely:
 
+```text
   1. What happens when a sandbox agent "downloads" a file?
 
   Agents don't write to media/browser/ at all — the gateway does. Here's the exact flow:
@@ -300,6 +303,7 @@ Now I can answer your questions precisely:
   Writes to /home/node/.openclaw/media/browser/<uuid>.jpg (perms 600, node:node)
       ↓
   Returns to agent: MEDIA:/home/node/.openclaw/media/browser/<uuid>.jpg + inline base64
+```
 
   The sandbox agent gets two things back: a host file path it can't access, and inline base64 it can see (but which
   bloats the context). If the agent runs a script via exec, it can only write to /workspace/ inside the sandbox —
