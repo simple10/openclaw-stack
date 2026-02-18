@@ -1431,7 +1431,7 @@ def cmd_llm_summary(args):
         "cache_read": 0, "cache_write": 0, "durations": [], "models": defaultdict(int),
     })
     # Aggregate by model
-    by_model = defaultdict(lambda: {"calls": 0, "cost": 0.0, "input_tokens": 0, "output_tokens": 0})
+    by_model = defaultdict(lambda: {"calls": 0, "cost": 0.0, "input_tokens": 0, "output_tokens": 0, "cache_read": 0, "cache_write": 0})
 
     for call in calls:
         agent = call["agentId"] or "unknown"
@@ -1454,6 +1454,8 @@ def cmd_llm_summary(args):
         m["cost"] += cost
         m["input_tokens"] += call["inputTokens"]
         m["output_tokens"] += call["outputTokens"]
+        m["cache_read"] += call["cacheReadTokens"]
+        m["cache_write"] += call["cacheWriteTokens"]
 
     if args.json_output:
         output = {
@@ -1477,10 +1479,16 @@ def cmd_llm_summary(args):
     total_cost = sum(c["cost"] or 0 for c in calls)
     total_in = sum(c["inputTokens"] for c in calls)
     total_out = sum(c["outputTokens"] for c in calls)
+    total_cr = sum(c["cacheReadTokens"] for c in calls)
+    total_cw = sum(c["cacheWriteTokens"] for c in calls)
 
     print(c(C.BOLD + C.CYAN, "\u2550" * 70))
     print(c(C.BOLD, f" LLM SUMMARY \u2014 {len(calls)} calls across {len(by_agent)} agents"))
-    print(c(C.BOLD, f" Total cost: {fmt_cost(total_cost)}  \u2502  In: {human_tokens(total_in)}  Out: {human_tokens(total_out)}"))
+    print(c(C.BOLD, f" Total cost: {fmt_cost(total_cost)}"))
+    print(
+        f" In: {human_tokens(total_in)}  Out: {human_tokens(total_out)}  "
+        f"Cache R: {human_tokens(total_cr)}  Cache W: {human_tokens(total_cw)}"
+    )
     print(c(C.BOLD + C.CYAN, "\u2550" * 70))
     print()
 
@@ -1493,9 +1501,6 @@ def cmd_llm_summary(args):
             avg_ms = sum(stats["durations"]) / len(stats["durations"])
             avg_dur = f"  \u2502  Avg: {avg_ms / 1000:.1f}s"
 
-        cache_total = stats["input_tokens"] + stats["cache_read"]
-        cache_pct = f"{stats['cache_read'] / cache_total * 100:.0f}%" if cache_total > 0 else "0%"
-
         print(c(C.BOLD + C.MAGENTA, f" \u250c\u2500 {agent}"))
         print(
             f" \u2502  Calls: {stats['calls']}  \u2502  "
@@ -1504,7 +1509,8 @@ def cmd_llm_summary(args):
         print(
             f" \u2502  In: {human_tokens(stats['input_tokens'])}  "
             f"Out: {human_tokens(stats['output_tokens'])}  "
-            f"Cache: {cache_pct}"
+            f"Cache R: {human_tokens(stats['cache_read'])}  "
+            f"Cache W: {human_tokens(stats['cache_write'])}"
         )
         # Model breakdown
         models_str = ", ".join(
@@ -1516,15 +1522,17 @@ def cmd_llm_summary(args):
 
     # By model
     print(c(C.BOLD, " BY MODEL"))
-    hdr = f"   {'MODEL':30s} {'CALLS':>6s} {'IN_TOK':>8s} {'OUT_TOK':>8s} {'COST':>10s}"
+    hdr = f"   {'MODEL':30s} {'CALLS':>6s} {'IN_TOK':>8s} {'OUT_TOK':>8s} {'CACHE_R':>8s} {'CACHE_W':>8s} {'COST':>10s}"
     print(c(C.DIM, hdr))
-    print(c(C.DIM, "   " + "\u2500" * 67))
+    print(c(C.DIM, "   " + "\u2500" * 87))
     for model in sorted(by_model, key=lambda m: by_model[m]["cost"], reverse=True):
         stats = by_model[model]
         print(
             f"   {model[:30]:30s} {stats['calls']:>6d} "
             f"{human_tokens(stats['input_tokens']):>8s} "
             f"{human_tokens(stats['output_tokens']):>8s} "
+            f"{human_tokens(stats['cache_read']):>8s} "
+            f"{human_tokens(stats['cache_write']):>8s} "
             f"{fmt_cost(stats['cost']):>10s}"
         )
     print()
