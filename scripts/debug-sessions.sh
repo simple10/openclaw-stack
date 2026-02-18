@@ -49,7 +49,7 @@ if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
   echo "  $0"
   echo ""
   echo "Direct mode:"
-  python3 "$SCRIPT_DIR/utils/debug-sessions.py" --help 2>&1 || true
+  python3 "$SCRIPT_DIR/debug-sessions/debug-sessions.py" --help 2>&1 || true
   exit 0
 fi
 
@@ -57,7 +57,7 @@ fi
 
 source "$CONFIG_FILE"
 
-PYTHON_SCRIPT="$SCRIPT_DIR/utils/debug-sessions.py"
+PYTHON_SCRIPT="$SCRIPT_DIR/debug-sessions/debug-sessions.py"
 REMOTE_SCRIPT="/tmp/debug-sessions.py"
 BASE_DIR="/home/openclaw/.openclaw/agents"
 
