@@ -1,5 +1,8 @@
 # Copy to .dev.vars and fill in real values
 
+# Level of logs to console.log in the Cloudflare Worker
+LOG_LEVEL=debug
+
 # Token to authorize requests to the AI proxy
 AUTH_TOKEN=your-shared-auth-token
 
@@ -8,7 +11,13 @@ OPENAI_API_KEY=sk-...
 ANTHROPIC_API_KEY=sk-ant-...
 CLAUDE_CODE_OAUTH_TOKEN= # claude code setup token
 
-# Your Cloudflare Account ID used for AI Gateway - use `wrangler whoami` to get account ID
-CF_AI_GATEWAY_ACCOUNT_ID=
-# Cloudflare AI Gateway auth token
-CF_AI_GATEWAY_TOKEN=
+# Cloudflare AI Gateway integration (optional)
+# When configured, provider requests are sent to Cloudflare AI Gateway instead of directly to the provider
+CF_AI_GATEWAY_ID=openclaw-ai-gateway    # Name of the gateway
+CF_AI_GATEWAY_ACCOUNT_ID=               # Use `wrangler whoami` to get account ID
+CF_AI_GATEWAY_TOKEN=                    # Cloudflare AI Gateway auth token
+
+# LangFuse (opt-in — set both keys to enable tracing)
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_BASE_URL=

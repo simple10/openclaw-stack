@@ -1,4 +1,3 @@
-import type { Provider } from './routing'
 import { env } from 'cloudflare:workers'
 
 export interface ProviderConfig {

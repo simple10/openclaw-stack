@@ -22,7 +22,10 @@
     // Otherwise, it routes directly to provider APIs (Anthropic, OpenAI).
     // Auto-detected at runtime — no code changes needed to switch modes.
     "CF_AI_GATEWAY_ID": "openclaw-ai-gateway",
-    "LOG_LEVEL": "debug"
+    "LOG_LEVEL": "debug",
+    // LangFuse base URL (default: https://cloud.langfuse.com).
+    // Set LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY via `wrangler secret put` to enable.
+    "LANGFUSE_BASE_URL": "https://cloud.langfuse.com"
     // Secrets (set via `wrangler secret put`):
     // Secrets survive `wrangler deploy` and will not be overwritten during new deploys
     //

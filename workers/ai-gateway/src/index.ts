@@ -2,15 +2,15 @@ import { validateAuthToken } from './auth'
 import { PROVIDER_CONFIG } from './config'
 import { handlePreflight, addCorsHeaders } from './cors'
 import { jsonError } from './errors'
+import { isLangfuseEnabled, isLlmRoute, reportGeneration } from './langfuse'
 import { createLog, logInboundRequest } from './log'
 import { matchProviderRoute } from './routing'
 import { getProviderApiKey } from './keys'
 import { proxyOpenAI } from './providers/openai'
 import { proxyAnthropic } from './providers/anthropic'
-import type { Env } from './types'
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     // CORS preflight
     if (request.method === 'OPTIONS') {
       return handlePreflight()
@@ -57,12 +57,45 @@ export default {
     const isGateway = providerConfig.baseUrl.includes('gateway.ai.cloudflare.com')
     const upstreamPath = isGateway ? route.gatewayPath : route.directPath
 
+    // When LangFuse is enabled for an LLM route, pre-read the request body
+    // so it can be shared with both the proxy function and LangFuse reporting
+    const langfuseActive = isLangfuseEnabled(env) && isLlmRoute(route.directPath)
+    const startTime = langfuseActive ? new Date() : undefined
+    const requestBody = langfuseActive ? await request.text() : undefined
+
     let response: Response
     if (route.provider === 'anthropic') {
-      response = await proxyAnthropic(apiKey, request, providerConfig, upstreamPath, log)
+      response = await proxyAnthropic(
+        apiKey,
+        request,
+        providerConfig,
+        upstreamPath,
+        log,
+        requestBody
+      )
     } else {
-      response = await proxyOpenAI(apiKey, request, providerConfig, upstreamPath, log)
+      response = await proxyOpenAI(apiKey, request, providerConfig, upstreamPath, log, requestBody)
     }
+
+    // LangFuse: tee the response stream and report in the background
+    if (langfuseActive && response.ok && response.body) {
+      const statusCode = response.status
+      const responseHeaders = new Headers(response.headers)
+      const [clientStream, langfuseStream] = response.body.tee()
+      response = new Response(clientStream, response)
+
+      ctx.waitUntil(
+        reportGeneration(env, log, {
+          provider: route.provider,
+          requestBody: requestBody!,
+          responseStream: langfuseStream,
+          responseHeaders,
+          statusCode,
+          startTime: startTime!,
+        })
+      )
+    }
+
     return addCorsHeaders(response)
   },
 } satisfies ExportedHandler<Env>

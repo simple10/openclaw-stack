@@ -9,7 +9,8 @@ export async function proxyAnthropic(
   request: Request,
   config: ProviderConfig,
   path: string,
-  log: Log
+  log: Log,
+  preReadBody?: string
 ): Promise<Response> {
   const url = `${config.baseUrl}/${path}`
 
@@ -44,7 +45,7 @@ export async function proxyAnthropic(
     log.debug(`[anthropic] Using API key: ${apiKey.substring(0, 10)}...`)
   }
 
-  const body = await request.text()
+  const body = preReadBody ?? await request.text()
 
   log.debug(`[anthropic] url=${url}`)
   log.debug('[anthropic] upstream headers', sanitizeHeaders(headers))
