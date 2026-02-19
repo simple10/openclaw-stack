@@ -5,6 +5,11 @@
 // Use jsonc (JSON with comments) when editing to avoid IDE formatting errors.
 //
 // This file is what controls the core setup of OpenClaw. It's loaded by the OpenClaw Gateway.
+// When OpenClaw starts, it adds defaults to its copy of openclaw.json
+// After deploy, changes can be made directly through OpenClaw (won't sync here).
+// Or changes can be made to this file and redeployed via claude.
+// Claude will attempt to diff any changes to this file and merge with the live openclaw.json.
+// If needed tell claude to completely replace the live version with this one when deploying changes.
 //
 // Some settings can be changed and hot-reloaded without a gateway restart.
 // Ask claude to deploy config changes.
@@ -213,14 +218,22 @@
           "deny": ["browser", "canvas", "nodes", "discord"]
         },
         "subagents": {
-          "allowAgents": ["code", "skills"]
+          "allowAgents": ["code", "skills"] // Add other agents here to allow main to spawn them; e.g. "personal", "work"
         }
       },
       // CODING AGENT
       {
         "id": "code",
         "name": "Code Agent",
-        "skills": ["coding-agent", "github", "clawhub", "skill-creator"],
+        "skills": [
+          "coding-agent",
+          "github",
+          "clawhub",
+          "skill-creator",
+          "gemini",
+          "mcporter",
+          "tmux"
+        ],
         "sandbox": {
           "workspaceAccess": "rw", // Code agent needs persistent read/write access to workspace
           "docker": {
@@ -252,24 +265,21 @@
         "name": "Skills Agent",
         "skills": [
           "blogwatcher",
-          "gemini",
           "gifgrep",
           "healthcheck",
           "himalaya",
-          "mcporter",
           "nano-pdf",
           "openai-image-gen",
           "openai-whisper-api",
           "oracle",
           "ordercli",
-          "tmux",
           "video-frames",
           "wacli",
           "weather"
         ],
         "tools": {
-          // Skills agent doesn't need to browse or spawn other agents — that's main's job
-          "deny": ["browser", "sessions_spawn"]
+          // Skills agent doesn't need to spawn other agents — that's main's job in this configuration
+          "deny": ["sessions_spawn"]
         },
         "sandbox": {
           "docker": {
@@ -282,6 +292,36 @@
           }
         }
       }
+      // PERSONAL AGENT
+      // Can be configured with custom AGENTS.md, SOUL.md, etc or different skills
+      // Has it's own browser container to login to personal accounts
+      // IMPORTANT: add agent id to main agent's list of allowedAgents to allow for delegation - otherwise only direct CLI or API is allowed
+      // {
+      //   "id": "personal",
+      //   "name": "Personal Agent",
+      //   // Add or remove specific personal agent skills as needed
+      //   "skills": [],
+      //   "sandbox": {
+      //     "docker": {
+      //       "network": "bridge"
+      //     }
+      //   }
+      // },
+      // WORK AGENT
+      // Can be configured with custom AGENTS.md, SOUL.md, etc or different skills
+      // Has it's own browser container to login to work accounts
+      // IMPORTANT: add agent id to main agent's list of allowedAgents to allow for delegation
+      // {
+      //   "id": "work",
+      //   "name": "Work Agent",
+      //   // Add or remove specific work related agent skills as needed
+      //   "skills": [],
+      //   "sandbox": {
+      //     "docker": {
+      //       "network": "bridge"
+      //     }
+      //   }
+      // }
     ]
   },
   "plugins": {
