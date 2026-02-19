@@ -86,29 +86,47 @@ export function handleRequest(req, res, subPath) {
 export function getRecentMedia(limit = 5) {
   const basePath = getEffectiveBP()
   try {
-    const entries = readdirSync(MEDIA_ROOT)
-      .map(name => {
-        try {
-          const stat = lstatSync(join(MEDIA_ROOT, name))
-          if (stat.isSymbolicLink() || stat.isDirectory()) return null
-          return { name, size: stat.size, mtimeMs: stat.mtimeMs, ext: extname(name).toLowerCase() }
-        } catch { return null }
-      })
-      .filter(Boolean)
+    const all = collectFiles(MEDIA_ROOT, '')
       .sort((a, b) => b.mtimeMs - a.mtimeMs)
       .slice(0, limit)
 
-    return entries.map(e => ({
+    return all.map(e => ({
       name: e.name,
       size: formatSize(e.size),
       sizeBytes: e.size,
       ext: e.ext,
       modified: e.mtimeMs,
-      url: `${basePath}/media/${encodeURIComponent(e.name)}`,
+      url: `${basePath}/media/${e.relPath.split('/').map(encodeURIComponent).join('/')}`,
     }))
   } catch {
     return []
   }
+}
+
+// Recursively collect files from media directory
+function collectFiles(dir, prefix) {
+  const results = []
+  try {
+    for (const name of readdirSync(dir)) {
+      try {
+        const full = join(dir, name)
+        const stat = lstatSync(full)
+        if (stat.isSymbolicLink()) continue
+        if (stat.isDirectory()) {
+          results.push(...collectFiles(full, prefix ? `${prefix}/${name}` : name))
+        } else {
+          results.push({
+            name,
+            relPath: prefix ? `${prefix}/${name}` : name,
+            size: stat.size,
+            mtimeMs: stat.mtimeMs,
+            ext: extname(name).toLowerCase(),
+          })
+        }
+      } catch { /* skip unreadable entries */ }
+    }
+  } catch { /* skip unreadable dirs */ }
+  return results
 }
 
 function formatSize(bytes) {

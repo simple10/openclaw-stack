@@ -1,0 +1,90 @@
+<!-- browsers.html — Agent Browsers page body template.
+     Injected into layout chrome by pages/browsers.mjs.
+     Shows all agent browser containers with status, noVNC links,
+     and embedded browser viewer. -->
+
+<div class="section-header" style="margin-bottom:16px">
+  <span class="section-title" style="font-size:12px">🌐 Agent Browsers</span>
+  <span class="info-box-subtitle" style="font-size:11px;color:var(--dim)">Ask <a href="" id="openclawLink" target="_blank" style="color:var(--accent);text-decoration:none">OpenClaw</a> to start a browser if not running</span>
+</div>
+
+<div id="browsersGrid" class="browsers-grid"><div class="empty">Loading...</div></div>
+
+<!-- Embedded browser viewer -->
+<div id="browserViewer" style="display:none;margin-top:20px">
+  <div class="section-header" style="margin-bottom:10px">
+    <span class="section-title" style="font-size:12px">🖥️ <span id="viewerTitle">Browser</span></span>
+    <div style="display:flex;gap:8px">
+      <a id="viewerPopout" href="#" target="_blank" style="color:var(--accent);font-size:12px;text-decoration:none">Open in new tab →</a>
+      <button onclick="closeBrowserViewer()" class="refresh-btn" style="padding:4px 10px;font-size:11px">✕ Close</button>
+    </div>
+  </div>
+  <div class="glass" style="border-radius:12px;overflow:hidden">
+    <iframe id="browserFrame" style="width:100%;height:600px;border:none;background:#000"></iframe>
+  </div>
+</div>
+
+<script>
+const BASE=window.__DASHBOARD_BASE||'';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
+// Set OpenClaw link
+{const ol=$('openclawLink');if(ol)ol.href=(window.__CONTROL_UI_BASE||'')+'/';}
+
+function renderBrowsers(browsers){
+  const el=$('browsersGrid');
+  if(!browsers||!browsers.length){
+    el.innerHTML='<div class="empty" style="grid-column:1/-1">No browser containers configured</div>';
+    return;
+  }
+  el.innerHTML=browsers.map(b=>{
+    const isRunning=b.running&&b.url;
+    const statusCls=b.running?'running':(b.denied?'disabled':'stopped');
+    const statusText=b.running?'Running':(b.denied?'Denied':'Stopped');
+    const dotCls=b.running?'sd-ok':(b.denied?'sd-none':'sd-none');
+    const borderColor=b.running?'var(--green)':(b.denied?'var(--dim)':'var(--border)');
+    return `<div class="glass browser-card" style="border-left:3px solid ${borderColor}">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <span class="sd ${dotCls}" style="width:10px;height:10px;margin:0"></span>
+        <span style="font-size:16px;font-weight:700;color:var(--textStrong);flex:1">${esc(b.name)}</span>
+        <span class="browser-status ${statusCls}">${statusText}</span>
+      </div>
+      <div style="font-size:11px;color:var(--dim);margin-bottom:${isRunning?'12':'0'}px">Agent: <span style="color:var(--muted);font-family:monospace">${esc(b.id)}</span></div>
+      ${isRunning?`<div style="display:flex;gap:8px">
+        <button onclick="openBrowserViewer('${esc(b.id)}','${esc(b.name)}','${esc(b.url)}')" class="refresh-btn" style="flex:1;text-align:center;color:var(--accent);border-color:rgba(99,102,241,.3)">🖥️ View Here</button>
+        <a href="${esc(b.url)}" target="_blank" class="refresh-btn" style="text-align:center;color:var(--accent);border-color:rgba(99,102,241,.3);text-decoration:none;display:inline-flex;align-items:center;padding:6px 14px">Open →</a>
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function openBrowserViewer(agentId,name,url){
+  $('browserViewer').style.display='block';
+  $('viewerTitle').textContent=name+' Browser';
+  $('viewerPopout').href=url;
+  $('browserFrame').src=url;
+  $('browserViewer').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function closeBrowserViewer(){
+  $('browserViewer').style.display='none';
+  $('browserFrame').src='about:blank';
+}
+
+let timer=60;
+async function loadData(){
+  try{
+    const res=await fetch(BASE+'/api/browsers?t='+Date.now());
+    const browsers=await res.json();
+    renderBrowsers(browsers);
+    const lu=$('lastUpdate');if(lu)lu.textContent='Updated: '+new Date().toLocaleTimeString();
+    timer=60;
+  }catch(e){
+    $('browsersGrid').innerHTML='<div class="empty" style="grid-column:1/-1">Failed to load browser data</div>';
+  }
+}
+
+setInterval(()=>{timer--;if(timer<=0){loadData();timer=60}$('countdown').textContent=timer+'s'},1000);
+loadData();
+</script>

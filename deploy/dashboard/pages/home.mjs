@@ -178,9 +178,9 @@ function serveHomePage(res) {
     const basePath = getEffectiveBP()
     const bodyHtml = readFileSync(join(__dirname, '..', 'html', 'home.html'), 'utf8')
     const html = renderPage({
-      title: 'OpenClaw Dashboard',
+      title: 'OpenClaw Mission Control',
       bodyHtml,
-      headExtra: `<script>window.__STATS_BASE="${basePath}/stats";</script>`,
+      headExtra: `<script>window.__STATS_BASE="${basePath}/stats";window.__CONTROL_UI_BASE="${process.env.OPENCLAW_DOMAIN_PATH || ''}";</script>`,
       basePath,
     })
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })

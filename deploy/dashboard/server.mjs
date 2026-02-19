@@ -28,6 +28,7 @@ import {
   init as initHome,
 } from './pages/home.mjs'
 
+import { handleRequest as handleBrowsers } from './pages/browsers.mjs'
 import { handleRequest as handleStats } from './pages/stats.mjs'
 import { handleRequest as handleMedia } from './pages/media.mjs'
 
@@ -153,6 +154,7 @@ const server = createServer(async (req, res) => {
       seg[1] !== 'media' &&
       seg[1] !== '_auth' &&
       seg[1] !== 'browser' &&
+      seg[1] !== 'browsers' &&
       seg[1] !== 'stats' &&
       seg[1] !== 'api' &&
       seg[1] !== 'public' &&
@@ -205,6 +207,12 @@ const server = createServer(async (req, res) => {
   // Home page
   if (path === '/' || path === '') {
     return handleHome(req, res, path)
+  }
+
+  // Browsers page
+  if (path === '/browsers' || path.startsWith('/browsers/')) {
+    const subPath = path === '/browsers' ? '' : path.slice('/browsers'.length)
+    return handleBrowsers(req, res, subPath)
   }
 
   // Stats dashboard

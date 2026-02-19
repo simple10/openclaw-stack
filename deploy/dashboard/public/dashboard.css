@@ -13,7 +13,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro','Helvetica Neue',sans
 .avatar{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:20px}
 .header-title-link{font-size:20px;font-weight:700;color:var(--textStrong);text-decoration:none}
 .header-title-link:hover{opacity:0.85}
-.header-nav{display:flex;align-items:center;gap:8px;font-size:12px;margin-top:2px}
+.header-nav{display:flex;align-items:center;gap:8px;font-size:14px;margin-top:2px}
 .header-nav a{color:var(--muted);text-decoration:none;font-weight:500;transition:color .15s}
 .header-nav a:hover{color:var(--textStrong)}
 .header-nav .nav-sep{color:var(--dim);font-size:10px}
@@ -68,13 +68,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro','Helvetica Neue',sans
 .health-value{font-size:15px;font-weight:700;color:var(--textStrong)}
 
 /* Two-column info boxes (browsers + media preview) */
-.info-boxes{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+.info-boxes{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:48px}
 .info-box{padding:16px}
 .info-box-title{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
 .info-box-footer{font-size:11px;color:var(--dim);margin-top:12px}
 .browser-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)}
 .browser-row:last-child{border-bottom:none}
-.browser-name{font-size:13px;font-weight:600;color:var(--textStrong);flex:1}
+.browser-name{font-size:16px;font-weight:600;color:var(--textStrong);flex:1}
+.browser-name.dimmed{color:var(--dim);font-weight:500}
 .browser-container{font-size:10px;color:var(--dim);font-family:monospace;flex:1}
 .browser-status{font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px}
 .browser-status.running{background:rgba(74,222,128,.12);color:var(--green)}
@@ -213,6 +214,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro','Helvetica Neue',sans
 .media-listing a{color:var(--accent);text-decoration:none}
 .media-listing a:hover{text-decoration:underline}
 .dl{font-size:1.2em;padding:2px 6px}
+
+/* Browsers page grid */
+.browsers-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.browser-card{padding:16px}
 
 @media(max-width:1024px){.cost-row{grid-template-columns:repeat(2,1fr)}.health-row{grid-template-columns:repeat(3,1fr)}.info-boxes{grid-template-columns:1fr}}
 @media(max-width:768px){.grid-2,.grid-3{grid-template-columns:1fr}.cost-row,.health-row{grid-template-columns:repeat(2,1fr)}}

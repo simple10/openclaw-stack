@@ -403,7 +403,7 @@ function getVersion() {
 // ── Gateway health ───────────────────────────────────────────────────
 
 async function getGateway() {
-  const gw = { status: 'offline', pid: null, uptime: '', memory: '', rss: 0 }
+  const gw = { status: 'offline', pid: null, uptime: '', memory: '', memoryLimit: '', rss: 0 }
   try {
     const out = await run('pgrep', ['-f', 'dist/index.js.*gateway'])
     const pids = out.split('\n').filter(p => p && p !== String(process.pid))
@@ -427,6 +427,29 @@ async function getGateway() {
       }
     }
   } catch { /* ignore */ }
+
+  // Container memory limit from cgroups (works in Docker/Sysbox)
+  try {
+    const { readFileSync } = await import('node:fs')
+    // Try cgroup v2 first, then v1
+    let limitBytes = 0
+    let usageBytes = 0
+    try {
+      const max = readFileSync('/sys/fs/cgroup/memory.max', 'utf8').trim()
+      if (max !== 'max') limitBytes = parseInt(max, 10)
+      usageBytes = parseInt(readFileSync('/sys/fs/cgroup/memory.current', 'utf8').trim(), 10)
+    } catch {
+      try {
+        limitBytes = parseInt(readFileSync('/sys/fs/cgroup/memory/memory.limit_in_bytes', 'utf8').trim(), 10)
+        usageBytes = parseInt(readFileSync('/sys/fs/cgroup/memory/memory.usage_in_bytes', 'utf8').trim(), 10)
+      } catch { /* no cgroup info */ }
+    }
+    if (limitBytes > 0 && limitBytes < 1e18) {
+      const fmtGB = (b) => (b / (1024 ** 3)).toFixed(1) + ' GB'
+      gw.memoryLimit = `${fmtGB(usageBytes)} / ${fmtGB(limitBytes)}`
+    }
+  } catch { /* ignore */ }
+
   return gw
 }
 

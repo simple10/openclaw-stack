@@ -292,7 +292,7 @@ function render(){
   $('hGw').style.color='var(--textStrong)';
   $('hVer').textContent=D.version||'—';
   $('hUp').textContent=gw.uptime||'—';
-  $('hMem').textContent=gw.memory||'—';
+  $('hMem').textContent=gw.memoryLimit||gw.memory||'—';
   $('hComp').textContent=D.compactionMode||'—';
   $('hSess').textContent=D.sessionCount||0;
 

@@ -20,14 +20,12 @@
 <!-- Agent Browsers + Browser Downloads -->
 <div class="info-boxes">
   <div class="glass info-box">
-    <div class="info-box-title">🌐 Agent Browsers</div>
+    <div class="info-box-title">🌐 Agent Browsers <span class="info-box-subtitle" style="font-size:10px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim);margin-left:6px">Ask <a href="" id="openclawLink" target="_blank" style="color:var(--accent);text-decoration:none">OpenClaw</a> to start a browser if not running</span></div>
     <div id="browsersPanel"><div class="empty">Loading...</div></div>
-    <div class="info-box-footer">Ask OpenClaw to start an agent browser if not running</div>
   </div>
   <div class="glass info-box">
-    <div class="info-box-title">📥 Browser Downloads</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div class="info-box-title" style="margin-bottom:0">📥 Browser Downloads</div><a href="" id="mediaLink" style="color:var(--accent);font-size:12px;font-weight:500;text-decoration:none">View All Media →</a></div>
     <div id="mediaPanel"><div class="empty">Loading...</div></div>
-    <div class="info-box-footer"><a href="" id="mediaLink" style="color:var(--accent)">View All Media →</a></div>
   </div>
 </div>
 
@@ -250,8 +248,9 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const BASE=window.__DASHBOARD_BASE||'';
 
-// Set media link href
+// Set dynamic link hrefs
 {const ml=$('mediaLink');if(ml)ml.href=BASE+'/media/';}
+{const ol=$('openclawLink');if(ol)ol.href=(window.__CONTROL_UI_BASE||'')+'/';}
 
 function sectionChanged(keys){
   if(!prevD)return true;
@@ -289,11 +288,15 @@ function renderBrowsers(browsers){
   el.innerHTML=browsers.map(b=>{
     const statusCls=b.running?'running':(b.denied?'disabled':'stopped');
     const statusText=b.running?'Running':(b.denied?'Denied':'Stopped');
-    const link=b.running&&b.url?`<a href="${esc(b.url)}" target="_blank" style="color:var(--accent);font-size:11px;margin-left:8px">Open →</a>`:'';
+    const dotCls=b.running?'sd-ok':(b.denied?'sd-none':'sd-none');
+    const nameCls=b.running?'browser-name':'browser-name dimmed';
+    const nameHtml=b.running&&b.url
+      ?`<a href="${esc(b.url)}" target="_blank" class="${nameCls}" style="color:var(--textStrong);text-decoration:none">${esc(b.name)}</a><a href="${esc(b.url)}" target="_blank" style="color:var(--accent);font-size:11px;margin-left:6px;text-decoration:none">Open →</a>`
+      :`<span class="${nameCls}">${esc(b.name)}</span>`;
     return `<div class="browser-row">
-      <span class="browser-name">${esc(b.name)}</span>
+      <span class="sd ${dotCls}"></span>
+      ${nameHtml}
       <span class="browser-status ${statusCls}">${statusText}</span>
-      ${link}
     </div>`;
   }).join('');
 }
@@ -309,7 +312,7 @@ function renderMediaPreview(media){
     const icon=m.ext==='.pdf'?'📄':'🖼️';
     return `<div class="media-row">
       <span class="media-icon">${icon}</span>
-      <span class="media-name">${esc(m.name)}</span>
+      <a href="${esc(m.url)}" target="_blank" class="media-name" style="color:var(--accent);text-decoration:none">${esc(m.name)}</a>
       <span class="media-size">${esc(m.size)}</span>
       <a href="${esc(m.url)}" download class="media-dl">⬇</a>
     </div>`;
@@ -357,7 +360,7 @@ function render(){
   $('hGw').style.color='var(--textStrong)';
   $('hVer').textContent=D.version||'—';
   $('hUp').textContent=gw.uptime||'—';
-  $('hMem').textContent=gw.memory||'—';
+  $('hMem').textContent=gw.memoryLimit||gw.memory||'—';
   $('hComp').textContent=D.compactionMode||'—';
   $('hSess').textContent=D.sessionCount||0;
 
