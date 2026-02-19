@@ -2,7 +2,7 @@
 
 See <https://docs.openclaw.ai/gateway/authentication>
 
-Claude Code OAuth tokens (Pro/Max subscription) are designed for CI/CD that uses claude code.
+Claude Code OAuth tokens (Pro/Max subscription) are designed for CI/CD that uses claude code directly, not OpenClaw.
 
 OpenClaw supports using subscription tokens with a workaround provided by the `pi-ai` lib.
 
@@ -24,6 +24,11 @@ Anthropic accepts the setup token because the headers match what it's expecting 
 > the setup token with Claude Code, but it works for now. Use at your own risk.
 >
 > Refer to OpenClaw's official documentation for additional details.
+>
+> Also see this [Hacker News threa](https://news.ycombinator.com/item?id=47069299) discussing recent
+> changes in Anthropic's terms of service. Most likely Anthropic will start blocking this workaround
+> in the near future as it's a clear violation. In the meantime, everyone on the Internet is
+> recommending people use their Claude subscription with OpenClaw.
 
 ## Using Subscriptions with your OpenClaw VPS
 
