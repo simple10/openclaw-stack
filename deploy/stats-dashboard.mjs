@@ -26,6 +26,25 @@ let cachedAt = 0
 let pending = null
 const CACHE_MS = 30_000
 
+// Format a date in a specific timezone as "YYYY-MM-DD HH:MM"
+function fmtDate(ms, tz) {
+  if (!ms) return ''
+  const d = new Date(ms)
+  try {
+    // Intl gives us locale-aware timezone conversion
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz || undefined,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false,
+    }).formatToParts(d)
+    const p = Object.fromEntries(parts.filter(x => x.type !== 'literal').map(x => [x.type, x.value]))
+    return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}`
+  } catch {
+    // Fallback to ISO UTC if timezone is invalid
+    return d.toISOString().slice(0, 16).replace('T', ' ')
+  }
+}
+
 console.log('[stats] Stats dashboard module loaded')
 
 // ── Export ────────────────────────────────────────────────────────────
@@ -281,16 +300,17 @@ function readCrons() {
     const state = job.state || {}
     const lastMs = state.lastRunAtMs || 0
     const nextMs = state.nextRunAtMs || 0
+    const tz = sched.tz || undefined // use job's timezone for display
 
     return {
       name: job.name || 'Unknown',
       schedule: schedStr,
       enabled: job.enabled !== false,
-      lastRun: lastMs ? new Date(lastMs).toISOString().slice(0, 16).replace('T', ' ') : '',
+      lastRun: fmtDate(lastMs, tz),
       lastStatus: state.lastStatus || 'none',
       lastDurationMs: state.lastDurationMs || 0,
       lastError: state.lastError || '',
-      nextRun: nextMs ? new Date(nextMs).toISOString().slice(0, 16).replace('T', ' ') : '',
+      nextRun: fmtDate(nextMs, tz),
       model: job.payload?.model || '',
     }
   })
@@ -400,10 +420,10 @@ function parseTokens(knownSids, sidToKey, today, d7, d30) {
           : 0
         const d = toDate(sessionLastTs)
         subRuns.push({
-          task: sessionTask.slice(0, 60), model: sessionModel,
+          task: sessionTask.slice(0, 60), agent: dir, model: sessionModel,
           cost: Math.round(sessionCost * 10000) / 10000,
           durationSec: dur, status: 'completed',
-          timestamp: sessionLastTs.toISOString().slice(0, 16).replace('T', ' '),
+          timestamp: fmtDate(sessionLastTs.getTime()),
           date: d,
         })
         dailySubCount[d] = (dailySubCount[d] || 0) + 1
@@ -421,6 +441,18 @@ function parseTokens(knownSids, sidToKey, today, d7, d30) {
   }
 }
 
+// ── Version ──────────────────────────────────────────────────────────
+
+let cachedVersion = null
+function getVersion() {
+  if (cachedVersion) return cachedVersion
+  try {
+    const pkg = JSON.parse(readFileSync('/app/package.json', 'utf8'))
+    cachedVersion = pkg.version || '—'
+  } catch { cachedVersion = '—' }
+  return cachedVersion
+}
+
 // ── Gateway health ───────────────────────────────────────────────────
 
 async function getGateway() {
@@ -431,11 +463,19 @@ async function getGateway() {
     if (pids[0]) {
       gw.pid = parseInt(pids[0], 10)
       gw.status = 'online'
-      const ps = await run('ps', ['-p', pids[0], '-o', 'etime=,rss='])
-      const parts = ps.split(/\s+/).filter(Boolean)
-      if (parts.length >= 2) {
-        gw.uptime = parts[0]
-        const kb = parseInt(parts[1], 10)
+      // Use lstart (absolute start time) instead of etime to avoid parsing issues
+      const ps = await run('ps', ['-p', pids[0], '-o', 'lstart=,rss='])
+      // lstart format: "Wed Feb 19 06:26:30 2026" followed by whitespace and RSS
+      // Split from the end to get RSS (last token), rest is lstart
+      const tokens = ps.split(/\s+/).filter(Boolean)
+      if (tokens.length >= 6) {
+        const kb = parseInt(tokens[tokens.length - 1], 10)
+        const startStr = tokens.slice(0, tokens.length - 1).join(' ')
+        const startMs = new Date(startStr).getTime()
+        if (!isNaN(startMs)) {
+          const elapsed = Date.now() - startMs
+          gw.uptime = fmtUptime(elapsed)
+        }
         gw.rss = kb
         if (kb > 1048576) gw.memory = (kb / 1048576).toFixed(1) + ' GB'
         else if (kb > 1024) gw.memory = Math.round(kb / 1024) + ' MB'
@@ -444,6 +484,17 @@ async function getGateway() {
     }
   } catch { /* ignore */ }
   return gw
+}
+
+function fmtUptime(ms) {
+  const m = Math.floor(ms / 60000)
+  if (m < 60) return `${m}m`
+  const h = Math.floor(m / 60)
+  const rm = m % 60
+  if (h < 24) return `${h}h ${rm}m`
+  const d = Math.floor(h / 24)
+  const rh = h % 24
+  return `${d}d ${rh}h ${rm}m`
 }
 
 // ── Git log ──────────────────────────────────────────────────────────
@@ -510,11 +561,23 @@ function parseConfig(groupNames) {
 
     res.compactionMode = defs.compaction?.mode || 'auto'
 
-    // Skills
+    // Skills — collect from per-agent skills arrays
+    const skillAgents = {} // skill name → [agent ids]
+    for (const ag of list) {
+      for (const sk of ag.skills || []) {
+        if (!skillAgents[sk]) skillAgents[sk] = []
+        skillAgents[sk].push(ag.id)
+      }
+    }
+    // Also include top-level skill entries (for enabled/disabled status)
     const skillEnts = oc.skills?.entries || {}
-    res.skills = Object.entries(skillEnts).map(([n, c]) => ({
-      name: n, active: typeof c === 'object' ? c.enabled !== false : true, type: 'builtin',
-    }))
+    res.skills = Object.keys({ ...skillAgents, ...Object.fromEntries(Object.entries(skillEnts).map(([n]) => [n, true])) })
+      .sort()
+      .map(n => ({
+        name: n,
+        active: skillEnts[n] ? (typeof skillEnts[n] === 'object' ? skillEnts[n].enabled !== false : true) : true,
+        agents: skillAgents[n] || [],
+      }))
 
     // Available models
     res.availableModels = Object.entries(models).map(([mid, mc]) => ({
@@ -723,7 +786,7 @@ async function collect() {
     lastRefresh: now.toISOString().replace('T', ' ').slice(0, 19) + ' UTC',
     lastRefreshMs: now.getTime(),
 
-    gateway: gw, compactionMode: cfg.compactionMode,
+    gateway: gw, version: getVersion(), compactionMode: cfg.compactionMode,
 
     totalCostToday: round2(costToday), totalCostAllTime: round2(costAll),
     projectedMonthly: round2(costToday * 30),
