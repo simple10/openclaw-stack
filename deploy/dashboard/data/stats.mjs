@@ -1,14 +1,12 @@
-// stats-dashboard.mjs — Self-contained stats dashboard module for OpenClaw gateway.
-// Exports handleStatsRequest() for dashboard.mjs to delegate /stats/* routes.
-// Data collection logic ported from openclaw-dashboard/refresh.sh (Python).
-// Zero dependencies (Node.js built-ins only).
+// data/stats.mjs — Stats data collection pipeline for the OpenClaw dashboard.
+// Reads session files, cron jobs, agent config, git history, and gateway health.
+// Ported from openclaw-dashboard/refresh.sh (Python). Zero dependencies.
+// Exports getData() with a 30-second debounce cache.
 
 import { readFileSync, readdirSync } from 'node:fs'
 import { execFile } from 'node:child_process'
-import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
 const OPENCLAW_PATH = '/home/node/.openclaw'
 const AGENTS_BASE = join(OPENCLAW_PATH, 'agents')
 const CONFIG_PATH = join(OPENCLAW_PATH, 'openclaw.json')
@@ -31,7 +29,6 @@ function fmtDate(ms, tz) {
   if (!ms) return ''
   const d = new Date(ms)
   try {
-    // Intl gives us locale-aware timezone conversion
     const parts = new Intl.DateTimeFormat('en-CA', {
       timeZone: tz || undefined,
       year: 'numeric', month: '2-digit', day: '2-digit',
@@ -40,7 +37,6 @@ function fmtDate(ms, tz) {
     const p = Object.fromEntries(parts.filter(x => x.type !== 'literal').map(x => [x.type, x.value]))
     return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}`
   } catch {
-    // Fallback to ISO UTC if timezone is invalid
     return d.toISOString().slice(0, 16).replace('T', ' ')
   }
 }
@@ -49,52 +45,7 @@ console.log('[stats] Stats dashboard module loaded')
 
 // ── Export ────────────────────────────────────────────────────────────
 
-export async function handleStatsRequest(req, res, path, basePath) {
-  const sub = path.slice('/stats'.length) || ''
-
-  if (sub === '' || sub === '/') {
-    return serveHtml(res, basePath + '/stats')
-  }
-  if (sub === '/api/refresh') {
-    const data = await getData()
-    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
-    return res.end(JSON.stringify(data))
-  }
-  if (sub === '/themes.json') {
-    return serveFile(res, 'stats-themes.json', 'application/json', 'public, max-age=3600')
-  }
-  res.writeHead(404, { 'Content-Type': 'text/plain' })
-  res.end('Not found')
-}
-
-// ── Serving ──────────────────────────────────────────────────────────
-
-function serveHtml(res, base) {
-  try {
-    let html = readFileSync(join(__dirname, 'stats.html'), 'utf8')
-    html = html.replace('<head>', `<head>\n<script>window.__STATS_BASE="${base}";</script>`)
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-    res.end(html)
-  } catch (e) {
-    res.writeHead(500, { 'Content-Type': 'text/plain' })
-    res.end('Stats page error: ' + e.message)
-  }
-}
-
-function serveFile(res, name, mime, cache) {
-  try {
-    const data = readFileSync(join(__dirname, name), 'utf8')
-    res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': cache })
-    res.end(data)
-  } catch (e) {
-    res.writeHead(500, { 'Content-Type': 'text/plain' })
-    res.end('File error: ' + e.message)
-  }
-}
-
-// ── Data collection with debounce + concurrency guard ────────────────
-
-async function getData() {
+export async function getData() {
   if (cached && Date.now() - cachedAt < CACHE_MS) return cached
   if (pending) return pending
   pending = collect()
@@ -214,7 +165,6 @@ function readStores() {
         knownSids.set(sid, t)
       }
 
-      // Group name mapping for bindings display
       if (key.includes('group:') && !key.includes('topic') && !key.includes('run:') && !key.includes('subagent')) {
         const gid = key.split('group:').pop().split(':')[0]
         const name = val.subject || val.displayName || ''
@@ -300,7 +250,7 @@ function readCrons() {
     const state = job.state || {}
     const lastMs = state.lastRunAtMs || 0
     const nextMs = state.nextRunAtMs || 0
-    const tz = sched.tz || undefined // use job's timezone for display
+    const tz = sched.tz || undefined
 
     return {
       name: job.name || 'Unknown',
@@ -371,7 +321,6 @@ function parseTokens(knownSids, sidToKey, today, d7, d30) {
           sessionModel = name
         }
 
-        // Parse timestamp for date bucketing
         const ts = obj.timestamp || ''
         let msgDate = ''
         if (ts) {
@@ -386,7 +335,6 @@ function parseTokens(knownSids, sidToKey, today, d7, d30) {
         }
 
         if (msgDate) {
-          // Daily tracking for charts
           if (!dailyCosts[msgDate]) dailyCosts[msgDate] = {}
           dailyCosts[msgDate][name] = (dailyCosts[msgDate][name] || 0) + cost
           if (!dailyTokens[msgDate]) dailyTokens[msgDate] = {}
@@ -413,7 +361,6 @@ function parseTokens(knownSids, sidToKey, today, d7, d30) {
         }
       }
 
-      // Track sub-agent runs
       if (isSub && sessionCost > 0 && sessionLastTs) {
         const dur = sessionFirstTs && sessionLastTs
           ? Math.round((sessionLastTs - sessionFirstTs) / 1000)
@@ -463,10 +410,7 @@ async function getGateway() {
     if (pids[0]) {
       gw.pid = parseInt(pids[0], 10)
       gw.status = 'online'
-      // Use lstart (absolute start time) instead of etime to avoid parsing issues
       const ps = await run('ps', ['-p', pids[0], '-o', 'lstart=,rss='])
-      // lstart format: "Wed Feb 19 06:26:30 2026" followed by whitespace and RSS
-      // Split from the end to get RSS (last token), rest is lstart
       const tokens = ps.split(/\s+/).filter(Boolean)
       if (tokens.length >= 6) {
         const kb = parseInt(tokens[tokens.length - 1], 10)
@@ -498,8 +442,6 @@ function fmtUptime(ms) {
 }
 
 // ── Git log ──────────────────────────────────────────────────────────
-// Reads .git-info generated at image build time (tab-delimited: hash, subject, ISO date).
-// Computes relative timestamps live so "ago" stays accurate.
 
 function getGit() {
   try {
@@ -561,15 +503,13 @@ function parseConfig(groupNames) {
 
     res.compactionMode = defs.compaction?.mode || 'auto'
 
-    // Skills — collect from per-agent skills arrays
-    const skillAgents = {} // skill name → [agent ids]
+    const skillAgents = {}
     for (const ag of list) {
       for (const sk of ag.skills || []) {
         if (!skillAgents[sk]) skillAgents[sk] = []
         skillAgents[sk].push(ag.id)
       }
     }
-    // Also include top-level skill entries (for enabled/disabled status)
     const skillEnts = oc.skills?.entries || {}
     res.skills = Object.keys({ ...skillAgents, ...Object.fromEntries(Object.entries(skillEnts).map(([n]) => [n, true])) })
       .sort()
@@ -579,34 +519,28 @@ function parseConfig(groupNames) {
         agents: skillAgents[n] || [],
       }))
 
-    // Available models
     res.availableModels = Object.entries(models).map(([mid, mc]) => ({
       provider: mid.includes('/') ? mid.split('/')[0].replace(/^\w/, c => c.toUpperCase()) : 'Unknown',
       name: mc.alias || mid, id: mid,
       status: mid === primary ? 'active' : 'available',
     }))
 
-    // Channels
     const tg = oc.channels?.telegram || {}
     const chEnabled = Object.entries(oc.channels || {})
       .filter(([, c]) => typeof c === 'object' && c.enabled !== false).map(([k]) => k)
 
-    // Hooks
     const hookEnts = oc.hooks?.internal?.entries || {}
     const hooks = Object.entries(hookEnts).map(([n, v]) => ({
       name: n, enabled: typeof v === 'object' ? v.enabled !== false : true,
     }))
 
-    // Plugins
     const plugEnts = oc.plugins?.entries || {}
     const plugins = Object.keys(plugEnts)
 
-    // Skills config
     const skillsCfg = Object.entries(skillEnts).map(([n, v]) => ({
       name: n, enabled: typeof v === 'object' ? v.enabled !== false : true,
     }))
 
-    // Bindings
     const bindings = (oc.bindings || []).map(b => ({
       agentId: b.agentId || '', channel: b.match?.channel || '',
       kind: b.match?.peer?.kind || '', id: b.match?.peer?.id || '',
@@ -654,7 +588,6 @@ function parseConfig(groupNames) {
       },
     }
 
-    // Agent entries
     if (list.length > 0) {
       for (const ag of list) {
         const aid = ag.id || 'unknown'
@@ -688,7 +621,6 @@ function buildChart(td, now) {
   const dates = []
   for (let i = 29; i >= 0; i--) dates.push(toDate(new Date(now - i * 86400000)))
 
-  // Find top 6 models by 30d cost
   const totals = {}
   for (const d of dates) {
     for (const [m, c] of Object.entries(td.dailyCosts[d] || {})) {
@@ -764,14 +696,11 @@ async function collect() {
   const d7 = toDate(new Date(now - 7 * 86400000))
   const d30 = toDate(new Date(now - 30 * 86400000))
 
-  // Read all session stores in one pass
   const stores = readStores()
 
-  // Run async tasks in parallel
   const gw = await getGateway()
   const git = getGit()
 
-  // Sync tasks
   const cfg = parseConfig(stores.groupNames)
   const sessions = buildSessions(stores.stores, now)
   const crons = readCrons()

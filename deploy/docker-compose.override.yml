@@ -57,12 +57,8 @@ services:
       - ./deploy/parse-toolkit.mjs:/app/deploy/parse-toolkit.mjs:ro
       # Sandbox builder: extracted build logic called by entrypoint and update-sandboxes.sh
       - ./deploy/rebuild-sandboxes.sh:/app/deploy/rebuild-sandboxes.sh:ro
-      # Dashboard server: browser sessions, media files, logs through a fixed port
-      - ./deploy/dashboard.mjs:/app/deploy/dashboard.mjs:ro
-      # Stats dashboard: self-contained monitoring module, SPA frontend, and themes
-      - ./deploy/stats-dashboard.mjs:/app/deploy/stats-dashboard.mjs:ro
-      - ./deploy/stats.html:/app/deploy/stats.html:ro
-      - ./deploy/stats-themes.json:/app/deploy/stats-themes.json:ro
+      # Dashboard server: browser sessions, media files, stats, and admin panels
+      - ./deploy/dashboard:/app/deploy/dashboard:ro
     # Entrypoint handles pre-start tasks before exec-ing the command
     entrypoint: ["/app/scripts/entrypoint-gateway.sh"]
     # Full gateway command (entrypoint passes it through via exec "$@")
@@ -99,6 +95,8 @@ services:
       # Dashboard base path — set when dashboard is served under a URL subpath
       # (e.g., /dashboard). Empty = serve at root. Set from OPENCLAW_DASHBOARD_DOMAIN_PATH.
       - DASHBOARD_BASE_PATH=${DASHBOARD_BASE_PATH:-}
+      # Control UI base path — used by dashboard header nav links (Chat, Config, Logs)
+      - OPENCLAW_DOMAIN_PATH=${OPENCLAW_DOMAIN_PATH:-}
       # Telegram channel — enables chatting with OpenClaw via Telegram bot
       - TELEGRAM_BOT_TOKEN=${OPENCLAW_TELEGRAM_BOT_TOKEN:-}
       - TZ=UTC

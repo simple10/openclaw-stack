@@ -211,7 +211,7 @@ fi
 # Reads browsers.json dynamically to discover sandbox browser containers and their mapped ports.
 # Run as node to avoid creating root-owned jiti cache files in /tmp/jiti/
 # that would block the gateway (also node) from writing cache entries.
-DASHBOARD_SERVER="/app/deploy/dashboard.mjs"
+DASHBOARD_SERVER="/app/deploy/dashboard/server.mjs"
 if [ -f "$DASHBOARD_SERVER" ]; then
   gosu node node "$DASHBOARD_SERVER" &
   echo "[entrypoint] Dashboard server started on port 6090 (as node)"
