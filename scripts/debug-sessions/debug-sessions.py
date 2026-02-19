@@ -1324,12 +1324,26 @@ def cmd_llm_trace(args):
         print()
         return
 
-    # Header
+    # Cross-reference with session transcript for completeness check
     agent = matched[0]["agentId"]
     sid = matched[0]["sessionId"][:12] if matched[0]["sessionId"] else session_id[:12]
+    session_turns = None
+    try:
+        session_info = find_session(args.base_dir, session_id, agent if args.agent else None)
+        if session_info:
+            records = parse_session_file(session_info["filepath"])
+            a = analyze_session(records)
+            session_turns = a["assistant_turns"]
+    except Exception:
+        pass
+
+    # Header
     print(c(C.BOLD + C.CYAN, "\u2550" * 90))
     print(c(C.BOLD + C.CYAN, f" LLM TRACE: {agent}/{sid}  ({len(matched)} calls)"))
     print(c(C.BOLD + C.CYAN, "\u2550" * 90))
+    if session_turns is not None and len(matched) < session_turns:
+        print(c(C.YELLOW, f" \u26a0  Session has {session_turns} turns but only {len(matched)} LLM calls logged"))
+        print(c(C.DIM, "    (llm-logger plugin may have been enabled after session started)"))
     print()
 
     cumulative_cost = 0.0
