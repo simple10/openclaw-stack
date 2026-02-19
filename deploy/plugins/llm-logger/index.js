@@ -18,6 +18,11 @@
 //
 // Log file is managed by logrotate (daily, 50M maxsize, 7 rotations).
 // File writes only — no LLM content is sent to stdout/stderr (avoids Vector shipping).
+//
+// LLM Telemetry (llemtry):
+//   When ENABLE_LLEMTRY_LOGGING=true, also sends spans to the Log Worker's /llemtry
+//   endpoint for forwarding to Langfuse (or other backends). Derives the URL from
+//   LOG_WORKER_URL (replaces /logs suffix with /llemtry). Uses LOG_WORKER_TOKEN for auth.
 
 import { appendFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -35,6 +40,19 @@ const LIMITS = {
 
 // Keys to redact from logged objects (matches debug-logger pattern)
 const SENSITIVE_KEYS = /token|secret|password|apiKey|api_key|authorization/i
+
+// ── Llemtry configuration (from environment) ───────────────────────
+const LLEMTRY_ENABLED_ENV = process.env.ENABLE_LLEMTRY_LOGGING === 'true'
+const LLEMTRY_URL = process.env.LOG_WORKER_URL
+  ? process.env.LOG_WORKER_URL.replace(/\/logs$/, '/llemtry')
+  : undefined
+const LLEMTRY_TOKEN = process.env.LOG_WORKER_TOKEN
+const INSTANCE_ID = process.env.OPENCLAW_INSTANCE_ID || undefined
+const HOSTNAME = process.env.VPS_HOSTNAME || undefined
+
+// Stale pending input cleanup interval (5 minutes)
+const PENDING_INPUT_TTL_MS = 5 * 60 * 1000
+const PENDING_CLEANUP_INTERVAL_MS = 60 * 1000
 
 function truncate(str, limit) {
   if (!limit || typeof str !== 'string' || str.length <= limit) return str
@@ -91,6 +109,77 @@ function contextFields(event, ctx) {
   }
 }
 
+// ── Llemtry span assembly helpers ──────────────────────────────────
+
+function buildLlemtrySpan(input, outputEvent, ctx) {
+  const startNano = input ? String(input.timestamp * 1_000_000) : String(Date.now() * 1_000_000)
+  const endNano = String(Date.now() * 1_000_000)
+
+  return {
+    traceId: outputEvent.sessionId ?? ctx.sessionId,
+    spanId: outputEvent.runId ?? ctx.runId,
+    name: 'gen_ai.generate',
+    kind: 'client',
+    startTimeUnixNano: startNano,
+    endTimeUnixNano: endNano,
+    status: { code: 'OK' },
+    attributes: {
+      'gen_ai.system': outputEvent.provider,
+      'gen_ai.request.model': outputEvent.model,
+      'gen_ai.usage.input_tokens': outputEvent.usage?.input,
+      'gen_ai.usage.output_tokens': outputEvent.usage?.output,
+      'gen_ai.request.max_tokens': input?.event?.maxTokens,
+      'gen_ai.request.temperature': input?.event?.temperature,
+      'gen_ai.response.stop_reason': outputEvent.stopReason ?? outputEvent.lastAssistant?.stopReason ?? outputEvent.lastAssistant?.stop_reason,
+      'openclaw.agent.id': ctx.agentId,
+      'openclaw.session.id': outputEvent.sessionId ?? ctx.sessionId,
+      'openclaw.session.key': ctx.sessionKey,
+      'openclaw.run.id': outputEvent.runId ?? ctx.runId,
+      'openclaw.usage.cache_read_tokens': outputEvent.usage?.cacheRead,
+      'openclaw.usage.cache_write_tokens': outputEvent.usage?.cacheWrite,
+      'openclaw.images_count': input?.event?.imagesCount,
+    },
+    events: [
+      input && {
+        name: 'gen_ai.content.prompt',
+        timeUnixNano: startNano,
+        body: {
+          system: input.event.systemPrompt,
+          messages: input.event.historyMessages,
+          prompt: input.event.prompt,
+        },
+      },
+      {
+        name: 'gen_ai.content.completion',
+        timeUnixNano: endNano,
+        body: outputEvent.lastAssistant ?? outputEvent.assistantTexts,
+      },
+    ].filter(Boolean),
+  }
+}
+
+async function sendSpan(span) {
+  const batch = {
+    resource: {
+      serviceName: 'openclaw-gateway',
+      instanceId: INSTANCE_ID,
+      hostname: HOSTNAME,
+    },
+    spans: [span],
+  }
+  const res = await fetch(LLEMTRY_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${LLEMTRY_TOKEN}`,
+    },
+    body: JSON.stringify(batch),
+  })
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}: ${await res.text().catch(() => '')}`)
+  }
+}
+
 // Gateway package.json has "type": "module" — plugins must use ESM exports
 export default {
   id: 'llm-logger',
@@ -111,6 +200,35 @@ export default {
         // Silent failure — no LLM content in error message
         console.error(`[llm-logger] Failed to write log entry: ${e.code || e.message}`)
       }
+    }
+
+    // ── Llemtry output validation ────────────────────────────────
+    let llemtryEnabled = LLEMTRY_ENABLED_ENV
+    if (llemtryEnabled) {
+      if (!LLEMTRY_URL || !LLEMTRY_TOKEN) {
+        api.logger.error(
+          '[llm-logger] ENABLE_LLEMTRY_LOGGING is true but LOG_WORKER_URL or LOG_WORKER_TOKEN is missing. ' +
+            'LLM telemetry will NOT be sent. Set these env vars or disable ENABLE_LLEMTRY_LOGGING.'
+        )
+        llemtryEnabled = false
+      } else {
+        api.logger.info(`[llm-logger] LLM telemetry enabled → ${LLEMTRY_URL}`)
+      }
+    }
+
+    // In-memory buffer: runId → pending input event (for span assembly)
+    const pendingInputs = new Map()
+
+    // Periodic cleanup of stale pending inputs (prevents memory leaks)
+    if (llemtryEnabled) {
+      setInterval(() => {
+        const now = Date.now()
+        for (const [runId, entry] of pendingInputs) {
+          if (now - entry.timestamp > PENDING_INPUT_TTL_MS) {
+            pendingInputs.delete(runId)
+          }
+        }
+      }, PENDING_CLEANUP_INTERVAL_MS)
     }
 
     // ── llm_input handler ──────────────────────────────────────────
@@ -158,6 +276,18 @@ export default {
       if (event.maxTokens !== undefined) entry.maxTokens = event.maxTokens
 
       await writeLine(entry)
+
+      // Buffer for llemtry span assembly
+      if (llemtryEnabled) {
+        const runId = event.runId ?? ctx.runId
+        if (runId) {
+          pendingInputs.set(runId, {
+            timestamp: Date.now(),
+            event,
+            ctx,
+          })
+        }
+      }
     })
 
     // ── llm_output handler ─────────────────────────────────────────
@@ -233,6 +363,18 @@ export default {
       }
 
       await writeLine(entry)
+
+      // Assemble llemtry span and send
+      if (llemtryEnabled) {
+        const runId = event.runId ?? ctx.runId
+        const input = runId ? pendingInputs.get(runId) : undefined
+        if (runId) pendingInputs.delete(runId)
+
+        const span = buildLlemtrySpan(input, event, ctx)
+        sendSpan(span).catch((err) =>
+          console.error(`[llm-logger] llemtry send failed: ${err.message}`)
+        )
+      }
     })
 
     api.logger.info('[llm-logger] Plugin registered — logging to ~/.openclaw/logs/llm.log')

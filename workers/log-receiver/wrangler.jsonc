@@ -23,8 +23,12 @@
 
   "vars": {
     // Comma-separated log levels to output to console (changeable without redeploy via dashboard)
-    "LOGGABLE_LEVELS": "info,warn,error,fatal,panic"
+    "LOGGABLE_LEVELS": "info,warn,error,fatal,panic",
+    // Langfuse base URL for llemtry backend (changeable without redeploy via dashboard)
+    "LANGFUSE_BASE_URL": "https://cloud.langfuse.com"
     // Secrets (set via `wrangler secret put`):
     // AUTH_TOKEN — token Vector uses to authenticate to this worker
+    // LANGFUSE_PUBLIC_KEY — Langfuse public key (enables llemtry → Langfuse backend)
+    // LANGFUSE_SECRET_KEY — Langfuse secret key
   }
 }

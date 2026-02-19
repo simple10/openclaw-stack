@@ -462,6 +462,54 @@ openclaw doctor --deep
 
 ---
 
+## 7.6a LLM Telemetry (llemtry)
+
+> Skip this section if `ENABLE_LLEMTRY_LOGGING` is not `true` in `openclaw-config.env`.
+
+**1. Llemtry endpoint exists:**
+
+```bash
+# Replace LOG_WORKER_URL base and LOG_WORKER_TOKEN from openclaw-config.env
+# The llemtry URL replaces the /logs path with /llemtry
+LLEMTRY_URL="${LOG_WORKER_URL/\/logs/\/llemtry}"
+curl -s -X POST "$LLEMTRY_URL" \
+  -H "Authorization: Bearer $LOG_WORKER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"resource":{"serviceName":"test"},"spans":[]}' | jq .
+# Expected: {"status":"ok","count":0}
+```
+
+**2. Langfuse secrets configured** (if using Langfuse backend):
+
+```bash
+# From your local machine with wrangler configured
+cd workers/log-receiver
+npx wrangler secret list
+# Should include: LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY
+```
+
+**3. Plugin startup validation** (on VPS):
+
+```bash
+sudo docker logs openclaw-gateway 2>&1 | grep -i 'llm-logger.*telemetry'
+# Expected: "[llm-logger] LLM telemetry enabled → https://..."
+# If missing LOG_WORKER_URL/TOKEN: "[llm-logger] ENABLE_LLEMTRY_LOGGING is true but..."
+```
+
+**4. End-to-end** (after sending a message to an agent):
+
+```bash
+# Check Log Worker logs for llemtry entries (Cloudflare dashboard or wrangler tail)
+npx wrangler tail --format json | jq 'select(.logs[].message | contains("[LLEMTRY]"))'
+```
+
+- [ ] Llemtry endpoint returns `{"status":"ok","count":0}` for empty batch
+- [ ] Plugin logs confirm telemetry enabled (or correctly warns if misconfigured)
+- [ ] After agent message: llemtry spans visible in Log Worker logs
+- [ ] (If Langfuse configured) Traces appear in Langfuse with sessionId and agentId metadata
+
+---
+
 ## 7.7 End-to-End Test
 
 > **Note:** Steps 1-3 require authenticating through Cloudflare Access (user-driven). For automated browser E2E testing, see [`docs/TESTING.md`](../docs/TESTING.md) (Phase 2).

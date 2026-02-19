@@ -1,9 +1,10 @@
 import { validateAuth } from './auth'
 import { handlePreflight, addCorsHeaders } from './cors'
 import { jsonError } from './errors'
+import { handleLlemtry } from './llemtry'
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     // CORS preflight
     if (request.method === 'OPTIONS') {
       return handlePreflight()
@@ -28,6 +29,16 @@ export default {
       }
 
       return addCorsHeaders(await handleLogs(request, env))
+    }
+
+    // POST /llemtry — receive LLM telemetry spans from llm-logger plugin
+    if (request.method === 'POST' && pathname === '/llemtry') {
+      const authError = await validateAuth(request, env.AUTH_TOKEN)
+      if (authError) {
+        return addCorsHeaders(jsonError(authError, 401))
+      }
+
+      return addCorsHeaders(await handleLlemtry(request, env, ctx))
     }
 
     return addCorsHeaders(jsonError('Not found', 404))
