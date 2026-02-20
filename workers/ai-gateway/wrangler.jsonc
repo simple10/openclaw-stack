@@ -26,11 +26,10 @@
     "LOG_LEVEL": "debug", // Level to console.log to Cloudflare Worker Observability
     //
     //
-    // ---- LangFuse tracing (optional) ----
-    "LANGFUSE_ENABLED": "false", // Set to "true" to enable, must also set other langfuse keys
-    "LANGFUSE_BASE_URL": "https://cloud.langfuse.com",
-    // LANGFUSE_PUBLIC_KEY - set via `wrangler put secret ...`
-    // LANGFUSE_SECRET_KEY
+    // ---- LLM telemetry via llemtry (optional) ----
+    "LLEMTRY_ENABLED": "false", // Set to "true" to send LLM telemetry to log receiver worker
+    // LLEMTRY_ENDPOINT   — URL of log receiver /llemtry endpoint, set via `wrangler secret put ...`
+    // LLEMTRY_AUTH_TOKEN  — Bearer token for log receiver, set via `wrangler secret put ...`
     //
     //
     // ---- Provider API keys ----

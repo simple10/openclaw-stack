@@ -1,13 +1,12 @@
 import type { Log, Provider } from './types'
 
 const MAX_OUTPUT_BYTES = 100 * 1024 // 100KB
-const DEFAULT_LANGFUSE_URL = 'https://cloud.langfuse.com'
 
-/** Returns true when LangFuse is explicitly enabled and keys are configured. */
-export function isLangfuseEnabled(env: Env, log: Log): boolean {
-  if (env.LANGFUSE_ENABLED !== 'true') return false
-  if (!env.LANGFUSE_PUBLIC_KEY || !env.LANGFUSE_SECRET_KEY) {
-    log.error('[langfuse] LANGFUSE_ENABLED is true but LANGFUSE_PUBLIC_KEY and/or LANGFUSE_SECRET_KEY are missing')
+/** Returns true when llemtry is explicitly enabled and endpoint/token are configured. */
+export function isLlemtryEnabled(env: Env, log: Log): boolean {
+  if (env.LLEMTRY_ENABLED !== 'true') return false
+  if (!env.LLEMTRY_ENDPOINT || !env.LLEMTRY_AUTH_TOKEN) {
+    log.error('[llemtry] LLEMTRY_ENABLED is true but LLEMTRY_ENDPOINT and/or LLEMTRY_AUTH_TOKEN are missing')
     return false
   }
   return true
@@ -262,7 +261,7 @@ async function parseOpenAIStream(stream: ReadableStream<Uint8Array>): Promise<Pa
 }
 
 // ---------------------------------------------------------------------------
-// LangFuse API client
+// Llemtry reporting
 // ---------------------------------------------------------------------------
 
 export interface ReportOptions {
@@ -274,7 +273,12 @@ export interface ReportOptions {
   startTime: Date
 }
 
-/** Parse the response stream and report to LangFuse. Best-effort, never throws. */
+/** Convert a Date to epoch nanoseconds as a string. */
+function toNanoString(date: Date): string {
+  return (BigInt(date.getTime()) * 1_000_000n).toString()
+}
+
+/** Parse the response stream and report to log worker via llemtry. Best-effort, never throws. */
 export async function reportGeneration(env: Env, log: Log, opts: ReportOptions): Promise<void> {
   try {
     const req = parseRequestBody(opts.requestBody)
@@ -296,98 +300,83 @@ export async function reportGeneration(env: Env, log: Log, opts: ReportOptions):
 
     const endTime = new Date()
     const model = parsed.model ?? req.model ?? 'unknown'
-    const traceId = crypto.randomUUID()
-    const generationId = crypto.randomUUID()
-
-    // Build LangFuse usage object
-    const langfuseUsage: Record<string, unknown> = { unit: 'TOKENS' }
-    if (parsed.usage) {
-      if (parsed.usage.input != null) langfuseUsage.input = parsed.usage.input
-      if (parsed.usage.output != null) langfuseUsage.output = parsed.usage.output
-      if (parsed.usage.total != null) langfuseUsage.total = parsed.usage.total
-    }
-
-    // Build metadata
-    const generationMetadata: Record<string, unknown> = {
-      provider: opts.provider,
-      stream: isStreaming,
-      ...parsed.metadata,
-    }
-    if (parsed.usage?.cacheCreationInputTokens) {
-      generationMetadata.cacheCreationInputTokens = parsed.usage.cacheCreationInputTokens
-    }
-    if (parsed.usage?.cacheReadInputTokens) {
-      generationMetadata.cacheReadInputTokens = parsed.usage.cacheReadInputTokens
-    }
+    const spanId = crypto.randomUUID()
 
     // Build input — include system prompt for Anthropic if present
     const input: Record<string, unknown> = { messages: req.messages }
     if (req.system) input.system = req.system
 
-    const batch = [
-      {
-        id: crypto.randomUUID(),
-        type: 'trace-create' as const,
-        timestamp: opts.startTime.toISOString(),
-        body: {
-          id: traceId,
-          name: `${opts.provider}-generation`,
-          metadata: { provider: opts.provider },
-        },
+    // Build llemtry batch
+    const batch = {
+      resource: {
+        serviceName: 'openclaw-ai-gateway',
       },
-      {
-        id: crypto.randomUUID(),
-        type: 'generation-create' as const,
-        timestamp: opts.startTime.toISOString(),
-        body: {
-          traceId,
-          id: generationId,
-          name: model,
-          model,
-          input,
-          output: parsed.output,
-          startTime: opts.startTime.toISOString(),
-          endTime: endTime.toISOString(),
-          usage: langfuseUsage,
-          metadata: generationMetadata,
-          statusMessage: String(opts.statusCode),
-          modelParameters: buildModelParams(req),
+      spans: [
+        {
+          traceId: crypto.randomUUID(),
+          spanId,
+          name: 'gen_ai.generate',
+          kind: 'client' as const,
+          startTimeUnixNano: toNanoString(opts.startTime),
+          endTimeUnixNano: toNanoString(endTime),
+          status: {
+            code: (opts.statusCode >= 200 && opts.statusCode < 300 ? 'OK' : 'ERROR') as 'OK' | 'ERROR',
+          },
+          attributes: {
+            'gen_ai.system': opts.provider,
+            'gen_ai.request.model': model,
+            ...(parsed.usage?.input != null && { 'gen_ai.usage.input_tokens': parsed.usage.input }),
+            ...(parsed.usage?.output != null && { 'gen_ai.usage.output_tokens': parsed.usage.output }),
+            ...(req.max_tokens != null && { 'gen_ai.request.max_tokens': req.max_tokens }),
+            ...(req.temperature != null && { 'gen_ai.request.temperature': req.temperature }),
+            'openclaw.session.id': 'ai-gateway',
+            'openclaw.run.id': spanId,
+            ...(parsed.usage?.cacheReadInputTokens != null && {
+              'openclaw.usage.cache_read_tokens': parsed.usage.cacheReadInputTokens,
+            }),
+            ...(parsed.usage?.cacheCreationInputTokens != null && {
+              'openclaw.usage.cache_write_tokens': parsed.usage.cacheCreationInputTokens,
+            }),
+          },
+          events: [
+            {
+              name: 'gen_ai.content.prompt',
+              timeUnixNano: toNanoString(opts.startTime),
+              body: input,
+            },
+            {
+              name: 'gen_ai.content.completion',
+              timeUnixNano: toNanoString(endTime),
+              body: parsed.output ?? '',
+            },
+          ],
         },
-      },
-    ]
-
-    const payload = JSON.stringify({ batch })
-
-    // Check size limit (3.5 MB)
-    if (payload.length > 3.5 * 1024 * 1024) {
-      log.warn('[langfuse] Batch exceeds 3.5 MB, skipping')
-      return
+      ],
     }
 
-    const baseUrl = env.LANGFUSE_BASE_URL || DEFAULT_LANGFUSE_URL
-    const basicAuth = btoa(`${env.LANGFUSE_PUBLIC_KEY}:${env.LANGFUSE_SECRET_KEY}`)
+    const payload = JSON.stringify(batch)
 
-    const res = await fetch(`${baseUrl}/api/public/ingestion`, {
+    const res = await fetch(env.LLEMTRY_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Basic ${basicAuth}`,
+        Authorization: `Bearer ${env.LLEMTRY_AUTH_TOKEN}`,
       },
       body: payload,
     })
 
     if (!res.ok) {
       const body = await res.text()
-      log.error(`[langfuse] Ingestion failed: ${res.status} ${body}`)
+      log.error(`[llemtry] Ingestion failed: ${res.status} ${body}`)
     } else {
       log.debug(
-        `[langfuse] Reported generation ${generationId} (model=${model}, tokens=${
+        `[llemtry] Reported generation ${spanId} (model=${model}, tokens=${
           parsed.usage?.total ?? '?'
         })`
       )
     }
   } catch (err) {
-    log.error('[langfuse] Unexpected error:', err)
+    log.error('[llemtry] Unexpected error:', err)
   }
 }
 
@@ -402,13 +391,4 @@ async function streamToText(stream: ReadableStream<Uint8Array>): Promise<string>
     result += decoder.decode(value, { stream: true })
   }
   return result
-}
-
-/** Extract model parameters for LangFuse (all values must be strings). */
-function buildModelParams(req: ParsedRequest): Record<string, string> | undefined {
-  const params: Record<string, string> = {}
-  if (req.max_tokens != null) params.max_tokens = String(req.max_tokens)
-  if (req.temperature != null) params.temperature = String(req.temperature)
-  if (req.top_p != null) params.top_p = String(req.top_p)
-  return Object.keys(params).length > 0 ? params : undefined
 }

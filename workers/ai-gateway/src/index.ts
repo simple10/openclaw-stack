@@ -2,7 +2,7 @@ import { validateAuthToken } from './auth'
 import { PROVIDER_CONFIG } from './config'
 import { handlePreflight, addCorsHeaders } from './cors'
 import { jsonError } from './errors'
-import { isLangfuseEnabled, isLlmRoute, reportGeneration } from './langfuse'
+import { isLlemtryEnabled, isLlmRoute, reportGeneration } from './llemtry'
 import { createLog, logInboundRequest } from './log'
 import { matchProviderRoute } from './routing'
 import { getProviderApiKey } from './keys'
@@ -57,11 +57,11 @@ export default {
     const isGateway = providerConfig.baseUrl.includes('gateway.ai.cloudflare.com')
     const upstreamPath = isGateway ? route.gatewayPath : route.directPath
 
-    // When LangFuse is enabled for an LLM route, pre-read the request body
-    // so it can be shared with both the proxy function and LangFuse reporting
-    const langfuseActive = isLangfuseEnabled(env, log) && isLlmRoute(route.directPath)
-    const startTime = langfuseActive ? new Date() : undefined
-    const requestBody = langfuseActive ? await request.text() : undefined
+    // When llemtry is enabled for an LLM route, pre-read the request body
+    // so it can be shared with both the proxy function and llemtry reporting
+    const llemtryActive = isLlemtryEnabled(env, log) && isLlmRoute(route.directPath)
+    const startTime = llemtryActive ? new Date() : undefined
+    const requestBody = llemtryActive ? await request.text() : undefined
 
     let response: Response
     if (route.provider === 'anthropic') {
@@ -77,18 +77,18 @@ export default {
       response = await proxyOpenAI(apiKey, request, providerConfig, upstreamPath, log, requestBody)
     }
 
-    // LangFuse: tee the response stream and report in the background
-    if (langfuseActive && response.ok && response.body) {
+    // Llemtry: tee the response stream and report in the background
+    if (llemtryActive && response.ok && response.body) {
       const statusCode = response.status
       const responseHeaders = new Headers(response.headers)
-      const [clientStream, langfuseStream] = response.body.tee()
+      const [clientStream, reportStream] = response.body.tee()
       response = new Response(clientStream, response)
 
       ctx.waitUntil(
         reportGeneration(env, log, {
           provider: route.provider,
           requestBody: requestBody!,
-          responseStream: langfuseStream,
+          responseStream: reportStream,
           responseHeaders,
           statusCode,
           startTime: startTime!,

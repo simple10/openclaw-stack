@@ -17,8 +17,7 @@ CF_AI_GATEWAY_ID=openclaw-ai-gateway    # Name of the gateway
 CF_AI_GATEWAY_ACCOUNT_ID=               # Use `wrangler whoami` to get account ID
 CF_AI_GATEWAY_TOKEN=                    # Cloudflare AI Gateway auth token
 
-# LangFuse (opt-in — set LANGFUSE_ENABLED=true and provide keys to enable tracing)
-LANGFUSE_ENABLED=false
-LANGFUSE_PUBLIC_KEY=pk-lf-...
-LANGFUSE_SECRET_KEY=sk-lf-...
-LANGFUSE_BASE_URL=
+# LLM telemetry via llemtry (opt-in — set LLEMTRY_ENABLED=true and provide endpoint/token)
+LLEMTRY_ENABLED=false
+LLEMTRY_ENDPOINT=               # URL of log receiver /llemtry endpoint
+LLEMTRY_AUTH_TOKEN=              # Bearer token for log receiver auth
