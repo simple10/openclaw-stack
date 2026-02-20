@@ -3,6 +3,26 @@ import type { LlemtrySpan, LlemtryBatch } from '../llemtry'
 const MAX_PAYLOAD_BYTES = 3.5 * 1024 * 1024
 
 /**
+ * Map short model aliases to full versioned names for Langfuse cost matching.
+ * Langfuse's default-model-prices.json uses regex patterns that require
+ * the full versioned name (e.g. claude-sonnet-4-5-20250929).
+ * OpenClaw often sends the short alias (e.g. claude-sonnet-4-5).
+ * Models without a date suffix (e.g. claude-opus-4-6) match as-is and don't need an entry.
+ */
+const MODEL_ALIAS_MAP: Record<string, string> = {
+  'claude-sonnet-4-5': 'claude-sonnet-4-5-20250929',
+  'claude-haiku-4-5': 'claude-haiku-4-5-20251001',
+  'claude-sonnet-4': 'claude-sonnet-4-20250514',
+  'claude-opus-4': 'claude-opus-4-20250514',
+  'claude-3-5-sonnet': 'claude-3-5-sonnet-20241022',
+  'claude-3-5-haiku': 'claude-3-5-haiku-20241022',
+}
+
+function resolveModelName(model: string): string {
+  return MODEL_ALIAS_MAP[model] ?? model
+}
+
+/**
  * Convert llemtry spans to Langfuse batch ingestion format and POST to the API.
  * Best-effort — logs errors but never throws.
  */
@@ -29,7 +49,8 @@ export async function sendToLangfuse(
     for (const span of spans) {
       const sessionId = span.traceId
       const agentId = span.attributes['openclaw.agent.id']
-      const model = span.attributes['gen_ai.request.model'] ?? 'unknown'
+      const rawModel = span.attributes['gen_ai.request.model'] ?? 'unknown'
+      const model = resolveModelName(rawModel)
       const traceId = `${sessionId}-${span.spanId}`
       const generationId = span.spanId
 
@@ -41,6 +62,16 @@ export async function sendToLangfuse(
       if (resource.instanceId) sharedMeta.instanceId = resource.instanceId
       if (resource.hostname) sharedMeta.hostname = resource.hostname
 
+      // Input/output from events (needed by both trace and generation)
+      let input: unknown
+      let output: unknown
+      if (span.events) {
+        const promptEvent = span.events.find((e) => e.name === 'gen_ai.content.prompt')
+        const completionEvent = span.events.find((e) => e.name === 'gen_ai.content.completion')
+        if (promptEvent) input = promptEvent.body
+        if (completionEvent) output = completionEvent.body
+      }
+
       // Trace — groups under Langfuse session
       batch.push({
         id: crypto.randomUUID(),
@@ -50,6 +81,8 @@ export async function sendToLangfuse(
           id: traceId,
           sessionId,
           name: agentId ? `agent-${agentId}` : 'openclaw-generation',
+          input,
+          output,
           metadata: {
             ...sharedMeta,
             agentId,
@@ -80,16 +113,6 @@ export async function sendToLangfuse(
       const cacheWrite = span.attributes['openclaw.usage.cache_write_tokens']
       if (cacheRead != null) genMeta.cacheReadInputTokens = cacheRead
       if (cacheWrite != null) genMeta.cacheCreationInputTokens = cacheWrite
-
-      // Input/output from events
-      let input: unknown
-      let output: unknown
-      if (span.events) {
-        const promptEvent = span.events.find((e) => e.name === 'gen_ai.content.prompt')
-        const completionEvent = span.events.find((e) => e.name === 'gen_ai.content.completion')
-        if (promptEvent) input = promptEvent.body
-        if (completionEvent) output = completionEvent.body
-      }
 
       // Model parameters
       const modelParams: Record<string, string> = {}
