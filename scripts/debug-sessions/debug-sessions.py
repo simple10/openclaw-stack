@@ -54,6 +54,8 @@ class C:
     BLUE = "\033[34m"
     MAGENTA = "\033[35m"
     CYAN = "\033[36m"
+    WHITE = "\033[37m"
+    LIGHT_BLUE = "\033[94m"
 
     @classmethod
     def disable(cls):
@@ -783,10 +785,10 @@ def cmd_trace(args):
                 text = extract_text(msg.get("content", ""))
                 if text:
                     display = text if max_text == 0 else truncate(text, max_text)
-                    print(c(C.BOLD + C.BLUE, "\u250c\u2500 USER"))
+                    print(c(C.BOLD + C.CYAN, "\u250c\u2500 USER"))
                     for line in display.split("\n"):
-                        print(c(C.BLUE, f"\u2502 {line}"))
-                    print(c(C.BLUE, "\u2514" + "\u2500" * 79))
+                        print(c(C.CYAN, f"\u2502 {line}"))
+                    print(c(C.CYAN, "\u2514" + "\u2500" * 79))
                     print()
 
             elif role == "assistant":
@@ -816,7 +818,7 @@ def cmd_trace(args):
                                     if max_text == 0
                                     else truncate(text, max_text)
                                 )
-                                print(c(C.YELLOW, f"  \U0001f4ad {display}"))
+                                print(c(C.DIM, f"  \U0001f4ad {display}"))
 
                         elif btype == "text":
                             text = block.get("text", "")
@@ -826,7 +828,7 @@ def cmd_trace(args):
                                     if max_text == 0
                                     else truncate(text, 300)
                                 )
-                                print(c(C.DIM, f"  \U0001f4ac {display}"))
+                                print(c(C.WHITE, f"  \U0001f4ac {display}"))
 
                         elif btype == "toolCall":
                             step += 1
@@ -843,7 +845,8 @@ def cmd_trace(args):
                                 "step": step,
                             }
                             print(
-                                c(C.CYAN + C.BOLD, f"  [{step:3d}] {name}")
+                                c(C.WHITE, f"  [{step:3d}]")
+                                + c(C.YELLOW + C.BOLD, f" {name}")
                                 + c(C.DIM, f"  {summary}")
                             )
 
@@ -871,12 +874,17 @@ def cmd_trace(args):
                 if is_err:
                     display = text if max_text == 0 else truncate(text, 300)
                     print(
-                        c(C.RED, f"  [{step_num:>3}] \u2717 {tool_name}: {display}")
+                        c(C.WHITE, f"  [{step_num:>3}]")
+                        + c(C.RED, f" \u2717 ")
+                        + c(C.YELLOW, f"{tool_name}: ")
+                        + c(C.RED, display)
                     )
                 else:
                     display = text if max_text == 0 else truncate(text, 200)
                     print(
-                        c(C.GREEN, f"  [{step_num:>3}] \u2713 {tool_name}")
+                        c(C.WHITE, f"  [{step_num:>3}]")
+                        + c(C.GREEN, f" \u2713 ")
+                        + c(C.YELLOW, f"{tool_name}")
                         + c(C.DIM, f"  {display}")
                     )
                 print()

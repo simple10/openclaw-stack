@@ -6,8 +6,8 @@
 
 import {
   enterAltScreen, exitAltScreen, termSize, renderFrame, parseKey,
-  st, pad, stripAnsi,
-  RESET, BOLD, DIM, INVERT, RED, GREEN, YELLOW, BLUE, CYAN, MAGENTA, GRAY,
+  st, pad, stripAnsi, withBg,
+  RESET, BOLD, DIM, INVERT, RED, GREEN, YELLOW, BLUE, CYAN, MAGENTA, GRAY, BG_HIGHLIGHT,
   type Key,
 } from "./terminal"
 import {
@@ -166,6 +166,12 @@ function fmtDuration(ms: number | null): string {
 function hbar(text: string, w: number) { return st(pad(` ${text}`, w), BOLD, INVERT) }
 function fbar(text: string, w: number) { return st(pad(` ${text}`, w), DIM, INVERT) }
 
+function statusLine(): string {
+  if (loadingMsg) return `  ${st(SPINNER[spinFrame], GREEN)} ${st(loadingMsg, YELLOW)}`
+  if (errorMsg) return st(`  ${errorMsg}`, RED)
+  return ""
+}
+
 // ─── Screen renderers ────────────────────────────────────────────────────────
 
 function render() {
@@ -187,6 +193,7 @@ function render() {
 function rMenu(w: number, h: number): string[] {
   const L: string[] = []
   L.push(hbar("OpenClaw Session Debug", w))
+  L.push(statusLine())
   L.push(st(`  VPS: ${cfg.host}`, DIM))
   L.push("")
 
@@ -197,9 +204,6 @@ function rMenu(w: number, h: number): string[] {
     L.push(`      ${st(desc, DIM)}`)
     L.push("")
   }
-
-  if (loadingMsg) L.push(`  ${st(SPINNER[spinFrame], CYAN)} ${loadingMsg}`)
-  if (errorMsg) { L.push(""); L.push(st(`  ${errorMsg}`, RED)) }
 
   while (L.length < h - 1) L.push("")
   L.push(fbar("\u2191\u2193 Navigate  Enter Select  q Quit", w))
@@ -213,6 +217,7 @@ function rSessions(w: number, h: number): string[] {
   const leftInfo = `Sessions (${filtered.length})`
   const gap = Math.max(2, w - leftInfo.length - rightInfo.length - 4)
   L.push(hbar(`${leftInfo}${" ".repeat(gap)}${rightInfo}`, w))
+  L.push(statusLine())
 
   L.push(st(
     `   ${"AGENT".padEnd(12)} ${"SESSION".padEnd(10)} ${"DATE".padEnd(17)} ` +
@@ -233,18 +238,16 @@ function rSessions(w: number, h: number): string[] {
     L.push(st("  No sessions found.", DIM))
   } else {
     for (let i = scroll; i < Math.min(filtered.length, scroll + contentH); i++) {
-      L.push(sessionRow(filtered[i], i === cursor))
+      L.push(sessionRow(filtered[i], i === cursor, w))
     }
   }
-
-  if (loadingMsg) L.push(`  ${st(SPINNER[spinFrame], CYAN)} ${loadingMsg}`)
 
   while (L.length < h - footerH) L.push("")
   L.push(fbar("\u2191\u2193/jk Navigate  Enter Select  A Agent  S Sort  Esc Back  q Quit", w))
   return L
 }
 
-function sessionRow(si: SessionInfo, sel: boolean): string {
+function sessionRow(si: SessionInfo, sel: boolean, w: number): string {
   const pfx = sel ? st("\u25b8 ", CYAN, BOLD) : "  "
   const agent = si.agent.padEnd(12)
   const sid = si.session_id.slice(0, 8).padEnd(10)
@@ -269,7 +272,8 @@ function sessionRow(si: SessionInfo, sel: boolean): string {
   const mark = si.status === "deleted" ? st(" \u2717", RED)
     : si.status === "reset" ? st(" \u21ba", YELLOW) : ""
 
-  return `${pfx}${agent} ${sid} ${date} ${size} ${turns} ${errs} ${cost}  ${stopC}${mark}`
+  const row = `${pfx}${agent} ${sid} ${date} ${size} ${turns} ${errs} ${cost}  ${stopC}${mark}`
+  return sel ? withBg(pad(row, w), BG_HIGHLIGHT) : row
 }
 
 function rActions(w: number, h: number): string[] {
@@ -279,6 +283,7 @@ function rActions(w: number, h: number): string[] {
     `${si.agent}/${si.session_id.slice(0, 8)}  \u2502  ` +
     `${si.turns} turns  \u2502  ${si.errors} errors  \u2502  ${fmtCost(si.cost)}`, w,
   ))
+  L.push(statusLine())
   L.push("")
 
   for (let i = 0; i < ACTIONS.length; i++) {
@@ -288,9 +293,6 @@ function rActions(w: number, h: number): string[] {
     L.push(`      ${st(desc, DIM)}`)
     L.push("")
   }
-
-  if (loadingMsg) L.push(`  ${st(SPINNER[spinFrame], CYAN)} ${loadingMsg}`)
-  if (errorMsg) { L.push(""); L.push(st(`  ${errorMsg}`, RED)) }
 
   while (L.length < h - 1) L.push("")
   L.push(fbar("\u2191\u2193 Navigate  Enter Select  Esc Back  q Quit", w))
@@ -302,8 +304,9 @@ function rOutput(w: number, h: number): string[] {
   const total = outputLines.length
   const pos = total > 0 ? `Line ${outputScroll + 1}\u2013${Math.min(outputScroll + h - 2, total)}/${total}` : ""
   L.push(hbar(`${outputTitle}${" ".repeat(Math.max(2, w - outputTitle.length - pos.length - 4))}${pos}`, w))
+  L.push(statusLine())
 
-  const contentH = h - 2 // header + footer
+  const contentH = h - 3 // header + status + footer
   for (let i = outputScroll; i < Math.min(total, outputScroll + contentH); i++) {
     L.push(outputLines[i])
   }
@@ -316,6 +319,7 @@ function rOutput(w: number, h: number): string[] {
 function rAgents(w: number, h: number): string[] {
   const L: string[] = []
   L.push(hbar("Filter by Agent", w))
+  L.push(statusLine())
   L.push("")
 
   const items = ["All agents", ...agents]
@@ -342,6 +346,7 @@ function rLlmCalls(w: number, h: number): string[] {
   const leftInfo = `LLM Calls (${filteredLlmCalls.length})`
   const gap = Math.max(2, w - leftInfo.length - rightInfo.length - 4)
   L.push(hbar(`${leftInfo}${" ".repeat(gap)}${rightInfo}`, w))
+  L.push(statusLine())
 
   L.push(st(
     `   ${"AGENT".padEnd(12)} ${"MODEL".padEnd(22)} ${"DATE".padEnd(17)} ` +
@@ -362,18 +367,16 @@ function rLlmCalls(w: number, h: number): string[] {
     L.push(st("  No LLM calls found.", DIM))
   } else {
     for (let i = scroll; i < Math.min(filteredLlmCalls.length, scroll + contentH); i++) {
-      L.push(llmCallRow(filteredLlmCalls[i], i === cursor))
+      L.push(llmCallRow(filteredLlmCalls[i], i === cursor, w))
     }
   }
-
-  if (loadingMsg) L.push(`  ${st(SPINNER[spinFrame], CYAN)} ${loadingMsg}`)
 
   while (L.length < h - footerH) L.push("")
   L.push(fbar("\u2191\u2193/jk Navigate  Enter Select  A Agent  M Model  S Sort  Esc Back  q Quit", w))
   return L
 }
 
-function llmCallRow(ci: LlmCallInfo, sel: boolean): string {
+function llmCallRow(ci: LlmCallInfo, sel: boolean, w: number): string {
   const pfx = sel ? st("\u25b8 ", CYAN, BOLD) : "  "
   const agent = (ci.agentId || "?").slice(0, 12).padEnd(12)
   const model = (ci.model || "?").slice(0, 22).padEnd(22)
@@ -397,7 +400,8 @@ function llmCallRow(ci: LlmCallInfo, sel: boolean): string {
   const stopC = ci.stopReason === "stop" || ci.stopReason === "end_turn"
     ? st(stop, GREEN) : st(stop, RED)
 
-  return `${pfx}${agent} ${model} ${date} ${dur} ${inTok} ${outTok} ${cacheR} ${cacheW} ${costC}  ${stopC}`
+  const row = `${pfx}${agent} ${model} ${date} ${dur} ${inTok} ${outTok} ${cacheR} ${cacheW} ${costC}  ${stopC}`
+  return sel ? withBg(pad(row, w), BG_HIGHLIGHT) : row
 }
 
 function rLlmActions(w: number, h: number): string[] {
@@ -409,6 +413,7 @@ function rLlmActions(w: number, h: number): string[] {
     `${ci.agentId}  ${ci.model}  \u2502  ${dur}  \u2502  ` +
     `in:${humanTokens(ci.inputTokens)} out:${humanTokens(ci.outputTokens)}  \u2502  ${costStr}`, w,
   ))
+  L.push(statusLine())
   L.push("")
 
   const actions = [...LLM_ACTIONS]
@@ -435,9 +440,6 @@ function rLlmActions(w: number, h: number): string[] {
   if (ci.toolNames.length > 0) L.push(`    Tools: ${ci.toolNames.join(", ")}`)
   L.push(`    Stop: ${ci.stopReason || "?"}`)
 
-  if (loadingMsg) L.push(`  ${st(SPINNER[spinFrame], CYAN)} ${loadingMsg}`)
-  if (errorMsg) { L.push(""); L.push(st(`  ${errorMsg}`, RED)) }
-
   while (L.length < h - 1) L.push("")
   L.push(fbar("\u2191\u2193 Navigate  Enter Select  Esc Back  q Quit", w))
   return L
@@ -446,6 +448,7 @@ function rLlmActions(w: number, h: number): string[] {
 function rModels(w: number, h: number): string[] {
   const L: string[] = []
   L.push(hbar("Filter by Model", w))
+  L.push(statusLine())
   L.push("")
 
   const items = ["All models", ...llmModels]
@@ -608,13 +611,15 @@ function onModelsKey(key: Key) {
 }
 
 function onOutputKey(key: Key) {
-  const maxScroll = Math.max(0, outputLines.length - (termSize()[1] - 2))
+  const [, rows] = termSize()
+  const pageSize = Math.max(1, rows - 3)
+  const maxScroll = Math.max(0, outputLines.length - (rows - 3))
   if (key.name === "up" || (key.name === "char" && key.ch === "k"))
-    outputScroll = clamp(outputScroll - 1, maxScroll)
+    outputScroll = clamp(outputScroll - 3, maxScroll)
   else if (key.name === "down" || (key.name === "char" && key.ch === "j"))
-    outputScroll = clamp(outputScroll + 1, maxScroll)
-  else if (key.name === "pageup") outputScroll = clamp(outputScroll - 20, maxScroll)
-  else if (key.name === "pagedown") outputScroll = clamp(outputScroll + 20, maxScroll)
+    outputScroll = clamp(outputScroll + 3, maxScroll)
+  else if (key.name === "pageup") outputScroll = clamp(outputScroll - pageSize, maxScroll)
+  else if (key.name === "pagedown") outputScroll = clamp(outputScroll + pageSize, maxScroll)
   else if (key.name === "home" || (key.name === "char" && key.ch === "g"))
     outputScroll = 0
   else if (key.name === "end" || (key.name === "char" && key.ch === "G"))

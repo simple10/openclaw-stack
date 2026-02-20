@@ -34,20 +34,42 @@ export const BLUE = "\x1b[34m"
 export const MAGENTA = "\x1b[35m"
 export const CYAN = "\x1b[36m"
 export const GRAY = "\x1b[90m"
+export const BG_HIGHLIGHT = "\x1b[48;5;237m"
 
 /** Wrap text in ANSI style codes. */
 export function st(text: string, ...codes: string[]): string {
   return codes.length ? codes.join("") + text + RESET : text
 }
 
+/** Apply a persistent background color to a line, surviving inner RESETs. */
+export function withBg(line: string, bg: string): string {
+  return bg + line.replaceAll(RESET, RESET + bg) + RESET
+}
+
 export function stripAnsi(str: string): string {
   return str.replace(/\x1b\[[0-9;]*m/g, "")
 }
 
-/** Pad string to width, accounting for ANSI codes. */
+/** Truncate a string with ANSI codes to maxWidth visible characters. */
+function clipAnsi(str: string, maxWidth: number): string {
+  let vis = 0
+  let i = 0
+  while (i < str.length && vis < maxWidth) {
+    if (str[i] === "\x1b") {
+      const m = str.indexOf("m", i)
+      if (m !== -1) { i = m + 1; continue }
+    }
+    vis++
+    i++
+  }
+  return str.slice(0, i) + RESET
+}
+
+/** Pad or clip string to exactly w visible characters, accounting for ANSI codes. */
 export function pad(str: string, w: number): string {
   const vis = stripAnsi(str).length
-  return vis >= w ? str : str + " ".repeat(w - vis)
+  if (vis > w) return clipAnsi(str, w)
+  return vis < w ? str + " ".repeat(w - vis) : str
 }
 
 // ─── Key parsing ─────────────────────────────────────────────────────────────
