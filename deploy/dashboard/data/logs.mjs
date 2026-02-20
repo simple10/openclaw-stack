@@ -487,7 +487,7 @@ export async function getSessions(agentFilter) {
   return sessionsPending
 }
 
-export async function getLlmCalls(agentFilter, modelFilter) {
+export async function getLlmCalls(agentFilter, modelFilter, sessionFilter) {
   const getCalls = () => {
     if (llmCache && Date.now() - llmCacheAt < CACHE_MS) return llmCache
     if (llmPending) return null // signal to use pending
@@ -510,6 +510,7 @@ export async function getLlmCalls(agentFilter, modelFilter) {
     const mf = modelFilter.toLowerCase()
     calls = calls.filter(c => (c.model || '').toLowerCase().includes(mf))
   }
+  if (sessionFilter) calls = calls.filter(c => c.sessionId === sessionFilter)
 
   return calls.map(c => ({
     ...c,

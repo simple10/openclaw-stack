@@ -32,8 +32,9 @@ export async function handleRequest(req, res, subPath) {
     const url = new URL(req.url, `http://${req.headers.host}`)
     const agent = url.searchParams.get('agent') || ''
     const model = url.searchParams.get('model') || ''
+    const session = url.searchParams.get('session') || ''
     try {
-      const data = await getLlmCalls(agent || undefined, model || undefined)
+      const data = await getLlmCalls(agent || undefined, model || undefined, session || undefined)
       json(res, data)
     } catch (e) {
       error(res, e)

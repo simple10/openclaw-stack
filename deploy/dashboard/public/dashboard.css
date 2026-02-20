@@ -239,7 +239,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro','Helvetica Neue',sans
 .metrics-value{color:var(--textStrong);font-variant-numeric:tabular-nums;text-align:right}
 
 /* Logs explorer — trace output */
-.trace-output{font-family:'SF Mono',Monaco,'Cascadia Code',monospace;font-size:12px;line-height:1.6;max-height:600px;overflow-y:auto}
+.trace-output{font-family:'SF Mono',Monaco,'Cascadia Code',monospace;font-size:12px;line-height:1.6;overflow-y:auto}
+.back-link{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;border:none;background:none;padding:4px 0;font-family:inherit;transition:color .15s}
+.back-link:hover{color:var(--textStrong)}
+.back-link::before{content:'\2190';font-size:14px}
+.detail-title{font-size:15px;font-weight:700;color:var(--textStrong);font-family:'SF Mono',Monaco,monospace}
+.detail-stats{display:flex;gap:6px;font-size:12px;color:var(--muted);flex-wrap:wrap;align-items:center}
+.detail-stats strong{color:var(--textStrong)}
 .trace-meta{color:var(--dim);font-size:11px;padding:2px 0}
 .trace-user{border-left:3px solid var(--accent);padding:8px 12px;margin:8px 0;background:rgba(99,102,241,.04);border-radius:0 6px 6px 0}
 .trace-role{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:4px}
