@@ -36,12 +36,11 @@ ${headExtra}
       <a href="${bp}/" class="header-title-link">OpenClaw Mission Control</a>
       <div class="header-nav">
         <a href="${bp}/browsers/">Browsers</a>
-        <a href="${bp}/stats/">Stats</a>
         <a href="${bp}/media/">Media</a>
+        <a href="${bp}/stats/">Stats</a>
+        <a href="${bp}/logs/">Logs</a>
         <span class="nav-sep">|</span>
-        <a href="${cui}/" class="nav-ext">Chat</a>
-        <a href="${cui}/config" class="nav-ext">Config</a>
-        <a href="${cui}/logs" class="nav-ext">Logs</a>
+        <a href="${cui}/" class="nav-ext">Control UI</a>
       </div>
     </div>
   </div>
