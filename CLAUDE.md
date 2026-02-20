@@ -18,6 +18,7 @@ All deployment steps are in modular playbooks under `playbooks/`:
 |----------|-------------|
 | `00-fresh-deploy-setup.md` | Fresh deploy validation & overview |
 | `00-analysis-mode.md` | Analyze existing deployment |
+| `01a-cloudflare-setup.md` | Cloudflare Tunnel & Access automation (API-based, optional) |
 | `01-workers.md` | Cloudflare Workers deployment (AI Gateway + Log Receiver) |
 | `02-base-setup.md` | Users, SSH, UFW, fail2ban, kernel |
 | `03-docker.md` | Docker installation and hardening |
@@ -49,9 +50,11 @@ IMPORTANT: Read configuration from `openclaw-config.env`:
 
 ```bash
 # See openclaw-config.env.example for all fields and documentation.
-# VPS1_IP, CF_TUNNEL_TOKEN, and domain config are required to start a fresh deployment.
-# Domain config (OPENCLAW_DOMAIN, OPENCLAW_DASHBOARD_DOMAIN, OPENCLAW_DASHBOARD_DOMAIN_PATH, OPENCLAW_DOMAIN_PATH)
-# is validated during fresh deploy setup (00-fresh-deploy-setup.md).
+# VPS1_IP and domain config are required to start a fresh deployment.
+# Either CF_API_TOKEN + CF_ACCOUNT_ID (for automated Cloudflare setup) or CF_TUNNEL_TOKEN
+# (for manual setup) is required. Domain config (OPENCLAW_DOMAIN, OPENCLAW_DASHBOARD_DOMAIN,
+# OPENCLAW_DASHBOARD_DOMAIN_PATH, OPENCLAW_DOMAIN_PATH) is validated during fresh deploy
+# setup (00-fresh-deploy-setup.md).
 ```
 
 SSH_USER and SSH_PORT start as provider defaults (e.g., `ubuntu`/`22`) and are changed to `adminclaw`/`<SSH_HARDENED_PORT>` during hardening. `SSH_HARDENED_PORT` (default `222`) is set in config and removed after hardening completes.
@@ -70,7 +73,7 @@ Check `openclaw-config.env` exists. If missing, tell user to `cp openclaw-config
 
 Ask: **New deployment** (fresh VPS) or **Existing deployment** (already configured)?
 
-- **New deployment:** Follow `playbooks/00-fresh-deploy-setup.md` for validation (`VPS1_IP`, `CF_TUNNEL_TOKEN`, domain config, and SSH needed). Cloudflare Access must be configured before deploy begins.
+- **New deployment:** Follow `playbooks/00-fresh-deploy-setup.md` for validation (`VPS1_IP`, domain config, and SSH needed). Cloudflare Tunnel + Access can be automated via API (`CF_API_TOKEN` + `CF_ACCOUNT_ID`) or configured manually (`CF_TUNNEL_TOKEN`).
 - **Existing deployment:** Ask: **Analyze** (`00-analysis-mode.md`), **Test** (`07-verification.md`), or **Modify** (describe custom changes). If "something else," use plan mode.
 
 ---
@@ -80,7 +83,7 @@ Ask: **New deployment** (fresh VPS) or **Existing deployment** (already configur
 ### Full Deployment
 
 ```
-1. Validate openclaw-config.env (including placeholder detection + auto worker deployment)
+1. Validate openclaw-config.env (including Cloudflare automation + worker placeholder detection)
 2. Execute 02-base-setup.md on VPS-1
 3. Execute 03-docker.md on VPS-1
 4. Execute 04-vps1-openclaw.md on VPS-1
@@ -90,7 +93,7 @@ Ask: **New deployment** (fresh VPS) or **Existing deployment** (already configur
 8. Execute 08-post-deploy.md (device pairing & deployment report)
 ```
 
-All steps are sequential on a single VPS. Workers deployment (01-workers) runs from the local machine using `wrangler` and is triggered automatically during config validation if needed.
+All steps are sequential on a single VPS. Cloudflare automation (01a-cloudflare-setup) and Workers deployment (01-workers) run from the local machine and are triggered automatically during config validation if needed.
 
 **Automation:** After the user confirms the deployment plan in `00-fresh-deploy-setup.md` § 0.7, execute all playbooks continuously without pausing between steps. Only stop for errors requiring user input. The first user interaction after confirmation should be device pairing in `08-post-deploy.md`.
 

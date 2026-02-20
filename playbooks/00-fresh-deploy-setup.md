@@ -6,13 +6,17 @@ Validation and overview for starting a fresh VPS deployment. All required config
 
 This playbook validates the configuration needed to deploy OpenClaw on a fresh Ubuntu VPS. Domain settings (`OPENCLAW_DOMAIN`, `OPENCLAW_DASHBOARD_DOMAIN`, `OPENCLAW_DASHBOARD_DOMAIN_PATH`, `OPENCLAW_DOMAIN_PATH`) and Cloudflare Access protection are required upfront so the full deployment can run end-to-end without interruption.
 
+Cloudflare Tunnel and Access can be configured in two ways:
+
+- **Automated (recommended):** Provide `CF_API_TOKEN` and `CF_ACCOUNT_ID` in config — the deployment creates the tunnel, routes, DNS records, and Access application automatically via [`01a-cloudflare-setup.md`](01a-cloudflare-setup.md).
+- **Manual:** Create the tunnel and Access application in the Cloudflare Dashboard first, then paste `CF_TUNNEL_TOKEN` into config (see [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md)).
+
 ## Prerequisites
 
 - A fresh Ubuntu VPS (>= 24.04) with root/sudo access
 - An SSH key pair for VPS access
 - A Cloudflare account with a domain
-- Cloudflare Tunnel created with public hostname routes configured
-- Cloudflare Access application protecting the domain
+- **Either** `CF_API_TOKEN` + `CF_ACCOUNT_ID` (for automated setup) **or** `CF_TUNNEL_TOKEN` + manual Cloudflare Access configuration
 
 ---
 
@@ -39,13 +43,27 @@ Then ask the user to fill in the required values (see section 0.2).
 Validate all of these fields:
 
 1. **`VPS1_IP`** — Must be set and not a placeholder (not `15.x.x.1` or containing `<`).
-2. **`CF_TUNNEL_TOKEN`** — Must not be empty.
+2. **`CF_TUNNEL_TOKEN`** — See [Tunnel Token Logic](#tunnel-token-logic) below.
 3. **`OPENCLAW_DOMAIN`** — Must not be a placeholder (no `<example>` or angle brackets).
 4. **`OPENCLAW_DASHBOARD_DOMAIN`** — Must not be a placeholder.
 5. **`OPENCLAW_DASHBOARD_DOMAIN_PATH`** — Validated (can be empty for separate subdomain, or a path like `/browser`).
 6. **`OPENCLAW_DOMAIN_PATH`** — Validated (can be empty for root).
 7. **`YOUR_TELEGRAM_ID`** — Must be set and numeric (Telegram user IDs are integers). If empty, warn the user: "Send a message to @userinfobot on Telegram to get your numeric user ID."
 8. **`OPENCLAW_TELEGRAM_BOT_TOKEN`** — Must be set. If empty, warn the user: "Create a Telegram bot via @BotFather and paste the token here. See `docs/TELEGRAM.md`."
+
+### Tunnel Token Logic
+
+`CF_TUNNEL_TOKEN` validation depends on whether Cloudflare automation is available:
+
+- **`CF_TUNNEL_TOKEN` is set (non-empty, starts with `ey`):** Manual path — tunnel was created in Dashboard. OK, proceed normally.
+- **`CF_TUNNEL_TOKEN` is empty AND `CF_API_TOKEN` + `CF_ACCOUNT_ID` are both set:** Automation path — tunnel will be created automatically in step 0.4a. OK, proceed. Note internally that **Cloudflare automation is needed**.
+- **`CF_TUNNEL_TOKEN` is empty AND `CF_API_TOKEN` is empty:** Error — the user must either:
+  - Set `CF_API_TOKEN` + `CF_ACCOUNT_ID` for automated setup (see [`01a-cloudflare-setup.md`](01a-cloudflare-setup.md) for required token permissions)
+  - Or create a tunnel manually and set `CF_TUNNEL_TOKEN` (see [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md))
+
+When automation is flagged, also validate:
+- **`CF_ACCOUNT_ID`** — Must be set and not contain angle brackets.
+- **`CF_ACCESS_ALLOWED_EMAILS`** — Optional at this stage (user will be prompted during automation if empty). If set, validate format (comma-separated emails or `@domain` entries).
 
 ### If any fields are invalid or missing
 
@@ -54,11 +72,11 @@ Report **all** issues at once (don't stop at the first one). Present them as:
 > **Configuration issues found:**
 >
 > - `VPS1_IP` is still a placeholder (`15.x.x.1`) — set it to your VPS public IP
-> - `CF_TUNNEL_TOKEN` is empty — create a tunnel in Cloudflare Dashboard and paste
->   the token (see [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md))
+> - `CF_TUNNEL_TOKEN` is empty and no automation credentials found — either set
+>   `CF_API_TOKEN` + `CF_ACCOUNT_ID` for automated setup (see [`01a-cloudflare-setup.md`](01a-cloudflare-setup.md)),
+>   or create a tunnel manually and set `CF_TUNNEL_TOKEN` (see [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md))
 > - `OPENCLAW_DOMAIN` is still a placeholder — set it to your actual domain
->   (e.g., `openclaw.yourdomain.com`). You need to configure Cloudflare Tunnel
->   public hostname routes first (see [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md))
+>   (e.g., `openclaw.yourdomain.com`)
 > - `OPENCLAW_DASHBOARD_DOMAIN` is still a placeholder — same as above
 > - `YOUR_TELEGRAM_ID` is empty — send a message to @userinfobot on Telegram to get your ID
 > - `OPENCLAW_TELEGRAM_BOT_TOKEN` is empty — create a bot via @BotFather and paste the token
@@ -168,6 +186,22 @@ If the user confirms changes, update `deploy/docker-compose.override.yml` with t
 
 ---
 
+## 0.4a Cloudflare Automation
+
+**Skip this section if Cloudflare automation was NOT flagged in step 0.2** (i.e., `CF_TUNNEL_TOKEN` was already set manually).
+
+If Cloudflare automation was flagged (CF_API_TOKEN + CF_ACCOUNT_ID available, CF_TUNNEL_TOKEN empty), execute [`01a-cloudflare-setup.md`](01a-cloudflare-setup.md) now.
+
+This creates:
+- Cloudflare Tunnel (and writes `CF_TUNNEL_TOKEN` to config)
+- Hostname routes for gateway + dashboard
+- DNS CNAME records
+- Cloudflare Access application + policy
+
+After `01a-cloudflare-setup.md` completes, re-read `openclaw-config.env` to pick up the newly written `CF_TUNNEL_TOKEN`. Then proceed to 0.5 to verify the result.
+
+---
+
 ## 0.5 Cloudflare Access Verification
 
 Verify the domain is protected by Cloudflare Access before deploying. Run from the local machine:
@@ -240,16 +274,17 @@ Present the full deployment plan to the user:
 
 ```
 Deployment Plan:
-  1. [If needed] Deploy Cloudflare Workers (01-workers.md) — sets up infrastructure (AUTH_TOKEN only)
-  2. Base setup & hardening (02-base-setup.md)
-  3. Docker installation (03-docker.md)
-  4. OpenClaw deployment (04-vps1-openclaw.md)
-  5. Backup configuration (06-backup.md)
-  6. Reboot & verification (07-verification.md)
-  7. Post-deploy: AI proxy configuration, device pairing & deployment report (08-post-deploy.md)
+  1. [If needed] Cloudflare Tunnel & Access setup (01a-cloudflare-setup.md) — automated via API
+  2. [If needed] Deploy Cloudflare Workers (01-workers.md) — sets up infrastructure (AUTH_TOKEN only)
+  3. Base setup & hardening (02-base-setup.md)
+  4. Docker installation (03-docker.md)
+  5. OpenClaw deployment (04-vps1-openclaw.md)
+  6. Backup configuration (06-backup.md)
+  7. Reboot & verification (07-verification.md)
+  8. Post-deploy: AI proxy configuration, device pairing & deployment report (08-post-deploy.md)
 ```
 
-Domain and Cloudflare Access have been verified.
+Domain and Cloudflare Access have been verified (or will be set up automatically in step 1).
 
 > **Note:** AI proxy provider API keys (e.g., `ANTHROPIC_API_KEY`) are configured during post-deploy (step 7, `08-post-deploy.md` § 8.1), not during worker deployment (step 1). Worker deployment only sets up the infrastructure (`AUTH_TOKEN`).
 

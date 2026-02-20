@@ -2,6 +2,12 @@
 
 This document describes how to secure OpenClaw behind Cloudflare Tunnel, eliminating the need to expose port 443 on the origin server.
 
+> **Automated setup available:** Instead of following the manual steps below, you can provide
+> `CF_API_TOKEN` and `CF_ACCOUNT_ID` in `openclaw-config.env` and the deployment will
+> automatically create the tunnel, configure hostname routes, DNS records, and Cloudflare Access.
+> See [`playbooks/01a-cloudflare-setup.md`](../playbooks/01a-cloudflare-setup.md) for details
+> and required API token permissions.
+
 ## Why Cloudflare Tunnel?
 
 | Before (Origin Exposed) | After (Tunnel) |
