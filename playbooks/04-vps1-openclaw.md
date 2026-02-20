@@ -144,7 +144,10 @@ mkdir -p "${OPENCLAW_HOME}/.openclaw/backups"
 mkdir -p "${OPENCLAW_HOME}/scripts"
 
 # Persistent sandbox home directories — agents opt in via openclaw.json binds
-mkdir -p "${OPENCLAW_HOME}/sandboxes-home"
+# main: persistent home for sandbox sessions (identity, team notes)
+# code: persistent home for tool configs, shell history, etc.
+mkdir -p "${OPENCLAW_HOME}/sandboxes-home/main"
+mkdir -p "${OPENCLAW_HOME}/sandboxes-home/code"
 
 chmod 700 "${OPENCLAW_HOME}/.openclaw"
 chmod 700 "${OPENCLAW_HOME}/.openclaw/credentials"
@@ -508,12 +511,17 @@ Create a convenience wrapper so `adminclaw` can run `openclaw <command>` directl
 sudo tee /usr/local/bin/openclaw << 'WRAPEOF'
 #!/bin/bash
 # OpenClaw CLI wrapper — runs commands inside the gateway container as node user
-# Detect TTY to avoid garbled output when called over non-interactive SSH
+# Uses env vars to force CLI to connect via localhost (avoids ws:// non-loopback security error)
+# Without this, the CLI resolves the gateway to a Docker LAN IP (e.g., 172.30.0.2)
+# and refuses ws:// to non-loopback addresses.
 TTY_FLAG=""
 if [ -t 0 ] && [ -t 1 ]; then
   TTY_FLAG="-it"
 fi
-exec sudo docker exec $TTY_FLAG --user node openclaw-gateway openclaw "$@"
+exec sudo docker exec $TTY_FLAG --user node \
+  -e OPENCLAW_GATEWAY_URL=ws://localhost:18789 \
+  -e OPENCLAW_GATEWAY_TOKEN="$(sudo grep OPENCLAW_GATEWAY_TOKEN /home/openclaw/openclaw/.env | cut -d= -f2)" \
+  openclaw-gateway openclaw "$@"
 WRAPEOF
 
 sudo chmod +x /usr/local/bin/openclaw
@@ -743,11 +751,15 @@ approved = False
 for req_id, req in list(pending.items()):
     if req.get('clientId') == 'cli':
         now = int(time.time() * 1000)
+        # Ensure all necessary scopes are present (CLI default may be missing operator.read)
+        required_scopes = ['operator.admin', 'operator.approvals', 'operator.pairing', 'operator.read']
+        existing_scopes = req.get('scopes', [])
+        merged_scopes = list(set(existing_scopes + required_scopes))
         paired[req['deviceId']] = {
             'deviceId': req['deviceId'], 'publicKey': req['publicKey'],
             'platform': req['platform'], 'clientId': req['clientId'],
             'clientMode': req['clientMode'], 'role': req['role'],
-            'roles': req['roles'], 'scopes': req['scopes'],
+            'roles': req['roles'], 'scopes': merged_scopes,
             'remoteIp': req['remoteIp'],
             'createdAtMs': now, 'approvedAtMs': now,
             'tokens': {},

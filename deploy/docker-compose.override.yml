@@ -97,6 +97,10 @@ services:
       - DASHBOARD_BASE_PATH=${DASHBOARD_BASE_PATH:-}
       # Telegram channel — enables chatting with OpenClaw via Telegram bot
       - TELEGRAM_BOT_TOKEN=${OPENCLAW_TELEGRAM_BOT_TOKEN:-}
+      # Slack channel — enables chatting with OpenClaw via Slack bot (optional)
+      # See playbooks/08-post-deploy.md §8.5.2 for setup instructions
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN:-}
+      - SLACK_APP_TOKEN=${SLACK_APP_TOKEN:-}
       - TZ=UTC
     networks:
       - openclaw-gateway-net

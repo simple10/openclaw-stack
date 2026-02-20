@@ -440,6 +440,14 @@ openclaw doctor --deep
 
 **Security audit expected:** 0 critical, 0 warnings. 1 info finding is normal. If ECONNREFUSED on unexpected port, check `OPENCLAW_GATEWAY_PORT` in `.env` is `18789` (port only, not `IP:port`).
 
+**If `security audit --deep` or `doctor --deep` fails with "SECURITY ERROR: Gateway URL ws:// uses plaintext to non-loopback":**
+
+This occurs when the CLI resolves the gateway to a Docker LAN IP (e.g., 172.30.0.2) instead of localhost. The host CLI wrapper (`04-vps1-openclaw.md` §4.12) should handle this automatically by injecting `OPENCLAW_GATEWAY_URL=ws://localhost:18789`. If you see this error:
+
+1. Verify the wrapper includes the env var override: `cat /usr/local/bin/openclaw`
+2. If missing, re-deploy the wrapper from `04-vps1-openclaw.md` §4.12
+3. As a one-off workaround: `sudo docker exec --user node -e OPENCLAW_GATEWAY_URL=ws://localhost:18789 -e OPENCLAW_GATEWAY_TOKEN=<token> openclaw-gateway openclaw security audit --deep`
+
 **Doctor expected:** Only the `lan` binding warning (safe — required for Docker/Tunnel). No State integrity or Sandbox warnings.
 
 **If you see other doctor warnings:**

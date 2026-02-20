@@ -191,13 +191,17 @@
           // Override default "all" — operator DM runs on host for full filesystem/docker access.
           // Group chats and subagent spawns still get sandboxed.
           "mode": "non-main",
+          "workspaceAccess": "rw", // Main agent needs rw to persist files (identity, team notes) in sandbox sessions
           "docker": {
+            "network": "bridge", // Main agent needs network for DNS/web access in sandbox sessions
             // Per-agent binds replace (not merge) defaults — repeat all needed binds
             "binds": [
               "/opt/skill-bins:/opt/skill-bins:ro",
               "/app/docs:/workspace/docs:ro", // Needed for main sandbox to read docs without making extra exec tool call
               // Make host-status reports available to any main agent sandbox tool
-              "/home/node/.openclaw/workspace/host-status:/workspace/host-status:ro"
+              "/home/node/.openclaw/workspace/host-status:/workspace/host-status:ro",
+              // Persistent home for sandbox sessions — survives sandbox pruning
+              "/home/node/sandboxes-home/main:/home/sandbox"
             ]
           }
         },

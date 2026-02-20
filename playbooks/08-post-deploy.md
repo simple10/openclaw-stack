@@ -270,6 +270,99 @@ If the bot token is empty, skip this step — Telegram was not configured.
 
 ---
 
+## 8.5.2 Slack Channel Setup (Optional)
+
+If the user wants to connect OpenClaw to a Slack workspace, follow these steps. Skip this section if Slack is not needed.
+
+> **Key lessons from deployment:** Do NOT use `streamMode` (that's Telegram-specific). Use `channelPolicy: "open"` — an empty `allowlist` blocks all channels.
+
+### Prerequisites
+
+- Slack workspace access with permission to create apps
+- `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN` fields in `openclaw-config.env` (or ready to add them)
+
+### Step 1: Create Slack App
+
+Go to https://api.slack.com/apps and click **Create New App** > **From scratch**.
+
+- **App Name:** OpenClaw (or your preferred name)
+- **Workspace:** Select your target workspace
+
+### Step 2: Configure Bot Token Scopes
+
+Navigate to **OAuth & Permissions** > **Scopes** > **Bot Token Scopes** and add:
+
+- `chat:write` — send messages
+- `channels:history` — read channel messages
+- `channels:read` — list channels
+- `groups:history` — read private channel messages
+- `groups:read` — list private channels
+- `im:history` — read DMs
+- `im:read` — list DMs
+- `app_mentions:read` — respond to @mentions
+
+### Step 3: Enable Socket Mode
+
+Navigate to **Socket Mode** and enable it. This generates an **App-Level Token** (`xapp-...`). Save it — this is `SLACK_APP_TOKEN`.
+
+### Step 4: Configure Event Subscriptions
+
+Navigate to **Event Subscriptions** and enable events. Under **Subscribe to bot events**, add:
+
+- `message.channels` — messages in public channels
+- `message.groups` — messages in private channels
+- `message.im` — direct messages
+- `app_mention` — @mentions
+
+### Step 5: Install to Workspace
+
+Navigate to **Install App** and click **Install to Workspace**. After authorization, copy the **Bot User OAuth Token** (`xoxb-...`). This is `SLACK_BOT_TOKEN`.
+
+### Step 6: Add OpenClaw Config
+
+Add the Slack channel config to `openclaw.json` (in the `channels` section alongside Telegram):
+
+```jsonc
+"slack": {
+  "enabled": true,
+  "dmPolicy": "pairing",       // Require device pairing for DMs
+  "channelPolicy": "open"      // Respond in all channels where the bot is invited
+  // botToken and appToken read from SLACK_BOT_TOKEN and SLACK_APP_TOKEN env vars
+}
+```
+
+> **Do NOT** use `"channelPolicy": "allowlist"` with an empty list — this blocks all channels. Use `"open"` to allow any channel the bot is invited to.
+
+### Step 7: Add Env Vars and Restart
+
+Add the tokens to the VPS `.env` or `docker-compose.override.yml` environment:
+
+```bash
+# On VPS: add to /home/openclaw/openclaw/.env
+echo "SLACK_BOT_TOKEN=xoxb-your-token-here" | sudo tee -a /home/openclaw/openclaw/.env
+echo "SLACK_APP_TOKEN=xapp-your-token-here" | sudo tee -a /home/openclaw/openclaw/.env
+
+# Restart gateway to pick up new env vars (use `up -d`, not `restart`, for .env changes)
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'
+```
+
+The `docker-compose.override.yml` already passes `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN` to the container.
+
+### Step 8: Invite Bot and Test
+
+1. In Slack, invite the bot to a channel: `/invite @OpenClaw`
+2. Send a test message mentioning the bot: `@OpenClaw hello`
+3. Check gateway logs for Slack connection: `sudo docker logs --tail 20 openclaw-gateway | grep -i slack`
+
+**If the bot doesn't respond:**
+
+- Verify Socket Mode is enabled (Step 3)
+- Check the App-Level Token starts with `xapp-` and the Bot Token starts with `xoxb-`
+- Ensure Event Subscriptions are enabled with the correct events (Step 4)
+- Check gateway logs for auth errors: `sudo docker logs openclaw-gateway 2>&1 | grep -i "slack\|socket"`
+
+---
+
 ## 8.6 Deployment Report
 
 **IMPORTANT:** After the user confirms the chat interface is working, output a complete deployment report. This is the final step — do NOT skip it.
