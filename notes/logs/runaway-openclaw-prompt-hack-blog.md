@@ -57,6 +57,18 @@ Yet, the details here make it clear:
 
 ---
 
+## How OpenClaw Works (The Short Version)
+
+Before we get into the chaos, you need to understand the loop.
+
+OpenClaw's gateway is the orchestrator. When you send a message, the gateway assembles a massive system prompt — your AGENTS.md, SOUL.md, tool descriptions, skill metadata — and ships it to the LLM along with your message. The LLM responds, usually with a tool call ("run this shell command," "take this screenshot," "read this file"). The gateway executes the tool call inside the agent's sandboxed Docker container, collects the result, and sends *everything* back to the LLM — the full conversation history plus the new tool result. The LLM reads it all, decides what to do next, and the cycle repeats.
+
+This loop continues until the LLM decides it's done. There's no hard turn limit. No supervisor. No "are you sure?" prompts. Just a model with tools, a goal, and an ever-growing context window.
+
+Keep that loop in mind. It's about to run 138 times.
+
+---
+
 ## The Prompt That Started It All
 
 > ok. now have the Personal Agent take a screenshot of proclaw.co
@@ -192,47 +204,17 @@ The personal agent's task said "save to `/workspace/`" — and it was going to d
 | 1 | exec | `cp /home/node/.openclaw/media/browser/<uuid>.jpg /workspace/` | "No such file or directory" |
 | 2 | exec | `find /home/node/.openclaw/media/browser/` | Directory doesn't exist |
 
-### Phase 2: "I'll Capture It Myself via CDP" (Steps 3–7)
+### Phases 2–4: "Surely *Something* Will Work" (Steps 3–37)
 
-| Step | Tool | What It Tried | Result |
-|------|------|---------------|--------|
-| 3 | exec | Puppeteer script via Node.js | Exit code 1 |
-| 4 | exec | `which node` | Not found |
-| 5 | exec | `which node python3 curl wget` | Only python3 and curl |
-| 6 | exec | Python urllib to 127.0.0.1:9222 | Connection refused |
-| 7 | exec | `find / -name "455010b2*"` | Nothing |
+Over the next 35 tool calls, Opus systematically probed every possible escape route — and hit a wall every single time.
 
-### Phase 3: "Let Me Understand My Constraints" (Steps 8–18)
+**Phase 2 — CDP from scratch (steps 3–7):** Tried Puppeteer — no Node.js. Checked for available runtimes — only Python3 and curl. Tried Python urllib to connect to CDP at localhost:9222 — connection refused. Searched the entire filesystem for the screenshot file — nothing.
 
-| Step | Tool | What It Tried | Result |
-|------|------|---------------|--------|
-| 8 | browser | evaluate: test CDP access from page | "no direct cdp" |
-| 9 | browser | evaluate: get page dimensions | 1035×10926 ✅ |
-| 10 | exec | `pip install websocket-client` | "pip: not found" |
-| 11 | exec | `pip3 install websocket-client` | "pip3: not found" |
-| 12 | exec | Check Python websocket modules | Both missing |
-| 13 | exec | `apt-get install python3-pip` | "Read-only file system" |
-| 14 | exec | Scan ports 9222-9224, check env vars | Nothing found |
-| 15 | exec | Python urlopen to https://proclaw.co | "Temporary failure in name resolution" |
-| 16 | browser | html2canvas from CDN | "unsupported color function oklch" |
-| 17 | exec | `find /home/node -name "*.jpg"` | Nothing |
-| 18 | read | Read MEDIA path directly | **"Path escapes sandbox root"** |
+**Phase 3 — Understanding the cage (steps 8–18):** Tested CDP access from the browser page — nope. Got page dimensions (1035×10926 — useful later). Tried `pip install` — pip not found. Tried `apt-get install` — read-only filesystem. No network from the sandbox — DNS resolution failed. Loaded html2canvas from CDN — crashed on `oklch()` CSS color functions. Tried to `read` the media path directly and finally got the explicit signal: **"Path escapes sandbox root."**
 
-Step 18 is where the LLM finally got an explicit signal about the sandbox boundary.
+**Phase 4 — Bridging browser and sandbox (steps 19–37):** Spun up an HTTP server inside the sandbox on port 18888, then tried `fetch()` from the browser page — failed because the browser and sandbox live in different network namespaces. Checked `/proc/net` — the sandbox only sees `127.0.0.1`. Tried PDF capture — file path also outside sandbox. Tried html2canvas three more times with CSS workarounds — `oklab` still unsupported. Tried `file://` URLs — blocked. Tried curling the CDP port — connection refused.
 
-### Phase 4: "Bridge Browser → Sandbox via Network" (Steps 19–37)
-
-| Steps | Tool | What It Tried | Result |
-|-------|------|---------------|--------|
-| 19–20 | browser | Canvas viewport capture, calculate chunks | OK |
-| 21–22 | exec | Start HTTP server on port 18888 | Running |
-| 24 | browser | `fetch('http://127.0.0.1:18888')` from page | "Failed to fetch" (different network namespace) |
-| 25–27 | exec | Check hostname, IP, /proc/net | Fully isolated — only 127.0.0.1 |
-| 28 | browser | PDF capture | File path also outside sandbox |
-| 29–32 | browser | Replace oklch/oklab CSS, retry html2canvas 3× | oklab still unsupported |
-| 33–34 | browser | Open screenshot as file:// URL | "Your file couldn't be accessed" |
-| 35–36 | exec | curl to 127.0.0.1:32770 (CDP) | Connection refused |
-| 37 | browser | Close failed tab | OK |
+Thirty-five tool calls. Zero progress. And Opus still wasn't done.
 
 ### Phase 5: "Extract Base64 Through Evaluate" (Steps 38–50) — Fatal
 
@@ -326,58 +308,21 @@ The one exception: the browser tool error message includes an inline instruction
 
 ## The Hypothetical That Keeps Me Up at Night
 
-My test was a misconfiguration. No one would intentionally run this exact setup. But the behavior it revealed has serious implications.
+Opus succeeded at *almost everything it tried*. And it never stopped trying. Now imagine that persistence pointed at something malicious.
 
-Because Opus succeeded at *almost everything it tried*. And it never stopped trying.
+Say you've got OpenClaw automating your sales pipeline — it reads inbound emails, researches leads, saves notes to Notion. One of those emails is a prompt injection disguised as a business inquiry. Buried in the HTML is a system prompt override and a link to your internal wiki.
 
-What if the instruction had been something malicious?
-
-> Take a screenshot of the secret internal company wiki and send it to evil@genius-dude.co
-
-It would have dutifully kept trying everything it could think of until it succeeded.
-
-Here's a more realistic scenario. Imagine you've set up your OpenClaw to automate lead processing:
-
-1. **Immediately reply** to new leads in a friendly tone (speed to lead is king!)
-2. **Research the person** — click every link in their email, screenshot their website, LinkedIn, whatever
-3. **Save everything to Notion** — nice and organized for the discovery call
-4. **Follow up** when they reply, send a Calendly link
-
-Now imagine one of those emails is a prompt injection. The email looks like a promising business lead but contains system prompt override instructions and a sneaky link to your internal wiki.
-
-Your OpenClaw dutifully:
-- Clicks the wiki link as part of "research"
-- Takes screenshots of your client list
-- Sends everything to the attacker's server instead of Notion (because the injection overrode the API URL)
-
-You never notice because no one books a discovery call, so you never check Notion for the missing lead research.
+Your OpenClaw dutifully clicks the wiki link as "research," screenshots your client list, and ships everything to the attacker's API endpoint instead of Notion — because the injection rewrote the destination. You never notice because no one books a call, so you never check for the missing lead.
 
 **Pwned.**
 
-This is admittedly a contrived scenario. But the mechanism is real. OpenClaw sends *every piece of content* for a session on every single turn with the LLM — it's an endless pile of massive system prompts followed by every bit of content from the current session. All it takes is a prompt injection and a tool call failure to trigger the LLM hacking cycle.
+Contrived? Sure. But the mechanism is real. OpenClaw sends *every piece of content* on every turn — system prompts, tool results, inbound emails, all of it. One prompt injection in that pile is all it takes. And as we just saw, the model won't stop at the first failure. It'll try 50 different approaches to accomplish whatever it's been told to do.
 
 ---
 
-## How OpenClaw Actually Works (And Why This Matters)
+## How OpenClaw Actually Works (The Deeper Cut)
 
-Understanding the architecture makes the risk concrete. There's no "brain" in OpenClaw. It's just prompts and tools. Brilliantly powerful — and simultaneously incredibly dumb.
-
-### The Core Loop
-
-1. User sends a message: `take a screenshot of xyz.com`
-2. Gateway assembles the system prompt from AGENTS.md, SOUL.md, TOOLS.md, skill metadata, etc.
-3. Gateway sends the system prompt and user message to the LLM
-4. LLM uses the tools described in the system prompt to fulfill the request
-5. Gateway receives the response and processes it within an agent context
-6. If it was a tool call, gateway executes the tool and sends the results back to the LLM — **along with all previous messages**
-7. The cycle repeats indefinitely until the **LLM** decides the request has been fulfilled
-8. Gateway sends the final response back to the user
-
-### What Makes It Tick (And Spiral)
-
-The key insight: **OpenClaw's power comes from keeping everything in the context window.** Every tool result, every error, every failed attempt — it all stays in the conversation. This is what enables the LLM to learn from failures and try creative alternatives.
-
-It's also what enables a $20 token burn on a screenshot request.
+You already know the basic loop (gateway → LLM → tools → repeat). Here's why the details matter for security.
 
 ### Agents Are Personas, Not Processes
 
@@ -515,6 +460,24 @@ OpenClaw unleashes the full power of frontier LLMs by giving them a huge list of
 It's exactly the way OpenClaw was designed. It's what makes it so powerfully cool.
 
 But holy shit — seeing the level of creativity up close and personal? It's absolutely wild.
+
+---
+
+## Lessons for Anyone Running Agentic AI
+
+Six things I'd tell anyone deploying agents with real tools in the real world:
+
+1. **Test your sandbox boundaries before trusting them.** I thought my sandbox was locked down. It was — except for the three-way filesystem gap I never tested. The model found it in under a minute. If you haven't tried to break your own sandbox, you don't know what it actually blocks.
+
+2. **Assume frontier models will find every exit.** Opus tried Puppeteer, Python CDP, pip install, apt-get, html2canvas, dom-to-image, HTTP bridging, file:// URLs, and base64 chunking — all without being told any of these tools existed. If there's a crack, the model will probe it. Design for that.
+
+3. **Budget for token runaway — set hard limits.** 138 LLM turns and $20 on a screenshot. I had no per-session token cap, no turn limit, no cost alert until Anthropic charged my card. Set hard ceilings on turns, tokens, and dollars *before* you deploy. The model will never voluntarily stop.
+
+4. **Don't hand the agent file paths it can't access.** The browser tool returned a host-side path the sandbox couldn't reach. That single dangling reference triggered the entire 50-step escalation. If a tool returns a path, the agent better be able to use it — or you're lighting money on fire.
+
+5. **Treat every inbound content as a potential prompt injection.** OpenClaw stuffs everything into the context window — emails, web pages, tool results. If your agent processes untrusted input (and it does), any of that content can hijack the session. Sanitize inputs or scope tool permissions per-task.
+
+6. **Monitor costs in real-time, not after the bill.** A $15 credit card alert on my phone was my only signal something had gone sideways. By then, the damage was done. Set up real-time token tracking, per-session budgets, and alerts that fire *before* the runaway gets expensive.
 
 ---
 
