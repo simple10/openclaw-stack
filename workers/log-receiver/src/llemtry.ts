@@ -96,7 +96,7 @@ export async function handleLlemtry(
   // Dispatch to configured backends (non-blocking)
   const backends: Promise<void>[] = []
 
-  if (env.LANGFUSE_PUBLIC_KEY && env.LANGFUSE_SECRET_KEY) {
+  if (env.LANGFUSE_BASE_URL && env.LANGFUSE_PUBLIC_KEY && env.LANGFUSE_SECRET_KEY) {
     backends.push(sendToLangfuse(batch.spans, batch.resource, env, console.error))
   }
   // Future:

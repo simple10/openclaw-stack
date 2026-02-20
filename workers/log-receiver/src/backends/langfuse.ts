@@ -1,6 +1,5 @@
 import type { LlemtrySpan, LlemtryBatch } from '../llemtry'
 
-const DEFAULT_LANGFUSE_URL = 'https://cloud.langfuse.com'
 const MAX_PAYLOAD_BYTES = 3.5 * 1024 * 1024
 
 /**
@@ -14,6 +13,15 @@ export async function sendToLangfuse(
   log: (...args: unknown[]) => void
 ): Promise<void> {
   if (spans.length === 0) return
+
+  if (!env.LANGFUSE_BASE_URL) {
+    log('[langfuse] LANGFUSE_BASE_URL is not set — aborting. Set this to your Langfuse instance URL (e.g. https://cloud.langfuse.com).')
+    return
+  }
+  if (!env.LANGFUSE_PUBLIC_KEY || !env.LANGFUSE_SECRET_KEY) {
+    log('[langfuse] LANGFUSE_PUBLIC_KEY or LANGFUSE_SECRET_KEY is missing — aborting.')
+    return
+  }
 
   try {
     const batch: Array<Record<string, unknown>> = []
@@ -119,7 +127,7 @@ export async function sendToLangfuse(
       return
     }
 
-    const baseUrl = env.LANGFUSE_BASE_URL || DEFAULT_LANGFUSE_URL
+    const baseUrl = env.LANGFUSE_BASE_URL
     const basicAuth = btoa(`${env.LANGFUSE_PUBLIC_KEY}:${env.LANGFUSE_SECRET_KEY}`)
 
     const res = await fetch(`${baseUrl}/api/public/ingestion`, {
