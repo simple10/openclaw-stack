@@ -105,8 +105,11 @@ services:
       - TZ=UTC
     networks:
       - openclaw-gateway-net
+    # Healthcheck: use lightweight curl instead of "openclaw health" which spawns
+    # ~320MB Node processes that outlive the timeout under Sysbox, creating orphans
+    # that accumulate until OOM kills the gateway.
     healthcheck:
-      test: ["CMD", "openclaw", "health"]
+      test: ["CMD", "curl", "-sf", "http://localhost:18789/"]
       interval: 30s
       timeout: 10s
       retries: 3
