@@ -1,6 +1,6 @@
 # Copy to .dev.vars and fill in real values
 
-# Token to authorize requests from Vector and llm-logger plugin
+# Token to authorize requests from Vector and telemetry plugin
 AUTH_TOKEN=your-log-worker-token
 
 # Langfuse (opt-in — set keys to enable llemtry → Langfuse backend)

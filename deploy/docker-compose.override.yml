@@ -99,7 +99,7 @@ services:
       - OPENCLAW_DOMAIN_PATH=${OPENCLAW_DOMAIN_PATH:-}
       # Telegram channel — enables chatting with OpenClaw via Telegram bot
       - TELEGRAM_BOT_TOKEN=${OPENCLAW_TELEGRAM_BOT_TOKEN:-}
-      # LLM Telemetry — deployment identifiers for llm-logger plugin spans
+      # Telemetry — deployment identifiers for telemetry plugin spans
       - OPENCLAW_INSTANCE_ID=${OPENCLAW_INSTANCE_ID:-}
       - VPS_HOSTNAME=${VPS_HOSTNAME:-}
       - TZ=UTC

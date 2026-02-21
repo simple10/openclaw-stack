@@ -84,12 +84,8 @@
           "enabled": true
         },
         // Bundled with openclaw - when enabled, commands will be logged and shipped to the Log Worker via vector
-        // Only logs command events; see debug-logger for all events
+        // If telemetry plugin is enabled, there's no need for the command-logger
         "command-logger": {
-          "enabled": true
-        },
-        // debug-logger hook replaced by the telemetry plugin (captures all event types)
-        "debug-logger": {
           "enabled": false
         }
       }

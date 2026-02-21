@@ -369,8 +369,6 @@ openclaw doctor --deep
 # Logs
 ./scripts/logs-openclaw.sh # Logs from OpenClaw command logger (built-in plugin)
 ./scripts/logs-docker.sh # Docker container logs, including gateway
-./scripts/logs-debug.sh # Logs from custom debug-logger OpenClaw plugin, similar to logs-openclaw but all messages
-./scripts/logs-llm.sh # All LLM request & response messages (from llm-logger plugin)
 ./scripts/logs-session.sh # OpenClaw chat session logs - one of the most useful debugging logs
 
 # Browser

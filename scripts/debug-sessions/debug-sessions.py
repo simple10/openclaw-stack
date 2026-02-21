@@ -24,7 +24,7 @@ Session JSONL schema (OpenClaw):
   Assistant content blocks: text, thinking, toolCall (arguments field, not input)
   Error detection: isError is always false — check details.status and content text
 
-LLM log schema (from llm-logger plugin):
+LLM log schema (from telemetry plugin):
   Each LLM round-trip produces two JSONL entries paired by runId:
   - llm_input: timestamp, agentId, sessionKey, runId, sessionId, provider, model, ...
   - llm_output: timestamp, agentId, sessionKey, runId, sessionId, provider, model,
@@ -527,8 +527,10 @@ MODEL_PRICING = {
 }
 
 DEFAULT_LLM_LOG_PATHS = [
-    "/home/node/.openclaw/logs/llm.log",
-    "/home/openclaw/.openclaw/logs/llm.log",
+    "/home/node/.openclaw/logs/telemetry.log",
+    "/home/openclaw/.openclaw/logs/telemetry.log",
+    "/home/node/.openclaw/logs/llm.log",        # legacy fallback
+    "/home/openclaw/.openclaw/logs/llm.log",     # legacy fallback
 ]
 
 
@@ -537,14 +539,13 @@ def find_llm_log(override=None):
         if os.path.isfile(override):
             return override
         print(c(C.RED, f"Error: LLM log not found: {override}"), file=sys.stderr)
-        print(c(C.DIM, "Enable with: openclaw config set plugins.entries.llm-logger.enabled true"), file=sys.stderr)
+        print(c(C.DIM, "Enable the telemetry plugin in openclaw.json"), file=sys.stderr)
         sys.exit(1)
     for path in DEFAULT_LLM_LOG_PATHS:
         if os.path.isfile(path):
             return path
     print(c(C.RED, "Error: LLM log not found."), file=sys.stderr)
-    print(c(C.DIM, "Enable the llm-logger plugin:"), file=sys.stderr)
-    print(c(C.DIM, "  openclaw config set plugins.entries.llm-logger.enabled true"), file=sys.stderr)
+    print(c(C.DIM, "Enable the telemetry plugin in openclaw.json"), file=sys.stderr)
     print(c(C.DIM, "Then restart the gateway."), file=sys.stderr)
     sys.exit(1)
 
@@ -1238,7 +1239,7 @@ def cmd_summary(args):
 
 
 def cmd_llm_list(args):
-    """List LLM calls from the llm.log file."""
+    """List LLM calls from the telemetry log file."""
     log_path = find_llm_log(args.llm_log)
     calls = parse_llm_log(log_path)
 
@@ -1397,7 +1398,7 @@ def cmd_llm_trace(args):
 
     if not matched:
         print(c(C.YELLOW, f"No LLM calls found for session: {session_id}"))
-        print(c(C.DIM, "Ensure the llm-logger plugin was enabled during this session."))
+        print(c(C.DIM, "Ensure the telemetry plugin was enabled during this session."))
         return
 
     if args.json_output:
@@ -1443,7 +1444,7 @@ def cmd_llm_trace(args):
     # LLM hooks fire once per user turn, not per API call — compare against user_turns
     if session_user_turns is not None and len(matched) < session_user_turns:
         print(c(C.YELLOW, f" \u26a0  Session has {session_user_turns} user turns but only {len(matched)} LLM calls logged"))
-        print(c(C.DIM, "    (llm-logger plugin may have been enabled after session started)"))
+        print(c(C.DIM, "    (telemetry plugin may have been enabled after session started)"))
     if session_assistant_turns is not None and session_assistant_turns > len(matched):
         extra = session_assistant_turns - len(matched)
         if session_user_turns is not None and len(matched) >= session_user_turns:
