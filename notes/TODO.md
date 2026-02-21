@@ -2,6 +2,13 @@
 
 AGENTS: IGNORE THIS TODO LIST - for development only
 
+- [x] Remove debug-logger hook and llm-logger plugin
+- [x] Update workers playbook to generate D1 database during Log Worker deployment
+- [X] Add prefixing to all dashboard models logs: e.g. [dashboard:stats] [dashboard:logs] etc.
+
+- [x] Run cleanup cron job for deleting out old session files in .openclaw/agents/[agent]/sessions
+  - Session jsonl files accumulate indefinitely
+
 - [ ] Redeploy fresh to ensure new vector config works
 - [ ] Try deploying without skill-bin shims to see if it's been fixed
   - Upstream might have better support for routing
