@@ -1,5 +1,5 @@
 {
-  "name": "openclaw-log-receiver-dev",
+  "name": "openclaw-log-receiver",
   "main": "src/index.ts",
   "workers_dev": true,
   "preview_urls": false,
