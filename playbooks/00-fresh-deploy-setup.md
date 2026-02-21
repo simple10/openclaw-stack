@@ -264,3 +264,35 @@ After the user confirms, execute playbooks 01 through 07 **continuously without 
 - **SSH verification (02-base-setup.md § 2.4 Step 3):** You MUST test SSH on port `<SSH_HARDENED_PORT>` from the local machine and confirm it works before proceeding. This is a mandatory stop point — do not skip it during automated deployment.
 
 Normal informational output (progress updates, version notes, check results) should be reported inline without pausing. The first user interaction after confirmation should be device pairing in `08-post-deploy.md`.
+
+### Context window management
+
+A full deployment consumes significant context. To avoid mid-deploy compaction, **offload verbose steps to Bash subagents** using the `Task` tool. Subagents run in their own context window — only their short summary returns to the main conversation.
+
+**Delegate to subagents:** Steps that produce verbose output but only need pass/fail + key values back:
+
+| Step | Why it's heavy |
+|------|---------------|
+| 02: System update + package install | apt output (hundreds of lines) |
+| 03: Docker CE installation | apt output |
+| 04: Sysbox installation | dpkg output |
+| 04: OpenClaw Docker build | Full Docker build log |
+| 04: File deployments (batch) | Reading templates + writing to VPS |
+| 04: Sandbox build wait | Polling loop with log tail |
+
+**Keep in main context:** Steps that need careful error handling, generate credentials used later, require user interaction, or involve critical transitions (SSH hardening port swap, device pairing, verification results).
+
+**Subagent prompt pattern:** Include SSH connection details, the exact commands from the playbook, and specify what to return:
+
+```
+Connect to VPS via: ssh -i <key> -p <port> <user>@<ip>
+Run these commands: <commands from playbook>
+Return: pass/fail, any generated values (tokens, passwords), error output if failed.
+Do NOT return raw apt/build output on success.
+```
+
+**Additional techniques:**
+- Batch related SSH commands into single calls (e.g., all file deployments in one SSH session)
+- Use `2>&1 | tail -5` for build commands where only the final status matters
+- Use background tasks (`run_in_background`) for sandbox build waits
+- After a subagent completes successfully, its verbose output stays out of main context automatically

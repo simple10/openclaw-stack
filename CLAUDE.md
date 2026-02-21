@@ -92,7 +92,7 @@ Ask: **New deployment** (fresh VPS) or **Existing deployment** (already configur
 
 All steps are sequential on a single VPS. Workers deployment (01-workers) runs from the local machine using `wrangler` and is triggered automatically during config validation if needed.
 
-**Automation:** After the user confirms the deployment plan in `00-fresh-deploy-setup.md` § 0.7, execute all playbooks continuously without pausing between steps. Only stop for errors requiring user input. The first user interaction after confirmation should be device pairing in `08-post-deploy.md`.
+**Automation:** After the user confirms the deployment plan in `00-fresh-deploy-setup.md` § 0.7, execute all playbooks continuously without pausing between steps. Only stop for errors requiring user input. The first user interaction after confirmation should be device pairing in `08-post-deploy.md`. See § 0.7 for context window management during deployment.
 
 ---
 
