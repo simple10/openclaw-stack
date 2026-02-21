@@ -1,5 +1,6 @@
 {
   "name": "openclaw-ai-gateway-proxy",
+  "account_id": "{{CF_ACCOUNT_ID}}",
   "main": "src/index.ts",
   "workers_dev": true,
   "preview_urls": false,

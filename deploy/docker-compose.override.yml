@@ -25,12 +25,12 @@ services:
         limits:
           # Set CPUs to max available on the VPS: `nproc`
           # Kernel handles CPU sharing & won't crash if over-provisioned
-          cpus: "6"
+          cpus: "8"
           # IMPORTANT: Set memory to 500M-1GB less than total available: `free -h`
           # System needs ~500M — Vector runs separately (see vector/docker-compose.yml)
           # This is the max memory openclaw can use for all agents, including browsers.
           # If container runs out of memory & swap, it will crash with OOM.
-          memory: 10.5G
+          memory: 14.5G
           # Process limit — prevents fork bombs from exhausting host PIDs.
           # Raised for nested Docker: gateway + agent sandboxes + browser sandboxes.
           pids: 1024

@@ -41,8 +41,10 @@ Create a **Custom API Token** at [dash.cloudflare.com/profile/api-tokens](https:
 |-----------|-------------|-----|
 | Account · Cloudflare Tunnel | Edit | Create/configure tunnels |
 | Account · Access: Apps and Policies | Edit | Create Access applications and policies |
-| Account · Access: Identity Providers | Read | Check if One-time PIN is available |
+| Account · Access: Identity Providers | Edit | Check/create identity providers (OTP, GitHub, Google, etc.) |
 | Zone · DNS | Edit | Create CNAME records for tunnel routing |
+| Account · Workers Scripts | Edit | Deploy workers and manage secrets (provider API keys) |
+
 
 **Account resources:** Include the specific account (or all accounts).
 **Zone resources:** Include the zone containing your domain (or all zones).

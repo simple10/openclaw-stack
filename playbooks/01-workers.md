@@ -19,10 +19,34 @@ This playbook deploys:
 
 From `../openclaw-config.env`:
 
+- `CF_ACCOUNT_ID` — Required, Cloudflare Account ID (used to pin worker deployments to the correct account)
 - `AI_GATEWAY_WORKER_URL` — Set after deploying AI Gateway Worker
 - `AI_GATEWAY_AUTH_TOKEN` — Auth token for AI Gateway Worker
 - `LOG_WORKER_URL` — Set after deploying Log Receiver Worker
 - `LOG_WORKER_TOKEN` — Auth token for Log Receiver Worker
+
+---
+
+## 1.0 Substitute Account ID
+
+Both `workers/ai-gateway/wrangler.jsonc` and `workers/log-receiver/wrangler.jsonc` contain `{{CF_ACCOUNT_ID}}` as a template placeholder. Substitute it with the actual account ID from `openclaw-config.env` before deploying:
+
+```bash
+#!/bin/bash
+# IMPORTANT: Wrangler picks a default account from the authenticated session if account_id
+# is not pinned. This can silently deploy workers to the wrong account when the user has
+# access to multiple Cloudflare accounts. The template ensures the correct account is always used.
+CF_ACCOUNT_ID="<from openclaw-config.env>"
+
+sed -i'' -e "s|{{CF_ACCOUNT_ID}}|${CF_ACCOUNT_ID}|g" workers/ai-gateway/wrangler.jsonc
+sed -i'' -e "s|{{CF_ACCOUNT_ID}}|${CF_ACCOUNT_ID}|g" workers/log-receiver/wrangler.jsonc
+
+# Verify no placeholders remain
+grep -r '{{CF_ACCOUNT_ID}}' workers/*/wrangler.jsonc && echo "ERROR: placeholder not substituted" && exit 1
+echo "Account ID set in both wrangler configs"
+```
+
+> **Why pin the account ID?** Without `account_id` in the wrangler config, wrangler selects an account from the authenticated session (OAuth login or API token). If the user has access to multiple accounts, wrangler may pick the wrong one — deploying workers to an account that doesn't match the tunnel and DNS configuration. Pinning avoids this silently.
 
 ---
 
@@ -69,7 +93,7 @@ echo "<generated-token>" | npx wrangler secret put AUTH_TOKEN
 
 If `AI_GATEWAY_AUTH_TOKEN` already has a real value, use that value instead.
 
-> **Multiple Cloudflare accounts:** If `wrangler whoami` lists more than one account, wrangler commands will fail with _"More than one account available but unable to select one in non-interactive mode."_ Fix by adding `"account_id": "<id>"` to `wrangler.jsonc`, or by setting `export CLOUDFLARE_ACCOUNT_ID=<id>` before running wrangler commands. Use the account ID that matches your Workers subscription.
+> **Account ID:** The `account_id` in `wrangler.jsonc` was set from `CF_ACCOUNT_ID` in step 1.0. If wrangler reports an account mismatch, verify `CF_ACCOUNT_ID` in `openclaw-config.env` matches your Workers subscription.
 
 ### Deploy AI Gateway Worker
 
