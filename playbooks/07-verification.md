@@ -462,15 +462,25 @@ openclaw doctor --deep
 
 ---
 
-## 7.6a LLM Telemetry (llemtry)
+## 7.6a Telemetry (unified plugin)
 
 > Skip this section if `ENABLE_LLEMTRY_LOGGING` is not `true` in `openclaw-config.env`.
 
-**1. Llemtry endpoint exists:**
+**1. Events endpoint (D1 storage):**
 
 ```bash
-# Replace LOG_WORKER_URL base and LOG_WORKER_TOKEN from openclaw-config.env
-# The llemtry URL replaces the /logs path with /llemtry
+# Derive events URL from LOG_WORKER_URL
+EVENTS_URL="${LOG_WORKER_URL/\/logs/\/events}"
+curl -s -X POST "$EVENTS_URL" \
+  -H "Authorization: Bearer $LOG_WORKER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"instance":{"id":"test"},"events":[]}' | jq .
+# Expected: {"status":"ok","count":0}
+```
+
+**2. Llemtry endpoint (Langfuse):**
+
+```bash
 LLEMTRY_URL="${LOG_WORKER_URL/\/logs/\/llemtry}"
 curl -s -X POST "$LLEMTRY_URL" \
   -H "Authorization: Bearer $LOG_WORKER_TOKEN" \
@@ -479,24 +489,32 @@ curl -s -X POST "$LLEMTRY_URL" \
 # Expected: {"status":"ok","count":0}
 ```
 
-**2. Plugin startup validation** (on VPS):
+**3. Plugin startup validation** (on VPS):
 
 ```bash
-sudo docker logs openclaw-gateway 2>&1 | grep -i 'llm-logger.*telemetry'
-# Expected: "[llm-logger] LLM telemetry enabled → https://..."
-# If missing url/authToken: "[llm-logger] llemtry.enabled is true but llemtry.url or llemtry.authToken is missing..."
+sudo docker logs openclaw-gateway 2>&1 | grep -i '\[telemetry\]'
+# Expected: "[telemetry] Plugin registered — outputs: [file:telemetry.log, events:/events, llemtry]"
+# If misconfigured: "[telemetry] events.enabled is true but events.url or events.authToken is missing..."
 ```
 
-**3. End-to-end** (after sending a message to an agent):
+**4. End-to-end** (after sending a message to an agent):
 
 ```bash
-# Check Log Worker logs for llemtry entries (Cloudflare dashboard or wrangler tail)
-npx wrangler tail --format json | jq 'select(.logs[].message | contains("[LLEMTRY]"))'
+# Check local telemetry log on VPS
+sudo tail -5 /home/openclaw/.openclaw/logs/telemetry.log | jq .
+
+# Check Log Worker logs for event and llemtry entries
+npx wrangler tail --format json | jq 'select(.logs[].message | contains("[EVENTS]") or contains("[LLEMTRY]"))'
+
+# Check D1 for stored events
+npx wrangler d1 execute openclaw-logs --command="SELECT type, category, agent_id, session_id FROM events ORDER BY id DESC LIMIT 10"
 ```
 
+- [ ] Events endpoint returns `{"status":"ok","count":0}` for empty batch
 - [ ] Llemtry endpoint returns `{"status":"ok","count":0}` for empty batch
-- [ ] Plugin logs confirm telemetry enabled (or correctly warns if misconfigured)
-- [ ] After agent message: llemtry spans visible in Log Worker logs
+- [ ] Plugin logs confirm all outputs enabled (or correctly warns if misconfigured)
+- [ ] After agent message: events visible in D1 and llemtry spans in Log Worker logs
+- [ ] Local telemetry.log file being written
 
 ---
 

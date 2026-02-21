@@ -1,0 +1,106 @@
+{
+  "id": "telemetry",
+  "name": "Telemetry",
+  "description": "Unified telemetry — captures LLM, session, tool, message, agent, and gateway events. Ships to local file, D1 (via Log Worker /events), and Langfuse (via /llemtry).",
+  "version": "1.0.0",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "logFile": {
+        "type": "string",
+        "description": "Log filename within ~/.openclaw/logs/. Empty string disables file logging.",
+        "default": "telemetry.log"
+      },
+      "events": {
+        "type": "object",
+        "description": "Remote event shipping to Log Worker /events endpoint for D1 storage",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": ["boolean", "string"],
+            "enum": [true, false, "true", "false"],
+            "description": "Enable batched event shipping to /events endpoint",
+            "default": false
+          },
+          "url": {
+            "type": "string",
+            "description": "Full URL of the /events endpoint (e.g. https://log-receiver.xxx.workers.dev/events)"
+          },
+          "authToken": {
+            "type": "string",
+            "description": "Bearer token for /events endpoint authentication"
+          },
+          "batchSize": {
+            "type": "number",
+            "description": "Flush after N events",
+            "default": 50
+          },
+          "flushIntervalMs": {
+            "type": "number",
+            "description": "Flush every N milliseconds",
+            "default": 10000
+          }
+        }
+      },
+      "llemtry": {
+        "type": "object",
+        "description": "LLM telemetry — send OTEL spans to Log Worker /llemtry for Langfuse",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": ["boolean", "string"],
+            "enum": [true, false, "true", "false"],
+            "description": "Enable sending LLM telemetry spans",
+            "default": false
+          },
+          "url": {
+            "type": "string",
+            "description": "Full URL of the llemtry endpoint"
+          },
+          "authToken": {
+            "type": "string",
+            "description": "Bearer token for llemtry endpoint authentication"
+          }
+        }
+      },
+      "categories": {
+        "type": "object",
+        "description": "Per-category granularity: full, summary, metadata, or off",
+        "additionalProperties": false,
+        "properties": {
+          "llm": {
+            "type": "string",
+            "enum": ["full", "summary", "metadata", "off"],
+            "default": "full"
+          },
+          "session": {
+            "type": "string",
+            "enum": ["full", "summary", "metadata", "off"],
+            "default": "full"
+          },
+          "tool": {
+            "type": "string",
+            "enum": ["full", "summary", "metadata", "off"],
+            "default": "summary"
+          },
+          "message": {
+            "type": "string",
+            "enum": ["full", "summary", "metadata", "off"],
+            "default": "summary"
+          },
+          "agent": {
+            "type": "string",
+            "enum": ["full", "summary", "metadata", "off"],
+            "default": "full"
+          },
+          "gateway": {
+            "type": "string",
+            "enum": ["full", "summary", "metadata", "off"],
+            "default": "metadata"
+          }
+        }
+      }
+    }
+  }
+}

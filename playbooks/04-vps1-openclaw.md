@@ -344,13 +344,17 @@ sudo chmod 600 /home/openclaw/vector/.env
 # Read the gateway token generated in section 4.5
 GATEWAY_TOKEN=$(sudo grep OPENCLAW_GATEWAY_TOKEN /home/openclaw/openclaw/.env | cut -d= -f2)
 
-# Derive llemtry URL from LOG_WORKER_URL (replace /logs suffix with /llemtry)
+# Derive telemetry URLs from LOG_WORKER_URL (replace /logs suffix)
 LLEMTRY_URL="${LOG_WORKER_URL/\/logs/\/llemtry}"
+EVENTS_URL="${LOG_WORKER_URL/\/logs/\/events}"
 
 # SOURCE: deploy/openclaw.json (template) → /home/openclaw/.openclaw/openclaw.json
 # VARS: GATEWAY_TOKEN (from .env on VPS), OPENCLAW_DOMAIN_PATH (from openclaw-config.env),
-#        YOUR_TELEGRAM_ID (from openclaw-config.env), ENABLE_LLEMTRY_LOGGING (from openclaw-config.env),
-#        LLEMTRY_URL (derived: LOG_WORKER_URL with /logs → /llemtry), LOG_WORKER_TOKEN (from openclaw-config.env)
+#        YOUR_TELEGRAM_ID (from openclaw-config.env),
+#        ENABLE_EVENTS_LOGGING (from openclaw-config.env), ENABLE_LLEMTRY_LOGGING (from openclaw-config.env),
+#        LLEMTRY_URL (derived: LOG_WORKER_URL with /logs → /llemtry),
+#        EVENTS_URL (derived: LOG_WORKER_URL with /logs → /events),
+#        LOG_WORKER_TOKEN (from openclaw-config.env)
 # IMPORTANT: ALL {{VAR}} placeholders must be substituted — including empty strings.
 # OPENCLAW_DOMAIN_PATH="" is valid (serves UI at root). Never leave literal {{...}} in output.
 sudo tee /home/openclaw/.openclaw/openclaw.json << 'JSONEOF'

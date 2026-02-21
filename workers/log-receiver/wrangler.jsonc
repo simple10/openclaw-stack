@@ -1,5 +1,5 @@
 {
-  "name": "openclaw-log-receiver",
+  "name": "openclaw-log-receiver-dev",
   "main": "src/index.ts",
   "workers_dev": true,
   "preview_urls": false,
@@ -20,6 +20,17 @@
   "placement": {
     "mode": "smart"
   },
+
+  // D1 database for telemetry event storage
+  // Create with: wrangler d1 create openclaw-logs
+  // Apply schema: wrangler d1 execute openclaw-logs --file=src/schema.sql
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "openclaw-logs",
+      "database_id": "<run: wrangler d1 create openclaw-logs>"
+    }
+  ],
 
   "vars": {
     // Comma-separated log levels to output to console (changeable without redeploy via dashboard)

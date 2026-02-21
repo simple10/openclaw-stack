@@ -88,13 +88,9 @@
         "command-logger": {
           "enabled": true
         },
-        // Custom: Logs all openclaw commands - see hooks/debug-logger/
-        // Logs to /home/openclaw/.openclaw/logs/debug.log (on VPS) - logrotate manages the log files
-        // Bind mounted into openclaw-gateway container at /home/openclaw/.openclaw/logs/debug.log`
-        // Useful for claude to debug openclaw installations
-        // Recommendation: disable in production
+        // debug-logger hook replaced by the telemetry plugin (captures all event types)
         "debug-logger": {
-          "enabled": true
+          "enabled": false
         }
       }
     }
@@ -331,7 +327,7 @@
     "enabled": true,
     "allow": [
       "coordinator", // Coordinator plugin — builds routing table from agent configs
-      "llm-logger" // LLM logger plugin — logs prompts/responses to llm.log
+      "telemetry" // Unified telemetry — replaces llm-logger plugin and debug-logger hook
     ],
     "entries": {
       // Coordinator Plugin
@@ -345,19 +341,37 @@
           "coordinatorAgent": "main"
         }
       },
-      // LLM Logger Plugin
-      // Logs all LLM input/output events to ~/.openclaw/logs/llm.log (JSONL)
-      // For development debugging — disabled by default to avoid large log files.
-      // Enable with: openclaw config set plugins.entries.llm-logger.enabled true
+      // Telemetry Plugin
+      // Unified telemetry — captures LLM, session, tool, message, agent, and gateway events.
+      // Replaces both llm-logger plugin and debug-logger hook.
+      // Ships to: local JSONL file, Log Worker /events (D1), and Log Worker /llemtry (Langfuse).
       // Requires gateway restart (plugins.* not hot-reloadable).
-      "llm-logger": {
+      "telemetry": {
         "enabled": true,
         "config": {
-          "logFile": "llm.log", // Set to empty string to disable file logging
+          "logFile": "telemetry.log", // Set to empty string to disable file logging
+          // Remote event shipping to Log Worker /events → D1 database
+          "events": {
+            "enabled": "{{ENABLE_EVENTS_LOGGING}}",
+            "url": "{{EVENTS_URL}}",
+            "authToken": "{{LOG_WORKER_TOKEN}}",
+            "batchSize": 50,
+            "flushIntervalMs": 10000
+          },
+          // LLM telemetry → Langfuse (via /llemtry endpoint)
           "llemtry": {
             "enabled": "{{ENABLE_LLEMTRY_LOGGING}}",
             "url": "{{LLEMTRY_URL}}",
             "authToken": "{{LOG_WORKER_TOKEN}}"
+          },
+          // Per-category granularity: "full" | "summary" | "metadata" | "off"
+          "categories": {
+            "llm": "full",
+            "session": "full",
+            "tool": "summary",
+            "message": "summary",
+            "agent": "full",
+            "gateway": "metadata"
           }
         }
       }

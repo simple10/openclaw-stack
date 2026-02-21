@@ -1,6 +1,7 @@
 import { validateAuth } from './auth'
 import { handlePreflight, addCorsHeaders } from './cors'
 import { jsonError } from './errors'
+import { handleEvents } from './events'
 import { handleLlemtry } from './llemtry'
 
 export default {
@@ -31,7 +32,7 @@ export default {
       return addCorsHeaders(await handleLogs(request, env))
     }
 
-    // POST /llemtry — receive LLM telemetry spans from llm-logger plugin
+    // POST /llemtry — receive LLM telemetry spans from telemetry plugin
     if (request.method === 'POST' && pathname === '/llemtry') {
       const authError = await validateAuth(request, env.AUTH_TOKEN)
       if (authError) {
@@ -39,6 +40,21 @@ export default {
       }
 
       return addCorsHeaders(await handleLlemtry(request, env, ctx))
+    }
+
+    // POST /events — receive batched telemetry events for D1 storage
+    if (request.method === 'POST' && pathname === '/events') {
+      if (!env.DB) {
+        console.error('[events] D1 database binding "DB" not configured — run: wrangler d1 create openclaw-logs')
+        return addCorsHeaders(jsonError('Events endpoint not available: D1 database not configured', 503))
+      }
+
+      const authError = await validateAuth(request, env.AUTH_TOKEN)
+      if (authError) {
+        return addCorsHeaders(jsonError(authError, 401))
+      }
+
+      return addCorsHeaders(await handleEvents(request, env, ctx))
     }
 
     return addCorsHeaders(jsonError('Not found', 404))
