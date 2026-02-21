@@ -92,7 +92,7 @@ curl -s https://<worker-url>/health
 
 ## 1.2 Deploy Log Receiver Worker
 
-The Log Receiver Worker receives batched log events from Vector and `console.log()`s them. Cloudflare captures Worker console output via real-time Logs dashboard and Logpush.
+The Log Receiver Worker receives batched log events from Vector and `console.log()`s them. Cloudflare captures Worker console output via real-time Logs dashboard and Logpush. It also stores structured telemetry events in a D1 database for dashboard session exploration.
 
 ### Setup Log Receiver
 
@@ -127,6 +127,48 @@ If `LOG_WORKER_TOKEN` already has a real value, use that value instead:
 
 ```bash
 echo "<existing-token>" | npx wrangler secret put AUTH_TOKEN
+```
+
+### Create D1 Database
+
+The Log Worker stores telemetry events in a D1 database. Check if one already exists:
+
+```bash
+npx wrangler d1 list | grep openclaw-logs
+```
+
+- **If it exists:** Skip creation, use the existing database ID.
+- **If not found:** Create it:
+
+```bash
+npx wrangler d1 create openclaw-logs
+```
+
+Capture the `database_id` from the output and update the `d1_databases` section in `wrangler.jsonc`:
+
+```jsonc
+"d1_databases": [
+  {
+    "binding": "DB",
+    "database_name": "openclaw-logs",
+    "database_id": "<paste-database-id-here>"
+  }
+]
+```
+
+### Apply D1 Schema
+
+Apply the events table schema to the remote database:
+
+```bash
+npx wrangler d1 execute openclaw-logs --remote --file=src/schema.sql
+```
+
+Verify the table was created:
+
+```bash
+npx wrangler d1 execute openclaw-logs --remote --command="SELECT name FROM sqlite_master WHERE type='table'"
+# Expected: events
 ```
 
 ### Deploy Log Worker
@@ -166,6 +208,13 @@ curl -X POST https://<worker-url>/logs \
   -H "Content-Type: application/json" \
   -d '{"container_name":"test","message":"hello","stream":"stdout","timestamp":"2026-02-07T00:00:00Z"}'
 # Expected: {"status":"ok","count":1}
+
+# Test events endpoint (D1 storage)
+curl -s -X POST https://<worker-url>/events \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"instance":{"id":"test"},"events":[]}'
+# Expected: {"status":"ok","count":0}
 ```
 
 ### View Logs in Cloudflare
