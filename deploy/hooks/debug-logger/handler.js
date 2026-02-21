@@ -10,6 +10,9 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
+/** Strips context.cfg from log messages when true - cfg is openclaw.json config */
+const STRIP_CONTEXT_CFG = true
+
 /**
  * Resolve state directory (inlined to avoid coupling to compiled gateway paths).
  */
@@ -58,14 +61,17 @@ const debugLogger = async (event) => {
     await fs.mkdir(logDir, { recursive: true })
 
     const logFile = path.join(logDir, 'debug.log')
-    const logLine =
-      JSON.stringify({
-        ...event, // type, action, sessionKey, context, timestamp, messages
-        timestamp: event.timestamp.toISOString(),
-        context: safeContext(event.context),
-      }) + '\n'
+    const logData = {
+      ...event, // type, action, sessionKey, context, timestamp, messages
+      timestamp: event.timestamp.toISOString(),
+      context: safeContext(event.context),
+    }
 
-    await fs.appendFile(logFile, logLine, 'utf-8')
+    if (STRIP_CONTEXT_CFG && logData.context?.cfg) {
+      delete logData.context.cfg
+    }
+
+    const logLine = await fs.appendFile(logFile, JSON.stringify(logData) + '\n', 'utf-8')
   } catch (err) {
     console.error(
       '[debug-logger] Failed to log event:',
