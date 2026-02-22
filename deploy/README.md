@@ -32,3 +32,18 @@ values come from. Template syntax:
 - `{{VAR}}` — replaced with the variable's value at deploy time
 - `{{VAR}}` is visually distinct from Docker Compose `${VAR}` interpolation
   and shell `$VAR` expansion, avoiding ambiguity
+
+## Deployment Scripts
+
+Scripts in `deploy/scripts/` are SCP'd to the VPS and executed remotely. They
+keep large bash out of playbook inline blocks (and out of the LLM context
+window), improving deployment reliability.
+
+| Script | Playbook | Purpose |
+|--------|----------|---------|
+| `scripts/setup-infra.sh` | 04 §4.2 | Creates Docker networks, directories, clones repo, generates `.env` |
+| `scripts/deploy-config.sh` | 04 §4.3 | Copies config files, substitutes templates, sets permissions, creates crons |
+
+Both scripts use `set -euo pipefail`, send progress to stderr, and emit a
+single machine-parseable line on stdout (`OPENCLAW_GENERATED_TOKEN=<hex>` or
+`DEPLOY_CONFIG_OK`). Config values are passed as environment variables.

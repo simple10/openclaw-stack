@@ -278,27 +278,27 @@ A full deployment consumes significant context. To avoid mid-deploy compaction, 
 | 02: System update + package install | apt output (hundreds of lines) | pass/fail |
 | 02: SSH hardening (2.5–2.9) | swap, fail2ban, kernel config output | pass/fail, cloudflared version |
 | 03: Docker CE installation | apt + daemon config output | pass/fail, Docker/Compose versions |
-| 04: Sysbox + infra (4.1–4.2) | dpkg + network/directory creation | pass/fail |
-| 04: Deploy configuration (4.3) | SCP files + template substitution on VPS | pass/fail |
+| 04: Sysbox + infra (4.1–4.2) | dpkg + network/directory creation + SCP | pass/fail, GATEWAY_TOKEN |
+| 04: Deploy configuration (4.3) | deploy-config.sh runs on VPS | pass/fail |
 | 04: Build + start (4.4) | Full Docker build log | pass/fail |
 | 06: Backup setup | Script creation + cron config | pass/fail, test backup size |
 | 07: VPS-side verification | 14 SSH checks, each with output | Summary table (check name + pass/fail) |
 
-**Keep in main context:** Steps that generate credentials stored in `openclaw-config.env` (user creation in 02, gateway token in 04), SSH hardening port transition (02), device pairing (04/08), user-facing interactions (08), local-side verification checks in 07 (worker health, Cloudflare Access, port exposure — these are fast curl commands), and the **sandbox build wait** (04: §4.4 — use background task + progress polling pattern for user feedback, ~100 tokens per poll).
+**Keep in main context:** Steps that generate credentials stored in `openclaw-config.env` (user creation in 02, gateway token recording in 04 after setup-infra.sh returns it), SSH hardening port transition (02), device pairing (04/08), user-facing interactions (08), local-side verification checks in 07 (worker health, Cloudflare Access, port exposure — these are fast curl commands), and the **sandbox build wait** (04: §4.4 — use background task + progress polling pattern for user feedback, ~100 tokens per poll).
 
 **Critical: avoid reading playbooks before delegating.** Do NOT read a playbook into main context and then pass its contents to a subagent — this doubles the context cost. Instead, tell the subagent to read the playbook section itself:
 
 ```
-Read playbooks/04-vps1-openclaw.md section 4.3 and execute it.
+Read playbooks/04-vps1-openclaw.md sections 4.1-4.2 and execute them.
 SSH: ssh -i <key> -p <port> <user>@<ip>
-Config values for template substitution:
-  GATEWAY_TOKEN=<value>
-  OPENCLAW_DOMAIN=<value>
+Config values (pass as env vars to setup-infra.sh):
+  AI_GATEWAY_WORKER_URL=<value>
+  AI_GATEWAY_AUTH_TOKEN=<value>
   ...
-Return: pass/fail for each section, error output if failed.
+Return: pass/fail, OPENCLAW_GENERATED_TOKEN from stdout.
 ```
 
-**Template substitution in subagents:** When delegating file deployments, pass the config variable values (from `openclaw-config.env`) to the subagent and let it read the `deploy/` template files internally. Do NOT read deploy files into main context and then copy their contents into the subagent prompt.
+**Template substitution in subagents:** Sections 4.2 and 4.3 now use standalone scripts (`deploy/scripts/setup-infra.sh` and `deploy/scripts/deploy-config.sh`) that are SCP'd to the VPS and run remotely. Config values are passed as env vars — the subagent just needs the variable values, not the script contents.
 
 **Additional techniques:**
 - Batch related SSH commands into single calls (e.g., all file deployments in one SSH session)
