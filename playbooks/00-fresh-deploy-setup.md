@@ -262,6 +262,7 @@ After the user confirms, execute playbooks 01 through 07 **continuously without 
 - A command fails and the error requires user input to resolve
 - A playbook step explicitly says to wait for user input (e.g., a blocking error with multiple resolution paths)
 - **SSH verification (02-base-setup.md § 2.4 Step 3):** You MUST test SSH on port `<SSH_HARDENED_PORT>` from the local machine and confirm it works before proceeding. This is a mandatory stop point — do not skip it during automated deployment.
+- **07-verification.md:** Delegate full VPS-side checks to a subagent. Report the summary table before proceeding to 08-post-deploy.md.
 
 Normal informational output (progress updates, version notes, check results) should be reported inline without pausing. The first user interaction after confirmation should be device pairing in `08-post-deploy.md`.
 

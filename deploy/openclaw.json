@@ -210,7 +210,7 @@
           // Main delegates browser tasks to other sandboxed agents with their own browser containers
           // If main is running in sandbox.mode:"all" then optionally remove "browser" from deny list to allow spawning it's own browser container
           // non-main -> host browser behavior is currently non-configurable here - can be somewhat controlled with a custom instruction in AGENTS.md
-          "deny": ["browser", "canvas", "nodes", "discord"]
+          "deny": ["browser", "canvas", "nodes", "discord", "group:plugins"]
         },
         "subagents": {
           "allowAgents": ["code", "skills"] // Add other agents here to allow main to spawn them; e.g. "personal", "work"
@@ -327,7 +327,7 @@
       "memory-core" // File-backed memory search tools
     ],
     "load": {
-      "paths": ["~/.openclaw/extensions"] // Trust the managed extensions directory for provenance
+      "paths": ["/app/deploy/plugins"] // Load directly from deploy dir — avoids copying into OpenClaw's namespace
     },
     "slots": {
       "memory": "memory-core" // Bundled memory plugin — provides memory_search and memory_get tools
@@ -422,13 +422,16 @@
           "sessions_send",
           "sessions_spawn", // Can spawn other agents
           "session_status",
-          "cron" // Enable for host status monitoring — agents can schedule checks on health/maintenance data
+          "cron", // Enable for host status monitoring — agents can schedule checks on health/maintenance data
+          "memory_search", // memory-core plugin — explicit allow since group:plugins is denied
+          "memory_get"
         ],
         "deny": [
           "canvas",
           "nodes",
           "discord",
-          "gateway" // Prevent sandboxed agents from manipulating the gateway — main gets it via per-agent allow
+          "gateway", // Prevent sandboxed agents from manipulating the gateway — main gets it via per-agent allow
+          "group:plugins" // Block unknown plugin tools — explicitly allow known ones above
         ]
       }
     }

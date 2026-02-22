@@ -150,8 +150,10 @@ chmod 700 "${OPENCLAW_HOME}/.openclaw"
 chmod 700 "${OPENCLAW_HOME}/.openclaw/credentials"
 EOF
 
-# IMPORTANT: Container runs as uid 1000 (node user), which is typically 'ubuntu' on the host
-# Change ownership of .openclaw and sandboxes-home to uid 1000 for container write access
+# ⚠️  IMPORTANT: Do NOT change 1000:1000 to openclaw:openclaw!
+# The container runs as uid 1000 (node user inside Docker), which is typically
+# 'ubuntu' on the host — NOT the openclaw user (uid 1002). Using the openclaw
+# UID breaks container write access to these directories.
 sudo chown -R 1000:1000 /home/openclaw/.openclaw
 sudo chown -R 1000:1000 /home/openclaw/sandboxes-home
 
@@ -541,20 +543,16 @@ openclaw devices list
 
 ---
 
-## 4.13 Deploy Skill Router Plugin
+## 4.13 Deploy Plugins
 
-Network-requiring skills (gifgrep, etc.) fail in the main agent's sandbox (`network: "none"`). The skills agent has bridge network access but doesn't receive slash commands — the main agent does.
+Plugins in `deploy/plugins/` are SCP'd to the VPS repo and loaded directly via `plugins.load.paths` in `openclaw.json` (pointing to `/app/deploy/plugins`). They are **not** copied into `~/.openclaw/extensions/` — this avoids name collisions with any plugins bundled by OpenClaw.
 
-**Solution:** The skill-router plugin intercepts the `before_agent_start` hook and rewrites skill descriptions in the system prompt based on routing rules in `openclaw.json`. The main agent sees delegation instructions; the skills agent sees original descriptions and executes directly.
+Current plugins:
 
-How it works:
+- **coordinator** — auto-discovers agent skills from `agents.list[].skills` arrays in `openclaw.json`, writes a routing table to `AGENTS.md` in the workspace, and injects delegation instructions into agent system prompts via `before_agent_start` hook.
+- **telemetry** — unified event shipping to the Log Receiver Worker (LLM spans, session events, tool usage). Configured via `plugins.entries.telemetry.config` in `openclaw.json`.
 
-1. Plugin lives in `deploy/plugins/skill-router/` (bind-mounted read-only into the container)
-2. Entrypoint section 1h copies plugins to `~/.openclaw/extensions/` where the gateway discovers them
-3. On agent start, the plugin matches skill names against configured rules and rewrites `<description>` tags
-4. Routing rules are configured in `openclaw.json` under `plugins.entries.skill-router.config.rules`
-
-SCP the plugin to the VPS:
+SCP the plugins to the VPS:
 
 **Run from LOCAL machine:**
 
@@ -570,29 +568,14 @@ scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r deploy/plugins/* ${SSH_USER}@${VPS1_IP}
 **Run on VPS (via SSH):**
 
 ```bash
-# Move into place with correct ownership
+# Move into place — must be owned by uid 1000 (container's node user), not openclaw (uid 1002).
+# OpenClaw's plugin security check blocks candidates with unexpected ownership.
 sudo cp -r /tmp/deploy-plugins/* /home/openclaw/openclaw/deploy/plugins/
-sudo chown -R openclaw:openclaw /home/openclaw/openclaw/deploy/plugins/
+sudo chown -R 1000:1000 /home/openclaw/openclaw/deploy/plugins/
 rm -rf /tmp/deploy-plugins
 ```
 
-To add a new delegated skill, append the skill name to the `skills` array in `openclaw.json`:
-
-```json
-{
-  "plugins": {
-    "entries": {
-      "skill-router": {
-        "config": {
-          "rules": [{ "agent": "main", "delegateTo": "skills", "skills": ["gifgrep", "new-skill"] }]
-        }
-      }
-    }
-  }
-}
-```
-
-No new files needed — just update the config and restart the gateway.
+To add a new skill to an agent, add it to the agent's `skills` array in `openclaw.json` under `agents.list[]`. The coordinator plugin reads these automatically and updates the routing table — no plugin config changes needed. Restart the gateway after updating `openclaw.json`.
 
 ---
 
@@ -617,31 +600,11 @@ sudo logrotate -d /etc/logrotate.d/openclaw
 
 ## 4.15 Deploy Managed Hooks
 
-Custom managed hooks live in `deploy/hooks/<name>/` (HOOK.md + handler.js). The entrypoint copies them to `~/.openclaw/hooks/` on boot, and `openclaw.json` enables them via `hooks.internal.entries`.
+> **Skip this section** if `deploy/hooks/` is empty (no hook subdirectories).
 
-SCP hooks to the VPS:
+Custom managed hooks live in `deploy/hooks/<name>/` (HOOK.md + handler.js). Unlike plugins, hooks use OpenClaw's built-in `hooks.internal.entries` config — they don't have a custom load path mechanism, so they must be registered in `openclaw.json`.
 
-**Run from LOCAL machine:**
-
-```bash
-# Create deploy/hooks directory on VPS and staging dir for SCP
-ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP} \
-  "sudo -u openclaw mkdir -p /home/openclaw/openclaw/deploy/hooks && mkdir -p /tmp/deploy-hooks"
-
-# Copy hooks from local repo to VPS
-scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r deploy/hooks/* ${SSH_USER}@${VPS1_IP}:/tmp/deploy-hooks/
-```
-
-**Run on VPS (via SSH):**
-
-```bash
-# Move into place with correct ownership
-sudo cp -r /tmp/deploy-hooks/* /home/openclaw/openclaw/deploy/hooks/
-sudo chown -R openclaw:openclaw /home/openclaw/openclaw/deploy/hooks/
-rm -rf /tmp/deploy-hooks
-```
-
-To add a new hook: create `deploy/hooks/<name>/` with HOOK.md + handler.js, add an entry to `openclaw.json` under `hooks.internal.entries`, SCP to VPS, restart.
+When hooks are added in the future, SCP them to the VPS and configure in `openclaw.json` under `hooks.internal.entries`.
 
 ---
 
@@ -712,80 +675,26 @@ echo "Gateway is healthy."
 > connects via WebSocket, which requires the gateway to be fully initialized. Checking
 > the "Executing as node" log line ensures the entrypoint has completed.
 
-### Pair the CLI
+### Fix .openclaw ownership
 
-The CLI needs a paired device identity to run gateway commands like `devices approve`.
-Once paired, the device identity persists in `.openclaw/identity/` and the pairing
-record in `.openclaw/devices/paired.json` — both survive gateway restarts.
-
-Auto-pairing (first device auto-approved on fresh gateway) is unreliable. Use the
-file-manipulation approach directly:
+The gateway creates subdirectories (`identity/`, `devices/`) during startup as root
+(before gosu drops to node). Fix ownership so the container can write to them:
 
 ```bash
-#!/bin/bash
-# Fix .openclaw ownership — the gateway creates identity/ and devices/ dirs during
-# startup as root (before gosu drops to node). The entrypoint's ownership fix (1d)
-# runs before these dirs exist, so they end up root-owned.
 sudo docker exec openclaw-gateway chown -R 1000:1000 /home/node/.openclaw
+```
 
-# Step 1: Trigger a pending pairing request (will fail but registers the device)
-sudo docker exec --user node openclaw-gateway openclaw devices list 2>&1 || true
+### Verify CLI access
 
-# Step 2: Approve the pending CLI device via file manipulation
-sudo python3 -c "
-import json, time, os
+The `openclaw` host wrapper and `docker exec` commands bypass WebSocket device pairing —
+they execute directly inside the container, so no CLI pairing step is needed.
 
-pending_file = '/home/openclaw/.openclaw/devices/pending.json'
-paired_file = '/home/openclaw/.openclaw/devices/paired.json'
-
-if not os.path.exists(pending_file):
-    print('No pending.json found — devices dir may not exist yet')
-    exit(1)
-
-with open(pending_file) as f:
-    pending = json.load(f)
-
-paired = {}
-if os.path.exists(paired_file):
-    with open(paired_file) as f:
-        paired = json.load(f)
-
-approved = False
-for req_id, req in list(pending.items()):
-    if req.get('clientId') == 'cli':
-        now = int(time.time() * 1000)
-        paired[req['deviceId']] = {
-            'deviceId': req['deviceId'], 'publicKey': req['publicKey'],
-            'platform': req['platform'], 'clientId': req['clientId'],
-            'clientMode': req['clientMode'], 'role': req['role'],
-            'roles': req['roles'], 'scopes': req['scopes'],
-            'remoteIp': req['remoteIp'],
-            'createdAtMs': now, 'approvedAtMs': now,
-            'tokens': {},
-        }
-        del pending[req_id]
-        approved = True
-        break
-
-if not approved:
-    print('No CLI pending request found')
-    exit(1)
-
-with open(paired_file, 'w') as f:
-    json.dump(paired, f, indent=2)
-with open(pending_file, 'w') as f:
-    json.dump(pending, f, indent=2)
-print('CLI device approved')
-"
-
-# Step 3: Verify — should work immediately (gateway reads files on each connection)
+```bash
 sudo /usr/local/bin/openclaw devices list
 ```
 
-**Expected:** The final command shows 1 paired device with role `operator`.
-
-> **Re-pairing after identity loss:** If the CLI identity is deleted while other devices
-> are already paired, use the same 3-step approach above (trigger pending → approve → verify).
+**Expected:** Command runs without pairing errors. On a fresh gateway with no browser
+connections yet, the output will show an empty device list — that's normal.
 
 ---
 
@@ -1023,13 +932,13 @@ sudo docker exec vector wget -q -O- <LOG_WORKER_URL_WITHOUT_PATH>/health
 sudo -u openclaw bash -c 'cd /home/openclaw/vector && docker compose restart'
 ```
 
-### CLI Pairing Lost
+### CLI Commands Failing
 
-If the CLI device identity is deleted or corrupted, follow the same pairing procedure
-as section 4.16 (fix ownership → trigger pending → approve via file manipulation → verify).
+The `openclaw` host wrapper uses `docker exec`, which bypasses WebSocket device pairing.
+If CLI commands fail, check:
 
-If the Control UI is accessible, you can also approve pending devices there instead of
-using file manipulation.
+1. The gateway container is running: `sudo docker ps | grep openclaw-gateway`
+2. The `.openclaw` directory has correct ownership: `sudo docker exec openclaw-gateway chown -R 1000:1000 /home/node/.openclaw`
 
 ### Network Issues
 

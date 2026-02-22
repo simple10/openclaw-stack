@@ -123,7 +123,7 @@ After the user opens the URL and sees "pairing required", approve their device.
 
 ### Approach 1: Standard CLI Pairing (try first)
 
-The CLI was auto-paired during deployment (`04-vps1-openclaw.md` §4.16).
+The `openclaw` host wrapper uses `docker exec` which bypasses WebSocket device pairing — no CLI pairing is needed.
 
 ```bash
 # List pending device requests
