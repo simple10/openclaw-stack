@@ -51,7 +51,7 @@ Single VPS running the OpenClaw gateway and sandboxes. Observability is handled 
 |---------|-----------|
 | `user: "0:0"` | Root inside container — Sysbox maps to unprivileged uid on host. Required for starting `dockerd`. Entrypoint drops to node via gosu. |
 | `read_only: false` | **Required.** Sysbox auto-mounts for `/var/lib/docker` inherit this flag. With `true`, dockerd gets read-only filesystem error. |
-| `/var/lib/docker` bind mount | Persists nested Docker images across container restarts. Without this, Sysbox auto-provisions ephemeral storage destroyed on `docker compose down`, forcing ~5 min sandbox rebuild. |
+| `/var/lib/docker` bind mount | Persists nested Docker images across container restarts. Without this, Sysbox auto-provisions ephemeral storage destroyed on `docker compose down`, forcing ~5-15 min sandbox rebuild. |
 | `memory: 9G` | Outer ceiling for gateway + all nested sandbox containers (cgroup hierarchy) |
 
 ### 3.2 Sandbox Configuration

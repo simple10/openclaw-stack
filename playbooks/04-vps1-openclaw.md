@@ -688,7 +688,7 @@ sudo docker logs --tail 20 openclaw-gateway
 
 ### Wait for full startup
 
-On first boot, the entrypoint builds 3 sandbox images inside nested Docker (~5-10 min).
+On first boot, the entrypoint builds 3 sandbox images inside nested Docker (~5-15 min).
 The gateway HTTP endpoint responds during this time, but WebSocket connections (needed for
 CLI pairing) fail until the entrypoint finishes and drops to the node user.
 
