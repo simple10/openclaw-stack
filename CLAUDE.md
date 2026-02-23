@@ -80,19 +80,21 @@ Ask: **New deployment** (fresh VPS) or **Existing deployment** (already configur
 ### Full Deployment
 
 ```
-1. Validate openclaw-config.env (including placeholder detection + auto worker deployment)
-2. Execute 02-base-setup.md on VPS-1
-3. Execute 03-docker.md on VPS-1
-4. Execute 04-vps1-openclaw.md on VPS-1
+1. Validate openclaw-config.env (including placeholder detection)
+2. In parallel:
+   a. Deploy workers (01-workers.md) — local machine via wrangler     ~5 min
+   b. Execute 02-base-setup.md — VPS via SSH                          ~10 min
+3. Execute 03-docker.md on VPS-1 (after 2b)
+4. Execute 04-vps1-openclaw.md on VPS-1 (after both 2a and 3)
 5. Execute 06-backup.md on VPS-1
 6. Reboot VPS-1
 7. Execute 07-verification.md
 8. Execute 08-post-deploy.md (device pairing & deployment report)
 ```
 
-All steps are sequential on a single VPS. Workers deployment (01-workers) runs from the local machine using `wrangler` and is triggered automatically during config validation if needed.
+Steps 3–8 are sequential on the VPS. Workers deployment (01-workers, step 2a) runs from the local machine using `wrangler` in parallel with base setup (02-base-setup, step 2b) since they share no dependencies. Both must complete before step 4 begins, as `04-vps1-openclaw` needs worker URLs/tokens from 2a and Docker from step 3 (which depends on 2b).
 
-**Automation:** After the user confirms the deployment plan in `00-fresh-deploy-setup.md` § 0.7, execute all playbooks continuously without pausing between steps. Only stop for errors requiring user input. The first user interaction after confirmation should be device pairing in `08-post-deploy.md`. See § 0.7 for context window management during deployment.
+**Automation:** After the user confirms the deployment plan in `00-fresh-deploy-setup.md` § 0.7, execute all playbooks continuously without pausing between steps. Launch steps 2a and 2b as parallel subagents (multiple Task tool calls in a single message), then synchronize their results before proceeding to step 3. Only stop for errors requiring user input. The first user interaction after confirmation should be device pairing in `08-post-deploy.md`. See § 0.7 for context window management during deployment.
 
 ---
 

@@ -240,24 +240,25 @@ Present the full deployment plan to the user:
 
 ```
 Deployment Plan:
-  1. [If needed] Deploy Cloudflare Workers (01-workers.md) — sets up infrastructure (AUTH_TOKEN only)
-  2. Base setup & hardening (02-base-setup.md)
-  3. Docker installation (03-docker.md)
-  4. OpenClaw deployment (04-vps1-openclaw.md)
-  5. Backup configuration (06-backup.md)
-  6. Reboot & verification (07-verification.md)
-  7. Post-deploy: AI proxy configuration, device pairing & deployment report (08-post-deploy.md)
+  1. [Parallel]
+     a. Deploy Cloudflare Workers (01-workers.md) — local              ~5 min
+     b. Base setup & hardening (02-base-setup.md) — VPS               ~10 min
+  2. Docker installation (03-docker.md)
+  3. OpenClaw deployment (04-vps1-openclaw.md)
+  4. Backup configuration (06-backup.md)
+  5. Reboot & verification (07-verification.md)
+  6. Post-deploy: AI proxy configuration, device pairing & deployment report (08-post-deploy.md)
 ```
 
 Domain and Cloudflare Access have been verified.
 
-> **Note:** AI proxy provider API keys (e.g., `ANTHROPIC_API_KEY`) are configured during post-deploy (step 7, `08-post-deploy.md` § 8.1), not during worker deployment (step 1). Worker deployment only sets up the infrastructure (`AUTH_TOKEN`).
+> **Note:** AI proxy provider API keys (e.g., `ANTHROPIC_API_KEY`) are configured during post-deploy (step 6, `08-post-deploy.md` § 8.1), not during worker deployment (step 1). Worker deployment only sets up the infrastructure (`AUTH_TOKEN`).
 
 Ask the user to confirm before proceeding with the deployment.
 
 ### Automation directive
 
-After the user confirms, execute playbooks 01 through 07 **continuously without pausing between steps**. Do not ask for confirmation between playbooks. Only stop if:
+After the user confirms, launch **01-workers and 02-base-setup as parallel subagents** (two Task tool calls in a single message). These have no shared dependencies — workers run locally via wrangler while base setup runs on the VPS via SSH. After both subagents return, execute playbooks 03 through 07 **continuously without pausing between steps**. Do not ask for confirmation between playbooks. Only stop if:
 
 - A command fails and the error requires user input to resolve
 - A playbook step explicitly says to wait for user input (e.g., a blocking error with multiple resolution paths)
@@ -283,6 +284,8 @@ A full deployment consumes significant context. To avoid mid-deploy compaction, 
 | 04: Build + start (4.4) | Full Docker build log | pass/fail |
 | 06: Backup setup | Script creation + cron config | pass/fail, test backup size |
 | 07: VPS-side verification | 14 SSH checks, each with output | Summary table (check name + pass/fail) |
+
+> **Parallel launch:** 01 and 02 subagents should be launched together in a single message (multiple Task tool calls). Both must return their values before step 04 can begin — 04 needs worker URLs/tokens from 01 and requires Docker (step 03, which depends on 02).
 
 **Keep in main context:** Steps that generate credentials stored in `openclaw-config.env` (user creation in 02, gateway token recording in 04 after setup-infra.sh returns it), SSH hardening port transition (02), device pairing (04/08), user-facing interactions (08), local-side verification checks in 07 (worker health, Cloudflare Access, port exposure — these are fast curl commands), and the **sandbox build wait** (04: §4.4 — use background task + progress polling pattern for user feedback, ~100 tokens per poll).
 
