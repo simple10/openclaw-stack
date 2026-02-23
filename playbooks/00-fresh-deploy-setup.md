@@ -263,7 +263,7 @@ After the user confirms, launch **01-workers and 02-base-setup as parallel subag
 - A command fails and the error requires user input to resolve
 - A playbook step explicitly says to wait for user input (e.g., a blocking error with multiple resolution paths)
 - **SSH verification (02-base-setup.md § 2.4 Step 3):** You MUST test SSH on port `<SSH_HARDENED_PORT>` from the local machine and confirm it works before proceeding. This is a mandatory stop point — do not skip it during automated deployment.
-- **07-verification.md:** Delegate full VPS-side checks to a subagent. Report the summary table before proceeding to 08-post-deploy.md.
+- **07-verification.md:** Run in the main context (not a subagent) so the user sees real-time progress and errors can be handled directly. By this point, all heavy steps have been offloaded to subagents and the context window has room. Report the summary table before proceeding to 08-post-deploy.md.
 
 Normal informational output (progress updates, version notes, check results) should be reported inline without pausing. The first user interaction after confirmation should be device pairing in `08-post-deploy.md`.
 
@@ -283,11 +283,10 @@ A full deployment consumes significant context. To avoid mid-deploy compaction, 
 | 04: Deploy configuration (4.3) | deploy-config.sh runs on VPS | pass/fail |
 | 04: Build + start (4.4) | Full Docker build log | pass/fail |
 | 06: Backup setup | Script creation + cron config | pass/fail, test backup size |
-| 07: VPS-side verification | 14 SSH checks, each with output | Summary table (check name + pass/fail) |
 
 > **Parallel launch:** 01 and 02 subagents should be launched together in a single message (multiple Task tool calls). Both must return their values before step 04 can begin — 04 needs worker URLs/tokens from 01 and requires Docker (step 03, which depends on 02).
 
-**Keep in main context:** Steps that generate credentials stored in `openclaw-config.env` (user creation in 02, gateway token recording in 04 after setup-infra.sh returns it), SSH hardening port transition (02), device pairing (04/08), user-facing interactions (08), local-side verification checks in 07 (worker health, Cloudflare Access, port exposure — these are fast curl commands), and the **sandbox build wait** (04: §4.4 — use background task + progress polling pattern for user feedback, ~100 tokens per poll).
+**Keep in main context:** Steps that generate credentials stored in `openclaw-config.env` (user creation in 02, gateway token recording in 04 after setup-infra.sh returns it), SSH hardening port transition (02), device pairing (04/08), user-facing interactions (08), **07-verification.md** (all checks — runs after heavy steps are done, gives user real-time progress and direct error handling), and the **sandbox build wait** (04: §4.4 — use background task + progress polling pattern for user feedback, ~100 tokens per poll).
 
 **Critical: avoid reading playbooks before delegating.** Do NOT read a playbook into main context and then pass its contents to a subagent — this doubles the context cost. Instead, tell the subagent to read the playbook section itself:
 
