@@ -128,7 +128,7 @@ printf '\033[33m[%d/%d] Regenerating gateway shims...\033[0m\n' "$STEP" "$TOTAL_
 if [ "$DRY_RUN" = true ]; then
   echo "  [dry-run] Would regenerate shims via docker exec --user root"
 else
-  ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+  TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
     "sudo docker exec -i --user root $GATEWAY sh" << 'SHIM_SCRIPT'
 TOOLKIT_CONFIG="/app/deploy/sandbox-toolkit.yaml"
 TOOLKIT_PARSER="/app/deploy/parse-toolkit.mjs"
@@ -186,10 +186,10 @@ if [ "$DRY_RUN" = true ]; then
 fi
 
 if [ "$DRY_RUN" = true ]; then
-  ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+  TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
     "sudo docker exec $GATEWAY /app/deploy/rebuild-sandboxes.sh $REBUILD_FLAGS"
 else
-  ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" -t "${SSH_USER}@${VPS1_IP}" \
+  TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" -t "${SSH_USER}@${VPS1_IP}" \
     "sudo docker exec $GATEWAY /app/deploy/rebuild-sandboxes.sh $REBUILD_FLAGS"
 fi
 

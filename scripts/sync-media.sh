@@ -24,7 +24,7 @@ mkdir -p "$LOCAL_DIR"
 
 echo "Syncing media from VPS to $LOCAL_DIR ..."
 rsync -avz --progress \
-  -e "ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT}" \
+  -e "TERM=xterm-256color ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT}" \
   --rsync-path="sudo rsync" \
   "${SSH_USER}@${VPS1_IP}:${REMOTE_PATH}" \
   "$LOCAL_DIR/"

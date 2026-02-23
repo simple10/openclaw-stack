@@ -29,13 +29,13 @@ if ! ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
 fi
 
 printf '\033[33mRestarting %s...\033[0m\n' "$GATEWAY"
-ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
   "sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart $GATEWAY'"
 
 # Wait for gateway to be healthy
 printf '\033[33mWaiting for gateway to be healthy...\033[0m\n'
 for i in $(seq 1 30); do
-  STATUS=$(ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+  STATUS=$(TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
     "sudo docker inspect -f '{{.State.Health.Status}}' $GATEWAY 2>/dev/null" || echo "unknown")
   if [ "$STATUS" = "healthy" ]; then
     printf '\033[32mGateway is healthy.\033[0m\n'

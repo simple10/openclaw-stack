@@ -74,7 +74,7 @@ else
   FILTER="name=openclaw-sbx-"
 fi
 
-CONTAINERS=$(ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+CONTAINERS=$(TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
   "sudo docker exec $GATEWAY docker ps -a --filter '$FILTER' --format '{{.Names}}\t{{.Status}}\t{{.Image}}'" 2>/dev/null || true)
 
 # Filter out browser containers unless --all
@@ -115,7 +115,7 @@ fi
 
 # Graceful stop (SIGTERM + 10s grace period) before removal.
 printf '\033[33mStopping sandbox containers...\033[0m\n'
-ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
   "sudo docker exec $GATEWAY docker stop $NAMES" 2>/dev/null || true
 
 # Use 'openclaw sandbox recreate' to remove containers AND clean the internal
@@ -126,7 +126,7 @@ if [ "$ALL" = false ]; then
   RECREATE_FLAGS="--force"
 fi
 printf '\033[33mRemoving sandbox containers...\033[0m\n'
-ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
   "sudo docker exec --user node $GATEWAY openclaw sandbox recreate $RECREATE_FLAGS"
 
 echo ""

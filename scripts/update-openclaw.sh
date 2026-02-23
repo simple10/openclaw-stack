@@ -25,17 +25,17 @@ printf '\033[32mUpdating OpenClaw on %s...\033[0m\n' "$VPS1_IP"
 
 # Step 1: Pull upstream changes
 printf '\033[33m[1/4] Pulling upstream changes...\033[0m\n'
-ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
   "sudo -u openclaw bash -c 'cd $OPENCLAW_DIR && git pull'"
 
 # Step 2: Rebuild gateway image
 printf '\033[33m[2/4] Building gateway image...\033[0m\n'
-ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
   "sudo -u openclaw $OPENCLAW_DIR/scripts/build-openclaw.sh"
 
 # Step 3: Recreate container with new image (brief downtime)
 printf '\033[33m[3/4] Recreating gateway container...\033[0m\n'
-ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
   "sudo -u openclaw bash -c 'cd $OPENCLAW_DIR && docker compose up -d'"
 
 # Step 4: Wait for healthy + show version
@@ -43,7 +43,7 @@ printf '\033[33m[4/4] Waiting for gateway to be healthy...\033[0m\n'
 TIMEOUT=300
 ELAPSED=0
 while true; do
-  STATUS=$(ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+  STATUS=$(TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
     "sudo docker inspect -f '{{.State.Health.Status}}' $GATEWAY 2>/dev/null" 2>/dev/null || echo "unknown")
   if [ "$STATUS" = "healthy" ]; then
     break
@@ -60,6 +60,6 @@ done
 
 # Show version
 echo ""
-VERSION=$(ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+VERSION=$(TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
   "openclaw --version 2>/dev/null" || echo "(could not read version)")
 printf '\033[32mOpenClaw updated successfully. Version: %s\033[0m\n' "$VERSION"

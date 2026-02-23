@@ -87,5 +87,5 @@ case "${1:-}" in
   llm-*) EXTRA_ARGS="${EXTRA_ARGS} --llm-log ${LLM_LOG}" ;;
 esac
 
-ssh $SSH_TTY_FLAG -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+TERM=xterm-256color ssh $SSH_TTY_FLAG -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
   "sudo python3 ${REMOTE_SCRIPT} $* ${EXTRA_ARGS}"

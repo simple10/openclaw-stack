@@ -55,7 +55,7 @@ if ! ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
 fi
 
 # Run rebuild-sandboxes.sh inside the running gateway container
-ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" -t "${SSH_USER}@${VPS1_IP}" \
+TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" -t "${SSH_USER}@${VPS1_IP}" \
   "sudo docker exec $GATEWAY /app/deploy/rebuild-sandboxes.sh $FLAGS"
 
 echo ""
