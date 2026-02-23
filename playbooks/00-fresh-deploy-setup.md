@@ -278,15 +278,13 @@ A full deployment consumes significant context. To avoid mid-deploy compaction, 
 | 01: Workers deployment | npm install + wrangler deploy output | Worker URLs, auth tokens, D1 database ID |
 | 02: System update + package install | apt output (hundreds of lines) | pass/fail |
 | 02: SSH hardening (2.5–2.9) | swap, fail2ban, kernel config output | pass/fail, cloudflared version |
-| 03: Docker CE installation | apt + daemon config output | pass/fail, Docker/Compose versions |
 | 04: Sysbox + infra (4.1–4.2) | dpkg + network/directory creation + SCP | pass/fail, GATEWAY_TOKEN |
 | 04: Deploy configuration (4.3) | deploy-config.sh runs on VPS | pass/fail |
 | 04: Build + start (4.4) | Full Docker build log | pass/fail |
-| 06: Backup setup | Script creation + cron config | pass/fail, test backup size |
 
 > **Parallel launch:** 01 and 02 subagents should be launched together in a single message (multiple Task tool calls). Both must return their values before step 04 can begin — 04 needs worker URLs/tokens from 01 and requires Docker (step 03, which depends on 02).
 
-**Keep in main context:** Steps that generate credentials stored in `openclaw-config.env` (user creation in 02, gateway token recording in 04 after setup-infra.sh returns it), SSH hardening port transition (02), device pairing (04/08), user-facing interactions (08), **07-verification.md** (all checks — runs after heavy steps are done, gives user real-time progress and direct error handling), and the **sandbox build wait** (04: §4.4 — use background task + progress polling pattern for user feedback, ~100 tokens per poll).
+**Keep in main context:** Steps that generate credentials stored in `openclaw-config.env` (user creation in 02, gateway token recording in 04 after setup-infra.sh returns it), SSH hardening port transition (02), **03-docker.md** (short — use `2>&1 | tail -5` for apt output), device pairing (04/08), **06-backup.md** (short — uses `SOURCE:` pattern, no verbose output), user-facing interactions (08), **07-verification.md** (all checks — runs after heavy steps are done, gives user real-time progress and direct error handling), and the **sandbox build wait** (04: §4.4 — use background task + progress polling pattern for user feedback, ~100 tokens per poll).
 
 **Critical: avoid reading playbooks before delegating.** Do NOT read a playbook into main context and then pass its contents to a subagent — this doubles the context cost. Instead, tell the subagent to read the playbook section itself:
 
@@ -315,10 +313,8 @@ Instruct each subagent to write its detailed report (all commands run, full outp
 ```
 .deploy-logs/YYYYMMDD-HHMMSS/01-workers.md
 .deploy-logs/YYYYMMDD-HHMMSS/02-base-setup.md
-.deploy-logs/YYYYMMDD-HHMMSS/03-docker.md
 .deploy-logs/YYYYMMDD-HHMMSS/04-infra-config.md
 .deploy-logs/YYYYMMDD-HHMMSS/04-build-start.md
-.deploy-logs/YYYYMMDD-HHMMSS/06-backup.md
 ```
 
 The subagent's return message to the main agent should still be a short summary (pass/fail + key values). The log file contains everything else. At the end of deployment, tell the user where the logs are so they can ask for review if needed.
