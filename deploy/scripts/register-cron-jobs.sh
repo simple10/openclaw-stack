@@ -12,32 +12,24 @@ set -euo pipefail
 #
 # Prerequisites: Gateway container must be running and healthy.
 
-# ============================================================
 # Parse schedule from HOSTALERT_DAILY_REPORT_TIME
-# ============================================================
 # Default: "9:30 AM PST" → cron "30 9 * * *" in America/Los_Angeles
 CRON_EXPR="${CRON_EXPR:-30 9 * * *}"
 CRON_TZ="${CRON_TZ:-America/Los_Angeles}"
 
-# ============================================================
 # Check if already registered (idempotent)
-# ============================================================
 if openclaw cron list 2>/dev/null | grep -q "Daily VPS Health Check"; then
   echo "Cron job 'Daily VPS Health Check' already registered, skipping."
   exit 0
 fi
 
-# ============================================================
 # Build delivery flags
-# ============================================================
 DELIVERY_FLAGS=""
 if [ -n "${HOSTALERT_TELEGRAM_CHAT_ID:-}" ]; then
   DELIVERY_FLAGS="--channel telegram --to ${HOSTALERT_TELEGRAM_CHAT_ID}"
 fi
 
-# ============================================================
 # Register the cron job
-# ============================================================
 # shellcheck disable=SC2086
 openclaw cron add \
   --name "Daily VPS Health Check" \

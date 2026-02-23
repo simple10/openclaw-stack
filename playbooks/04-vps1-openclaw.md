@@ -333,14 +333,7 @@ Print the result as a status update to the user (e.g., `[entrypoint] Building to
 
 3. **Check background task completion** between polls using `TaskOutput` with `block: false`. When the background task returns `READY`, proceed to the next step.
 
-> **Why not just check health?** The health endpoint (`curl`) responds as soon as the
-> gateway HTTP server starts, which happens before sandbox builds finish. But device
-> pairing requires the gateway to be fully initialized. Checking the "Executing as node"
-> log line ensures the entrypoint has completed.
->
-> **Why not delegate to a subagent?** Subagent output is invisible to the user until it
-> returns. The background + polling pattern keeps the build in the main context cheaply
-> (~100 tokens per poll) while giving real-time progress feedback.
+> **Note:** Check for the "Executing as node" log line, not the health endpoint — health responds before sandbox builds complete.
 
 ### Fix .openclaw ownership
 

@@ -370,7 +370,7 @@ Compare: CPUs should equal `nproc`, memory should be total minus 500M–1GB. Nan
 
 **If match:** Report correctly sized and continue.
 
-**If mismatch during fresh deploy:** Auto-apply recommended values (CPUs = nproc, memory = total - 750M) without prompting.
+**If mismatch during fresh deploy:** Resource limits were already reviewed in `00-fresh-deploy-setup.md` § 0.4. Auto-apply only if the gap is significant (CPUs differ or memory off by >2GB); otherwise report and continue.
 
 **If mismatch outside fresh deploy:** Show comparison and ask user. If confirmed, update local `deploy/docker-compose.override.yml`, then:
 

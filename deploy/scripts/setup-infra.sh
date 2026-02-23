@@ -14,9 +14,7 @@ set -euo pipefail
 #   Stdout: single line OPENCLAW_GENERATED_TOKEN=<hex> (all other output -> stderr)
 #   Exit: 0 success, 1 failure
 
-# ============================================================
 # Validate required environment variables
-# ============================================================
 # These must be passed by the caller (see playbook 04, section 4.2).
 # If running via sudo, use: env VAR=value ... bash setup-infra.sh
 # (do NOT use: sudo bash setup-infra.sh — sudo strips env vars)
@@ -30,9 +28,7 @@ for var in AI_GATEWAY_WORKER_URL AI_GATEWAY_AUTH_TOKEN; do
 done
 [ "$missing" -eq 1 ] && exit 1
 
-# ============================================================
 # Part 1: Create Docker Networks
-# ============================================================
 # IMPORTANT: Use 172.30.x.x subnets to avoid conflicts with Docker's default bridge (172.17.0.0/16)
 
 # Gateway network (for OpenClaw)
@@ -48,9 +44,7 @@ docker network create \
     --subnet 172.31.0.0/24 \
     openclaw-sandbox-net >&2
 
-# ============================================================
 # Part 2: Create Directory Structure
-# ============================================================
 sudo -u openclaw bash << 'DIREOF'
 OPENCLAW_HOME="/home/openclaw"
 
@@ -83,9 +77,7 @@ sudo chmod 755 /home/openclaw/.openclaw/workspace/host-status
 
 echo "Directory structure created." >&2
 
-# ============================================================
 # Part 3: Clone OpenClaw Repository
-# ============================================================
 sudo -u openclaw bash << 'CLONEEOF'
 cd /home/openclaw
 git clone https://github.com/openclaw/openclaw.git openclaw
@@ -96,9 +88,7 @@ CLONEEOF
 
 echo "Repository cloned." >&2
 
-# ============================================================
 # Part 4: Create Environment File
-# ============================================================
 GATEWAY_TOKEN=$(openssl rand -hex 32)
 
 # Dashboard base path — direct from config, no parsing needed
@@ -146,13 +136,10 @@ sudo chmod 600 /home/openclaw/openclaw/.env
 sudo chown openclaw:openclaw /home/openclaw/openclaw/.env
 
 echo "" >&2
-echo "=========================================" >&2
 echo "Generated Credentials (save these):" >&2
 echo "  Gateway Token: ${GATEWAY_TOKEN}" >&2
 if [ -n "${DASHBOARD_BASE_PATH}" ]; then
   echo "  Dashboard Base Path: ${DASHBOARD_BASE_PATH}" >&2
 fi
-echo "=========================================" >&2
 
-# Single stdout line for machine parsing
 echo "OPENCLAW_GENERATED_TOKEN=${GATEWAY_TOKEN}"

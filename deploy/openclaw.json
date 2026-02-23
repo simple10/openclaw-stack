@@ -1,19 +1,3 @@
-//
-// OpenClaw Config
-//
-// This file is json5 compatible.
-// Use jsonc (JSON with comments) when editing to avoid IDE formatting errors.
-//
-// This file is what controls the core setup of OpenClaw. It's loaded by the OpenClaw Gateway.
-// When OpenClaw starts, it adds defaults to its copy of openclaw.json
-// After deploy, changes can be made directly through OpenClaw (won't sync here).
-// Or changes can be made to this file and redeployed via claude.
-// Claude will attempt to diff any changes to this file and merge with the live openclaw.json.
-// If needed tell claude to completely replace the live version with this one when deploying changes.
-//
-// Some settings can be changed and hot-reloaded without a gateway restart.
-// Ask claude to deploy config changes.
-//
 // Hot-reloadable (no restart needed):
 //   - hooks — reloads hook handlers
 //   - cron — restarts cron jobs
@@ -287,36 +271,6 @@
           }
         }
       }
-      // PERSONAL AGENT
-      // Can be configured with custom AGENTS.md, SOUL.md, etc or different skills
-      // Has it's own browser container to login to personal accounts
-      // IMPORTANT: add agent id to main agent's list of allowedAgents to allow for delegation - otherwise only direct CLI or API is allowed
-      // {
-      //   "id": "personal",
-      //   "name": "Personal Agent",
-      //   // Add or remove specific personal agent skills as needed
-      //   "skills": [],
-      //   "sandbox": {
-      //     "docker": {
-      //       "network": "bridge"
-      //     }
-      //   }
-      // },
-      // WORK AGENT
-      // Can be configured with custom AGENTS.md, SOUL.md, etc or different skills
-      // Has it's own browser container to login to work accounts
-      // IMPORTANT: add agent id to main agent's list of allowedAgents to allow for delegation
-      // {
-      //   "id": "work",
-      //   "name": "Work Agent",
-      //   // Add or remove specific work related agent skills as needed
-      //   "skills": [],
-      //   "sandbox": {
-      //     "docker": {
-      //       "network": "bridge"
-      //     }
-      //   }
-      // }
     ]
   },
   "plugins": {
@@ -388,10 +342,7 @@
       }
     }
   },
-  // Top-level Tools Config
-  // These are the default tool settings for all agents
-  // Add agent specific overrides in the agents list above
-  // It's highly recommended to restrict tool usage per agent in production to protect against prompt injection attacks
+  // Default tool settings — override per-agent in agents.list
   "tools": {
     // Elevated mode — escape hatch for running exec on host from a sandboxed session
     // Gated to specific sender IDs. Use /elevated on in chat to activate, /elevated off to deactivate.

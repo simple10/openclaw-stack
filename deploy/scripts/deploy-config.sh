@@ -39,16 +39,12 @@ GATEWAY_TOKEN=$(sudo grep OPENCLAW_GATEWAY_TOKEN /home/openclaw/openclaw/.env | 
 
 STAGING="/tmp/deploy-staging"
 
-# ============================================================
 # 1. Docker Compose override (static)
-# ============================================================
 # Building happens separately via the build script (section 4.4), not via docker compose build.
 sudo -u openclaw cp "${STAGING}/docker-compose.override.yml" /home/openclaw/openclaw/docker-compose.override.yml
 echo "Deployed docker-compose.override.yml" >&2
 
-# ============================================================
 # 2. Vector log shipper (static, conditional)
-# ============================================================
 if [ "${ENABLE_VECTOR_LOG_SHIPPING}" = "true" ]; then
   sudo -u openclaw mkdir -p /home/openclaw/vector/data
 
@@ -69,9 +65,7 @@ else
   echo "Vector log shipping disabled, skipping." >&2
 fi
 
-# ============================================================
 # 3. OpenClaw configuration (template)
-# ============================================================
 # IMPORTANT: OpenClaw rejects unknown config keys — only use documented keys.
 # bind: "lan" required (Docker bridge traffic, not loopback). openclaw doctor warning is expected.
 # trustedProxies: exact IPs only, CIDR ranges NOT supported.
@@ -120,9 +114,7 @@ sudo chown 1000:1000 /home/openclaw/.openclaw/openclaw.json
 sudo chmod 600 /home/openclaw/.openclaw/openclaw.json
 echo "Deployed openclaw.json with template substitution." >&2
 
-# ============================================================
 # 4. Agent model configuration (template)
-# ============================================================
 # IMPORTANT: The embedded agent reads models.json from the agent directory,
 # NOT from openclaw.json. The built-in "anthropic" provider ignores the
 # ANTHROPIC_BASE_URL env var — this file is the only way to override the base URL.
@@ -151,9 +143,7 @@ for agent in main code skills; do
 done
 echo "Deployed per-agent models.json." >&2
 
-# ============================================================
 # 5. Build script and patches (static)
-# ============================================================
 # Instead of maintaining a forked Dockerfile, we patch upstream source files
 # in-place before building. Each patch auto-skips when already applied.
 # Five patches applied by build-openclaw.sh (each auto-skips when upstream fixes the issue).
@@ -162,9 +152,7 @@ sudo -u openclaw cp "${STAGING}/build-openclaw.sh" /home/openclaw/scripts/build-
 sudo chmod +x /home/openclaw/scripts/build-openclaw.sh
 echo "Deployed build-openclaw.sh." >&2
 
-# ============================================================
 # 6. Gateway entrypoint script (static)
-# ============================================================
 # Runs as root (user: "0:0"). Handles lock cleanup, permission fixes, dockerd startup,
 # sandbox image builds, then drops to node via gosu. See inline comments for details.
 sudo -u openclaw mkdir -p /home/openclaw/openclaw/scripts
@@ -172,9 +160,7 @@ sudo -u openclaw cp "${STAGING}/entrypoint-gateway.sh" /home/openclaw/openclaw/s
 sudo chmod +x /home/openclaw/openclaw/scripts/entrypoint-gateway.sh
 echo "Deployed entrypoint-gateway.sh." >&2
 
-# ============================================================
 # 7. Host alerter & maintenance checker (static)
-# ============================================================
 sudo cp "${STAGING}/host-alert.sh" /home/openclaw/scripts/host-alert.sh
 sudo chmod +x /home/openclaw/scripts/host-alert.sh
 
@@ -208,9 +194,7 @@ sudo chmod 644 /etc/cron.d/openclaw-alerts
 sudo chmod 644 /etc/cron.d/openclaw-maintenance
 echo "Deployed host cron jobs." >&2
 
-# ============================================================
 # 8. OpenClaw CLI host wrapper (inline)
-# ============================================================
 # Write wrapper directly to /usr/local/bin (not a symlink — adminclaw can't
 # traverse /home/openclaw/scripts/ due to directory permissions)
 sudo tee /usr/local/bin/openclaw > /dev/null << 'WRAPEOF'
@@ -227,9 +211,7 @@ WRAPEOF
 sudo chmod +x /usr/local/bin/openclaw
 echo "Deployed openclaw CLI wrapper." >&2
 
-# ============================================================
 # 9. Deploy plugins (static)
-# ============================================================
 # Plugins are loaded via plugins.load.paths in openclaw.json (pointing to /app/deploy/plugins).
 # They are NOT copied into ~/.openclaw/extensions/ — this avoids name collisions
 # with any plugins bundled by OpenClaw.
@@ -240,9 +222,7 @@ sudo cp -r "${STAGING}/plugins/"* /home/openclaw/openclaw/deploy/plugins/
 sudo chown -R 1000:1000 /home/openclaw/openclaw/deploy/plugins/
 echo "Deployed plugins." >&2
 
-# ============================================================
 # 10. Sandbox toolkit, rebuild script, and dashboard (static)
-# ============================================================
 # These files are bind-mounted into the container via ./deploy:/app/deploy:ro.
 # They must exist on the host before the container starts, otherwise Docker
 # creates empty directories as mount targets and sandbox builds fail.
@@ -254,9 +234,7 @@ sudo -u openclaw mkdir -p /home/openclaw/openclaw/deploy/dashboard
 sudo -u openclaw cp -r "${STAGING}/dashboard/"* /home/openclaw/openclaw/deploy/dashboard/
 echo "Deployed sandbox toolkit, rebuild script, and dashboard." >&2
 
-# ============================================================
 # 11. Log rotation config (static)
-# ============================================================
 sudo cp "${STAGING}/logrotate-openclaw" /etc/logrotate.d/openclaw
 sudo chmod 644 /etc/logrotate.d/openclaw
 
@@ -264,15 +242,10 @@ sudo chmod 644 /etc/logrotate.d/openclaw
 sudo logrotate -d /etc/logrotate.d/openclaw >&2 2>&1
 echo "Deployed logrotate configuration." >&2
 
-# ============================================================
 # Cleanup
-# ============================================================
 rm -rf "${STAGING}"
 
 echo "" >&2
-echo "=========================================" >&2
 echo "Configuration deployment complete." >&2
-echo "=========================================" >&2
 
-# Single stdout line for machine parsing
 echo "DEPLOY_CONFIG_OK"
