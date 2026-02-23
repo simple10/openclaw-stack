@@ -118,7 +118,7 @@ See [docs/CLOUDFLARE-TUNNEL.md](../docs/CLOUDFLARE-TUNNEL.md#rotating-tunnel-tok
 
 ### Sandbox Images
 
-Sandbox images (base, common, browser) persist across gateway restarts in `./data/docker`. The entrypoint auto-rebuilds when:
+Sandbox images (base, toolkit, browser) persist across gateway restarts in `./data/docker`. The entrypoint auto-rebuilds when:
 
 - An image is **missing** (first boot or after manual removal)
 - **`sandbox-toolkit.yaml` changes** — config is embedded as a Docker label; entrypoint compares current config against the label and rebuilds on mismatch
@@ -126,7 +126,7 @@ Sandbox images (base, common, browser) persist across gateway restarts in `./dat
 For manual updates (security patches, new apt packages):
 
 ```bash
-# From local machine — rebuilds common + base if needed
+# From local machine — rebuilds toolkit + base if needed
 scripts/update-sandboxes.sh
 
 # Also rebuild browser sandbox
@@ -148,20 +148,20 @@ No gateway restart needed — builds happen inside the running container's neste
 
 Several deploy files are bind-mounted read-only into the gateway container. These can be updated without a full image rebuild — just SCP the file and restart the gateway.
 
-**Bind-mounted files:** `dashboard.mjs`, `entrypoint-gateway.sh`, `rebuild-sandboxes.sh`, `parse-toolkit.mjs`, `sandbox-toolkit.yaml`, `plugins/`, `hooks/`
+**Bind-mounted files:** `dashboard/`, `entrypoint-gateway.sh`, `rebuild-sandboxes.sh`, `parse-toolkit.mjs`, `sandbox-toolkit.yaml`, `plugins/`
 
 ```bash
-# From local machine
-scp -i <SSH_KEY_PATH> -P <SSH_PORT> deploy/<file> adminclaw@<VPS1_IP>:/tmp/<file>
+# From local machine — copy to VPS (use -r for directories like dashboard/ or plugins/)
+scp -i <SSH_KEY_PATH> -P <SSH_PORT> [-r] deploy/<path> adminclaw@<VPS1_IP>:/tmp/deploy-update
 
-# On VPS (or via ssh)
-sudo cp /tmp/<file> /home/openclaw/openclaw/deploy/<file>
-sudo chown 1000:1000 /home/openclaw/openclaw/deploy/<file>
-rm /tmp/<file>
-
-# Restart gateway to pick up changes (service name is "openclaw-gateway")
-# `restart` is correct here — bind-mounted files are read from disk at startup, no env var changes
-sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart openclaw-gateway'
+# Move into place, fix ownership, and restart gateway (single SSH session)
+ssh -i <SSH_KEY_PATH> -p <SSH_PORT> adminclaw@<VPS1_IP> "
+  sudo rm -rf /home/openclaw/openclaw/deploy/<path>
+  sudo cp -r /tmp/deploy-update /home/openclaw/openclaw/deploy/<path>
+  sudo chown -R 1000:1000 /home/openclaw/openclaw/deploy/<path>
+  rm -rf /tmp/deploy-update
+  sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart openclaw-gateway'
+"
 ```
 
 > **Note:** `sandbox-toolkit.yaml` changes are also auto-detected on gateway restart via Docker label comparison, triggering a sandbox image rebuild if needed.

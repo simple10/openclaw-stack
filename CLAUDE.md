@@ -24,7 +24,7 @@ All deployment steps are in modular playbooks under `playbooks/`:
 | `04-vps1-openclaw.md` | Sysbox, networks, gateway, Vector |
 | `06-backup.md` | Backup scripts and cron jobs |
 | `07-verification.md` | Testing and verification |
-| `maintenance.md` | Token rotation schedules and procedures |
+| `maintenance.md` | Token rotation, image updates, and maintenance |
 | `08-post-deploy.md` | Device pairing & deployment report |
 
 See [playbooks/README.md](playbooks/README.md) for detailed playbook documentation.
@@ -45,14 +45,7 @@ See [playbooks/README.md](playbooks/README.md) for detailed playbook documentati
 
 ## Configuration
 
-IMPORTANT: Read configuration from `openclaw-config.env`:
-
-```bash
-# See openclaw-config.env.example for all fields and documentation.
-# VPS1_IP, CF_TUNNEL_TOKEN, and domain config are required to start a fresh deployment.
-# Domain config (OPENCLAW_DOMAIN, OPENCLAW_DASHBOARD_DOMAIN, OPENCLAW_DASHBOARD_DOMAIN_PATH, OPENCLAW_DOMAIN_PATH)
-# is validated during fresh deploy setup (00-fresh-deploy-setup.md).
-```
+IMPORTANT: Read configuration from `openclaw-config.env`. See `openclaw-config.env.example` for all fields. Required: `VPS1_IP`, `CF_TUNNEL_TOKEN`, domain config (`OPENCLAW_DOMAIN`, `OPENCLAW_DASHBOARD_DOMAIN`, paths). Domain config is validated during fresh deploy setup (`00-fresh-deploy-setup.md`).
 
 SSH_USER and SSH_PORT start as provider defaults (e.g., `ubuntu`/`22`) and are changed to `adminclaw`/`<SSH_HARDENED_PORT>` during hardening. `SSH_HARDENED_PORT` (default `222`) is set in config and removed after hardening completes.
 
@@ -62,37 +55,16 @@ SSH_USER and SSH_PORT start as provider defaults (e.g., `ubuntu`/`22`) and are c
 
 **ALWAYS start this flow when the user's intent is ambiguous or general** (e.g., "hi", "start", "let's go", "help me"). Also start when the user explicitly requests deployment or mentions VPS work. This is the default entry point.
 
-### Step 0: Check Configuration File
-
-Check `openclaw-config.env` exists. If missing, tell user to `cp openclaw-config.env.example openclaw-config.env` and fill in values. Give the user the option to copy the example env for them.
-
-### Step 1: Deployment Type
-
-Ask: **New deployment** (fresh VPS) or **Existing deployment** (already configured)?
-
-- **New deployment:** Follow `playbooks/00-fresh-deploy-setup.md` for validation (`VPS1_IP`, `CF_TUNNEL_TOKEN`, domain config, and SSH needed). Cloudflare Access must be configured before deploy begins.
-- **Existing deployment:** Ask: **Analyze** (`00-analysis-mode.md`), **Test** (`07-verification.md`), or **Modify** (describe custom changes). If "something else," use plan mode.
+1. Check `openclaw-config.env` exists. If missing, offer to `cp openclaw-config.env.example openclaw-config.env`.
+2. Ask: **New deployment** (fresh VPS) or **Existing deployment** (already configured)?
+   - **New deployment:** Follow [00-fresh-deploy-setup.md](playbooks/00-fresh-deploy-setup.md) for validation and deployment.
+   - **Existing deployment:** Ask: **Analyze** (`00-analysis-mode.md`), **Test** (`07-verification.md`), or **Modify** (describe changes). If something else, use plan mode.
 
 ---
 
 ## Execution Order
 
-### Full Deployment
-
-```
-1. Validate openclaw-config.env (including placeholder detection + auto worker deployment)
-2. Execute 02-base-setup.md on VPS-1
-3. Execute 03-docker.md on VPS-1
-4. Execute 04-vps1-openclaw.md on VPS-1
-5. Execute 06-backup.md on VPS-1
-6. Reboot VPS-1
-7. Execute 07-verification.md
-8. Execute 08-post-deploy.md (device pairing & deployment report)
-```
-
-All steps are sequential on a single VPS. Workers deployment (01-workers) runs from the local machine using `wrangler` and is triggered automatically during config validation if needed.
-
-**Automation:** After the user confirms the deployment plan in `00-fresh-deploy-setup.md` § 0.7, execute all playbooks continuously without pausing between steps. Only stop for errors requiring user input. The first user interaction after confirmation should be device pairing in `08-post-deploy.md`.
+See [00-fresh-deploy-setup.md](playbooks/00-fresh-deploy-setup.md) § 0.7 for execution order, automation directive, and context window management.
 
 ---
 
@@ -132,41 +104,4 @@ sudo -u openclaw bash -c 'cd /home/openclaw/vector && docker compose logs -f'   
 
 > **`restart` vs `up -d`:** `restart` does NOT reload `.env` values (baked at container creation). Use `up -d <service>` after `.env` changes. `restart` is fine for bind-mounted file changes (read from disk at startup).
 
-### Firewall
-
-```bash
-sudo ufw status    # View rules
-sudo ufw allow <port>  # Add rule
-sudo ufw reload    # Reload
-```
-
----
-
-## Security Model
-
-See [REQUIREMENTS.md § 2.1](REQUIREMENTS.md#21-two-user-model) for the two-user security model (`adminclaw` for admin, `openclaw` for runtime).
-
----
-
-## Troubleshooting Index
-
-Each playbook contains detailed troubleshooting sections. Common issues:
-
-| Issue | Playbook Section |
-|-------|------------------|
-| SSH lockout | `02-base-setup.md` -> Troubleshooting |
-| Container won't start | `04-vps1-openclaw.md` -> Troubleshooting |
-| Tunnel not starting | `07-verification.md` -> Tunnel Issues |
-| Backup permission denied | `06-backup.md` -> Troubleshooting |
-| Worker deployment fails | `01-workers.md` -> Troubleshooting |
-| Vector not shipping logs | `04-vps1-openclaw.md` -> Troubleshooting |
-
----
-
-For detailed architecture, configuration, and gotchas, see [REQUIREMENTS.md](REQUIREMENTS.md).
-
----
-
-## Security Checklist
-
-See [07-verification.md § 7.6](playbooks/07-verification.md) for the full security verification.
+For detailed architecture, security model, and gotchas, see [REQUIREMENTS.md](REQUIREMENTS.md).

@@ -1,13 +1,25 @@
 {
   "cSpell.words": [
     "adminclaw",
-    "HOSTALERT",
+    "blogwatcher",
+    "clawhub",
+    "cloudflared",
+    "gifgrep",
+    "healthcheck",
+    "hostalert",
+    "linuxbrew",
+    "llemtry",
     "lockdown",
     "openclaw",
+    "ordercli",
+    "pids",
     "reloadable",
-    "webchat"
+    "urlencode",
+    "wacli",
+    "webchat",
+    "websockify"
   ],
   "files.associations": {
-    "deploy/openclaw.json": "json5"
+    "deploy/openclaw.json": "jsonc"
   }
 }

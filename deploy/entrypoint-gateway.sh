@@ -112,54 +112,6 @@ if ! echo "$PATH" | grep -q '/opt/skill-bins'; then
   export PATH="/opt/skill-bins:$PATH"
 fi
 
-# ── 1h. Deploy plugins to global extensions dir ────────────────────
-# Plugins from deploy/plugins/ are copied to ~/.openclaw/extensions/
-# where the gateway discovers them automatically.
-# The coordinator plugin builds a routing table from agent configs and injects
-# delegation context into the coordinator agent via prependContext.
-global_extensions="/home/node/.openclaw/extensions"
-deploy_plugins="/app/deploy/plugins"
-if [ -d "$deploy_plugins" ]; then
-  mkdir -p "$global_extensions"
-  for plugin_dir in "$deploy_plugins"/*/; do
-    plugin_name=$(basename "$plugin_dir")
-    target="$global_extensions/$plugin_name"
-    # Copy if new or source is newer
-    if [ ! -d "$target" ] || [ "$deploy_plugins/$plugin_name/index.js" -nt "$target/index.js" ]; then
-      rm -rf "$target"
-      cp -r "$deploy_plugins/$plugin_name" "$target"
-      echo "[entrypoint] Deployed plugin: $plugin_name"
-    fi
-  done
-  chown -R 1000:1000 "$global_extensions"
-  echo "[entrypoint] Plugins ready"
-else
-  echo "[entrypoint] No plugins to deploy"
-fi
-
-# ── 1i. Deploy managed hooks ──────────────────────────────────────
-# Hooks from deploy/hooks/ are copied to ~/.openclaw/hooks/ where the
-# gateway discovers them. Each hook dir contains HOOK.md + handler.js.
-# Hook entries must also be enabled in openclaw.json (hooks.internal.entries).
-hooks_dir="/home/node/.openclaw/hooks"
-deploy_hooks="/app/deploy/hooks"
-if [ -d "$deploy_hooks" ]; then
-  mkdir -p "$hooks_dir"
-  for hook_dir in "$deploy_hooks"/*/; do
-    hook_name=$(basename "$hook_dir")
-    target="$hooks_dir/$hook_name"
-    if [ ! -d "$target" ] || [ "$deploy_hooks/$hook_name/handler.js" -nt "$target/handler.js" ]; then
-      rm -rf "$target"
-      cp -r "$deploy_hooks/$hook_name" "$target"
-      echo "[entrypoint] Deployed hook: $hook_name"
-    fi
-  done
-  chown -R 1000:1000 "$hooks_dir"
-  echo "[entrypoint] Hooks ready"
-else
-  echo "[entrypoint] No hooks to deploy"
-fi
-
 # ── 2. Start nested Docker daemon (Sysbox provides isolation) ───────
 # /var/lib/docker is a persistent bind mount from host (./data/docker),
 # so sandbox images survive container restarts (no ~5min rebuild).
@@ -211,9 +163,21 @@ fi
 # Reads browsers.json dynamically to discover sandbox browser containers and their mapped ports.
 # Run as node to avoid creating root-owned jiti cache files in /tmp/jiti/
 # that would block the gateway (also node) from writing cache entries.
-DASHBOARD_SERVER="/app/deploy/dashboard.mjs"
+DASHBOARD_SERVER="/app/deploy/dashboard/server.mjs"
 if [ -f "$DASHBOARD_SERVER" ]; then
-  gosu node node "$DASHBOARD_SERVER" &
+  # Supervisor loop: restart dashboard if it crashes, with backoff to avoid spin.
+  # - set +e: parent script uses set -e which subshells inherit; without this,
+  #   a non-zero exit from the dashboard (e.g. signal kill) would exit the loop.
+  # - Inner (...) around gosu: gosu uses exec which replaces the current process;
+  #   the inner subshell gives gosu a disposable process to replace.
+  (
+    set +e
+    while true; do
+      ( gosu node node "$DASHBOARD_SERVER" )
+      echo "[entrypoint] Dashboard exited ($?), restarting in 3s..."
+      sleep 3
+    done
+  ) &
   echo "[entrypoint] Dashboard server started on port 6090 (as node)"
 fi
 

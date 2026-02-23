@@ -1,0 +1,56 @@
+{
+  "name": "openclaw-ai-gateway-proxy",
+  "main": "src/index.ts",
+  "workers_dev": true,
+  "preview_urls": false,
+
+  "compatibility_date": "2026-02-06",
+
+  // Workers Logs: enables console.log in the worker
+  "observability": {
+    "enabled": true
+  },
+
+  // Smart placement for reduced latency
+  "placement": {
+    "mode": "smart"
+  },
+
+  "vars": {
+    // ---- Worker Client Auth ----
+    //   (Set during deployment via `wrangler put secret ...`)
+    //   AUTH_TOKEN — token clients use to authenticate to this worker
+    //
+    //
+    // ---- Console Logging ----
+    "LOG_LEVEL": "debug", // Level to console.log to Cloudflare Worker Observability
+    //
+    //
+    // ---- LLM telemetry via llemtry (optional) ----
+    "LLEMTRY_ENABLED": "false", // Set to "true" to send LLM telemetry to log receiver worker
+    // LLEMTRY_ENDPOINT   — URL of log receiver /llemtry endpoint, set via `wrangler secret put ...`
+    // LLEMTRY_AUTH_TOKEN  — Bearer token for log receiver, set via `wrangler secret put ...`
+    //
+    //
+    // ---- Provider API keys ----
+    // (see docs/AI-GATEWAY-CONFIG.md):
+    //   OPENAI_API_KEY        — forwarded to OpenAI (required for OpenAI models)
+    //   ANTHROPIC_API_KEY     — forwarded to Anthropic (required for Anthropic models)
+    //   CLAUDE_CODE_OAUTH_TOKEN  — Claude Code subscription token (sk-ant-oat-*)
+    //
+    //
+    // ---- CF AI Gateway ID (optional) ----
+    // (see docs/AI-GATEWAY-CONFIG.md)
+    // This worker will route upstream provider requests through the Cloudflare AI Gateway when
+    // CF_AI_GATEWAY_TOKEN, CF_AI_GATEWAY_ACCOUNT_ID, and CF_AI_GATEWAY_ID are all set.
+    // Otherwise, upstream requests are routed directly to provider APIs (Anthropic, OpenAI).
+    // Auto-detected at runtime — no code changes needed to switch modes.
+    // When using CF AI Gateway, provider API keys can be set in the worker or directly in CF AI Gateway.
+    // Any provider keys set in this worker are passed to CF AI Gateway and take precedence
+    // over any keys set in the CF AI Gateway.
+    "CF_AI_GATEWAY_ID": "openclaw-ai-gateway"
+    // CF AI Gateway Secret Keys: use `wrangler put secret ...` or set in CF Dashboard
+    //   CF_AI_GATEWAY_ACCOUNT_ID — Cloudflare account ID (`wrangler whoami`)
+    //   CF_AI_GATEWAY_TOKEN      — authenticates requests to Cloudflare AI Gateway
+  }
+}

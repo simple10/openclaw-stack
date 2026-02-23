@@ -32,7 +32,7 @@ fi
 
 printf "\033[32mStreaming logs from all containers on VPS-1 (%s)\033[0m\n" "$VPS1_IP"
 
-ssh -t -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+TERM=xterm-256color ssh -t -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
   "sudo -u openclaw bash -c 'cd $COMPOSE_DIR && docker compose ${COMPOSE_ARGS[*]}'"
 
 # Alternate if multiple compose files:

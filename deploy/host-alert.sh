@@ -39,14 +39,16 @@ alerts=()
 
 # Disk usage (root partition)
 disk_pct=$(df / --output=pcent | tail -1 | tr -dc '0-9')
+disk_total_gb=$(df / --output=size | tail -1 | awk '{printf "%.0f", $1/1024/1024}')
 if (( disk_pct > DISK_THRESHOLD )); then
-  alerts+=("⚠️ Disk usage at ${disk_pct}% (threshold: ${DISK_THRESHOLD}%)")
+  alerts+=("⚠️ Disk usage at ${disk_pct}% of ${disk_total_gb} GB (threshold: ${DISK_THRESHOLD}%)")
 fi
 
 # Memory usage
 mem_total=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
 mem_available=$(awk '/MemAvailable/ {print $2}' /proc/meminfo)
 mem_pct=$(( (mem_total - mem_available) * 100 / mem_total ))
+mem_total_gb=$(awk '/MemTotal/ {printf "%.0f", $2/1024/1024}' /proc/meminfo)
 if (( mem_pct > MEMORY_THRESHOLD )); then
   alerts+=("⚠️ Memory usage at ${mem_pct}% (threshold: ${MEMORY_THRESHOLD}%)")
 fi
@@ -107,8 +109,10 @@ cat > "${STATUS_DIR}/health.json" << HEALTHEOF
 {
   "timestamp": "$(date -Iseconds)",
   "disk_pct": ${disk_pct},
+  "disk_total_gb": ${disk_total_gb},
   "disk_threshold": ${DISK_THRESHOLD},
   "memory_pct": ${mem_pct},
+  "memory_total_gb": ${mem_total_gb},
   "memory_threshold": ${MEMORY_THRESHOLD},
   "load_avg": "${load_avg}",
   "cpu_count": ${cpu_count},
@@ -153,18 +157,18 @@ if $REPORT_MODE; then
 
   # Disk
   if (( disk_pct > DISK_THRESHOLD )); then
-    report+=$'\n'"⚠️ Disk: ${disk_pct}% (limit ${DISK_THRESHOLD}%)"
+    report+=$'\n'"⚠️ Disk: ${disk_pct}% of ${disk_total_gb} GB (limit ${DISK_THRESHOLD}%)"
     ((warn_count+=1))
   else
-    report+=$'\n'"✅ Disk: ${disk_pct}% (limit ${DISK_THRESHOLD}%)"
+    report+=$'\n'"✅ Disk: ${disk_pct}% of ${disk_total_gb} GB (limit ${DISK_THRESHOLD}%)"
   fi
 
   # Memory
   if (( mem_pct > MEMORY_THRESHOLD )); then
-    report+=$'\n'"⚠️ Memory: ${mem_pct}% (limit ${MEMORY_THRESHOLD}%)"
+    report+=$'\n'"⚠️ Memory: ${mem_pct}% of ${mem_total_gb} GB (limit ${MEMORY_THRESHOLD}%)"
     ((warn_count+=1))
   else
-    report+=$'\n'"✅ Memory: ${mem_pct}% (limit ${MEMORY_THRESHOLD}%)"
+    report+=$'\n'"✅ Memory: ${mem_pct}% of ${mem_total_gb} GB (limit ${MEMORY_THRESHOLD}%)"
   fi
 
   # Load

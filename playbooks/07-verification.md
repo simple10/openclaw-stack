@@ -329,7 +329,7 @@ sudo logrotate -f /etc/logrotate.d/openclaw
 sudo ls -la /home/openclaw/.openclaw/logs/
 ```
 
-**Expected:** Config file exists with mode 644. Dry run shows no errors. After forced rotation, `.1` files appear alongside the originals. Log writers (`debug.log`, `commands.log`) continue appending to the truncated files.
+**Expected:** Config file exists with mode 644. Dry run shows no errors. After forced rotation, `.1` files appear alongside the originals. Log writers (`telemetry.log`, `backup.log`) continue appending to the truncated files.
 
 ---
 
@@ -346,7 +346,7 @@ openclaw devices list
 
 **If it fails with "pairing required":**
 
-Re-run the auto-pairing step from `04-vps1-openclaw.md` section 4.16:
+Re-run the CLI pairing step from `08-post-deploy.md` § 8.3:
 
 ```bash
 GATEWAY_TOKEN=$(sudo grep OPENCLAW_GATEWAY_TOKEN /home/openclaw/openclaw/.env | cut -d= -f2)
@@ -358,7 +358,7 @@ sudo docker exec --user node openclaw-gateway \
 
 ## 7.5c Verify Resource Limits
 
-Verify deployed gateway resource limits match VPS hardware. See `00-fresh-deploy-setup.md` § 0.4 for the full resource check procedure and expected values.
+Verify deployed gateway resource limits match VPS hardware. Resource limits are configured via `GATEWAY_CPUS` and `GATEWAY_MEMORY` in `openclaw-config.env` (see § 0.4).
 
 ```bash
 # On VPS: query hardware and deployed limits in one command
@@ -370,14 +370,23 @@ Compare: CPUs should equal `nproc`, memory should be total minus 500M–1GB. Nan
 
 **If match:** Report correctly sized and continue.
 
-**If mismatch during fresh deploy:** Auto-apply recommended values (CPUs = nproc, memory = total - 750M) without prompting.
+**If mismatch during fresh deploy:** Resource limits were already reviewed in `00-fresh-deploy-setup.md` § 0.4. Auto-apply only if the gap is significant (CPUs differ or memory off by >2GB); otherwise report and continue.
 
-**If mismatch outside fresh deploy:** Show comparison and ask user. If confirmed, update local `deploy/docker-compose.override.yml`, then:
+**If mismatch outside fresh deploy:** Show comparison and ask user. If confirmed, update `GATEWAY_CPUS` and `GATEWAY_MEMORY` in `openclaw-config.env`, then redeploy the `.env` to the VPS and recreate the container:
 
 ```bash
-# NOTE: scp uses -P (uppercase) for port, unlike ssh's -p (lowercase)
-scp -i <SSH_KEY_PATH> -P <SSH_PORT> deploy/docker-compose.override.yml <SSH_USER>@<VPS1_IP>:/home/openclaw/openclaw/docker-compose.override.yml
-ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> "sudo chown openclaw:openclaw /home/openclaw/openclaw/docker-compose.override.yml && sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'"
+# Update the .env on VPS with new resource limits
+ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
+  "sudo -u openclaw bash -c \"grep -q '^GATEWAY_CPUS=' /home/openclaw/openclaw/.env && \
+    sed -i 's/^GATEWAY_CPUS=.*/GATEWAY_CPUS=<NEW_CPUS>/' /home/openclaw/openclaw/.env || \
+    echo 'GATEWAY_CPUS=<NEW_CPUS>' >> /home/openclaw/openclaw/.env; \
+    grep -q '^GATEWAY_MEMORY=' /home/openclaw/openclaw/.env && \
+    sed -i 's/^GATEWAY_MEMORY=.*/GATEWAY_MEMORY=<NEW_MEMORY>/' /home/openclaw/openclaw/.env || \
+    echo 'GATEWAY_MEMORY=<NEW_MEMORY>' >> /home/openclaw/openclaw/.env\""
+
+# Recreate container to pick up new limits (up -d re-reads .env)
+ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
+  "sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'"
 ```
 
 ---
@@ -417,7 +426,7 @@ sudo ss -tlnp
 
 # Verify pids_limit set (prevents fork bombs)
 sudo docker inspect openclaw-gateway --format '{{.HostConfig.PidsLimit}}'
-# Expected: 512
+# Expected: 1024
 ```
 
 ```bash
@@ -444,7 +453,7 @@ openclaw doctor --deep
 
 **If you see other doctor warnings:**
 
-- **State integrity: session store dir missing** — session dirs are pre-created during `04-vps1-openclaw.md` § 4.8 (OpenClaw Configuration). If missing, recreate: `sudo mkdir -p /home/openclaw/.openclaw/agents/main/sessions && echo '{}' | sudo tee /home/openclaw/.openclaw/agents/main/sessions/sessions.json > /dev/null && sudo chown -R 1000:1000 /home/openclaw/.openclaw/agents/main`
+- **State integrity: session store dir missing** — session dirs are pre-created during `04-vps1-openclaw.md` § 4.3 (Deploy Configuration). If missing, recreate: `sudo mkdir -p /home/openclaw/.openclaw/agents/main/sessions && echo '{}' | sudo tee /home/openclaw/.openclaw/agents/main/sessions/sessions.json > /dev/null && sudo chown -R 1000:1000 /home/openclaw/.openclaw/agents/main`
 - **Sandbox: base image missing** — restart gateway to retry build, then run sandbox verification in `04-vps1-openclaw.md`.
 
 ### Checklist
@@ -459,6 +468,62 @@ openclaw doctor --deep
 - [ ] Container ports localhost-only, pids_limit set, resource limits match VPS
 - [ ] AI Gateway Worker responding (+ Log Receiver if `ENABLE_VECTOR_LOG_SHIPPING=true`)
 - [ ] Security audit: 0 critical/warnings; Doctor: lan warning only
+
+---
+
+## 7.6a Telemetry (unified plugin)
+
+> Skip this section if `ENABLE_LLEMTRY_LOGGING` is not `true` in `openclaw-config.env`.
+
+**1. Events endpoint (D1 storage):**
+
+```bash
+# Derive events URL from LOG_WORKER_URL
+EVENTS_URL="${LOG_WORKER_URL/\/logs/\/events}"
+curl -s -X POST "$EVENTS_URL" \
+  -H "Authorization: Bearer $LOG_WORKER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"instance":{"id":"test"},"events":[]}' | jq .
+# Expected: {"status":"ok","count":0}
+```
+
+**2. Llemtry endpoint (Langfuse):**
+
+```bash
+LLEMTRY_URL="${LOG_WORKER_URL/\/logs/\/llemtry}"
+curl -s -X POST "$LLEMTRY_URL" \
+  -H "Authorization: Bearer $LOG_WORKER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"resource":{"serviceName":"test"},"spans":[]}' | jq .
+# Expected: {"status":"ok","count":0}
+```
+
+**3. Plugin startup validation** (on VPS):
+
+```bash
+sudo docker logs openclaw-gateway 2>&1 | grep -i '\[telemetry\]'
+# Expected: "[telemetry] Plugin registered — outputs: [file:telemetry.log, events:/events, llemtry]"
+# If misconfigured: "[telemetry] events.enabled is true but events.url or events.authToken is missing..."
+```
+
+**4. End-to-end** (after sending a message to an agent):
+
+```bash
+# Check local telemetry log on VPS
+sudo tail -5 /home/openclaw/.openclaw/logs/telemetry.log | jq .
+
+# Check Log Worker logs for event and llemtry entries
+npx wrangler tail --format json | jq 'select(.logs[].message | contains("[EVENTS]") or contains("[LLEMTRY]"))'
+
+# Check D1 for stored events (D1_DATABASE_NAME from workers/log-receiver/wrangler.jsonc)
+npx wrangler d1 execute <D1_DATABASE_NAME> --command="SELECT type, category, agent_id, session_id FROM events ORDER BY id DESC LIMIT 10"
+```
+
+- [ ] Events endpoint returns `{"status":"ok","count":0}` for empty batch
+- [ ] Llemtry endpoint returns `{"status":"ok","count":0}` for empty batch
+- [ ] Plugin logs confirm all outputs enabled (or correctly warns if misconfigured)
+- [ ] After agent message: events visible in D1 and llemtry spans in Log Worker logs
+- [ ] Local telemetry.log file being written
 
 ---
 

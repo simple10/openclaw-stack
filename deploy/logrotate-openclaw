@@ -10,8 +10,6 @@
 #   directory is owned by uid 1000 (group-writable). Using root:root so logrotate
 #   can traverse /home/openclaw (owned by openclaw user, mode 700).
 
-/home/openclaw/.openclaw/logs/debug.log
-/home/openclaw/.openclaw/logs/commands.log
 /home/openclaw/.openclaw/logs/backup.log
 {
     su root root
@@ -24,9 +22,10 @@
     compress
 }
 
-# LLM logs — much larger than other logs (two events per LLM call with full payloads).
+# Telemetry log — captures all event types (LLM, session, tool, agent, etc.).
 # More aggressive rotation: daily + 50M maxsize trigger for mid-day rotation.
-/home/openclaw/.openclaw/logs/llm.log
+# Replaces previous separate debug.log and llm.log entries.
+/home/openclaw/.openclaw/logs/telemetry.log
 {
     su root root
     daily

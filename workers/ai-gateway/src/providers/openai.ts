@@ -7,7 +7,8 @@ export async function proxyOpenAI(
   request: Request,
   config: ProviderConfig,
   path: string,
-  log: Log
+  log: Log,
+  preReadBody?: string
 ): Promise<Response> {
   const url = `${config.baseUrl}/${path}`
 
@@ -23,7 +24,7 @@ export async function proxyOpenAI(
     }
   }
 
-  const body = await request.text()
+  const body = preReadBody ?? await request.text()
   log.debug(`[openai] url=${url}`)
   log.debug('[openai] upstream headers', sanitizeHeaders(headers))
   log.debug('[openai] request body', truncateBody(body))

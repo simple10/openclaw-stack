@@ -154,15 +154,9 @@ echo "  openclaw:  ${OPENCLAW_PASS}"
 echo "========================================="
 ```
 
-**Record passwords locally:** Immediately after the script above runs, write/update the `ADMINCLAW_PASSWORD` and `OPENCLAW_PASSWORD` values in the `# DEPLOYED:` section of `openclaw-config.env`. Use `sed` to update existing lines in-place (don't append duplicates):
+**Record passwords locally:** Immediately after the script above runs, use the `Edit` tool to update the `ADMINCLAW_PASSWORD` and `OPENCLAW_PASSWORD` values in the `# DEPLOYED:` section of `openclaw-config.env`. Replace the existing `# DEPLOYED: ADMINCLAW_PASSWORD=` and `# DEPLOYED: OPENCLAW_PASSWORD=` lines with the generated passwords. Do NOT use `sed` — it creates backup files on macOS.
 
-```bash
-# Run on LOCAL machine — persist passwords as comments in openclaw-config.env
-sed -i'' -e "s|^# DEPLOYED: ADMINCLAW_PASSWORD=.*|# DEPLOYED: ADMINCLAW_PASSWORD=${ADMINCLAW_PASS}|" openclaw-config.env
-sed -i'' -e "s|^# DEPLOYED: OPENCLAW_PASSWORD=.*|# DEPLOYED: OPENCLAW_PASSWORD=${OPENCLAW_PASS}|" openclaw-config.env
-```
-
-> These are comments — `source openclaw-config.env` won't export them. They're a safety net in case the session ends before the deployment report (§ 8.6).
+> These are comments — `source openclaw-config.env` won't export them. They're a safety net in case the session ends before the deployment report (§ 8.5).
 
 **Workflow after setup:**
 
@@ -315,14 +309,13 @@ echo "Test port <SSH_HARDENED_PORT> from your LOCAL machine before proceeding."
 ssh -i <SSH_KEY_PATH> -p <SSH_HARDENED_PORT> adminclaw@<VPS1_IP> "echo 'Port <SSH_HARDENED_PORT> works!'"
 ```
 
-**If port `<SSH_HARDENED_PORT>` test succeeds:** Update `openclaw-config.env` on the LOCAL machine, then lock down SSH:
+**If port `<SSH_HARDENED_PORT>` test succeeds:** Update `openclaw-config.env` on the LOCAL machine using the `Edit` tool (do NOT use `sed` — it creates backup files on macOS):
 
-```bash
-# On LOCAL machine — update config to use new SSH user and port, remove SSH_HARDENED_PORT
-sed -i'' -e 's|^SSH_USER=.*|SSH_USER=adminclaw            # Changed from <SSH_USER> during hardening|' openclaw-config.env
-sed -i'' -e 's|^SSH_PORT=.*|SSH_PORT=<SSH_HARDENED_PORT>                  # Changed from <SSH_PORT> during hardening|' openclaw-config.env
-sed -i'' -e '/^SSH_HARDENED_PORT=/d' openclaw-config.env
-```
+1. Change `SSH_USER=<SSH_USER>` to `SSH_USER=adminclaw            # Changed from <SSH_USER> during hardening`
+2. Change `SSH_PORT=<SSH_PORT>` to `SSH_PORT=<SSH_HARDENED_PORT>                  # Changed from <SSH_PORT> during hardening`
+3. Delete the `SSH_HARDENED_PORT=` line entirely
+
+Then lock down SSH:
 
 ```bash
 # On VPS — lock down: remove port 22 from socket, remove <SSH_USER> from AllowUsers

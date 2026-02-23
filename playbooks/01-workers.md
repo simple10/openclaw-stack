@@ -39,6 +39,16 @@ cd workers/ai-gateway
 npm install
 ```
 
+### Configure wrangler.jsonc
+
+If `wrangler.jsonc` doesn't exist, copy from the example template:
+
+```bash
+cp wrangler.jsonc.example wrangler.jsonc
+```
+
+No values need to be changed for a standard deployment. If using multiple Cloudflare accounts, add `"account_id": "<id>"` to `wrangler.jsonc`.
+
 ### Check for Existing AI Gateway Worker Deployment
 
 Before deploying, check if the worker is already live. If `AI_GATEWAY_WORKER_URL` in `openclaw-config.env` is not a placeholder (no angle brackets), curl its health endpoint:
@@ -69,8 +79,6 @@ echo "<generated-token>" | npx wrangler secret put AUTH_TOKEN
 
 If `AI_GATEWAY_AUTH_TOKEN` already has a real value, use that value instead.
 
-> **Multiple Cloudflare accounts:** If `wrangler whoami` lists more than one account, wrangler commands will fail with _"More than one account available but unable to select one in non-interactive mode."_ Fix by adding `"account_id": "<id>"` to `wrangler.jsonc`, or by setting `export CLOUDFLARE_ACCOUNT_ID=<id>` before running wrangler commands. Use the account ID that matches your Workers subscription.
-
 ### Deploy AI Gateway Worker
 
 ```bash
@@ -92,7 +100,9 @@ curl -s https://<worker-url>/health
 
 ## 1.2 Deploy Log Receiver Worker
 
-The Log Receiver Worker receives batched log events from Vector and `console.log()`s them. Cloudflare captures Worker console output via real-time Logs dashboard and Logpush.
+The Log Receiver Worker receives batched log events from Vector and `console.log()`s them. Cloudflare captures Worker console output via real-time Logs dashboard and Logpush. It also stores structured telemetry events in a D1 database for dashboard session exploration.
+
+> **VARS:** `D1_DATABASE_NAME` — read from `workers/log-receiver/wrangler.jsonc` → `d1_databases[0].database_name`. All `wrangler d1` commands below use this value.
 
 ### Setup Log Receiver
 
@@ -100,6 +110,16 @@ The Log Receiver Worker receives batched log events from Vector and `console.log
 cd workers/log-receiver
 npm install
 ```
+
+### Configure wrangler.jsonc
+
+If `wrangler.jsonc` doesn't exist, copy from the example template:
+
+```bash
+cp wrangler.jsonc.example wrangler.jsonc
+```
+
+The D1 `database_id` placeholder will be updated after creating the database (see "Create D1 Database" below).
 
 ### Check for Existing Log Receiver Deployment
 
@@ -127,6 +147,38 @@ If `LOG_WORKER_TOKEN` already has a real value, use that value instead:
 
 ```bash
 echo "<existing-token>" | npx wrangler secret put AUTH_TOKEN
+```
+
+### Create D1 Database
+
+The Log Worker stores telemetry events in a D1 database. Check if one already exists:
+
+```bash
+npx wrangler d1 list | grep <D1_DATABASE_NAME>
+```
+
+- **If it exists:** Skip creation, use the existing database ID.
+- **If not found:** Create it:
+
+```bash
+npx wrangler d1 create <D1_DATABASE_NAME>
+```
+
+Capture the `database_id` from the output and update the placeholder in `wrangler.jsonc`.
+
+### Apply D1 Schema
+
+Apply the events table schema to the remote database:
+
+```bash
+npx wrangler d1 execute <D1_DATABASE_NAME> --remote --file=src/schema.sql
+```
+
+Verify the table was created:
+
+```bash
+npx wrangler d1 execute <D1_DATABASE_NAME> --remote --command="SELECT name FROM sqlite_master WHERE type='table'"
+# Expected: events
 ```
 
 ### Deploy Log Worker
@@ -166,6 +218,13 @@ curl -X POST https://<worker-url>/logs \
   -H "Content-Type: application/json" \
   -d '{"container_name":"test","message":"hello","stream":"stdout","timestamp":"2026-02-07T00:00:00Z"}'
 # Expected: {"status":"ok","count":1}
+
+# Test events endpoint (D1 storage)
+curl -s -X POST https://<worker-url>/events \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"instance":{"id":"test"},"events":[]}'
+# Expected: {"status":"ok","count":0}
 ```
 
 ### View Logs in Cloudflare

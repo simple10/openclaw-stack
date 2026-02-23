@@ -31,13 +31,13 @@ MAX_WAIT=90  # seconds to wait for browser container
 
 # Helper: run a command inside the gateway container as node
 gw_exec() {
-  ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+  TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
     "sudo docker exec --user node $GATEWAY $*"
 }
 
 # Helper: run a command inside the gateway container as root (for nested docker)
 gw_exec_root() {
-  ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+  TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
     "sudo docker exec $GATEWAY $*"
 }
 
@@ -117,7 +117,7 @@ if [[ -z "$BROWSER_CONTAINER" ]]; then
   printf '\033[33mNo existing browser container. Sending agent message to trigger creation...\033[0m\n'
 
   # Send a message that reliably triggers the browser tool
-  ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+  TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
     "sudo docker exec --user node $GATEWAY openclaw agent --agent $AGENT \
       --message 'Use the browser tool to navigate to about:blank. Do nothing else after that.' \
       --timeout 90" >/dev/null 2>&1 &

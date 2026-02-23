@@ -32,12 +32,12 @@ MAX_WAIT=60  # seconds to wait for sandbox to appear
 
 # Helper: run a command on the VPS inside the gateway container as node
 gw_exec() {
-  ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+  TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
     "sudo docker exec --user node $GATEWAY $*"
 }
 
 # Fetch agents list and sandbox status in one SSH call
-COMBINED_JSON=$(ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+COMBINED_JSON=$(TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
   "sudo docker exec --user node $GATEWAY sh -c '
     echo \"===AGENTS===\"
     openclaw agents list --json 2>/dev/null
@@ -151,7 +151,7 @@ if [[ "$CONTAINER_STATUS" == "none" ]]; then
   # Send a message to the agent to trigger sandbox creation.
   # The agent loop creates the sandbox container when a tool is needed (requires sandbox.mode = "all" per agent).
   # Stdout suppressed (agent response not needed); stderr preserved so errors are visible.
-  ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+  TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
     "sudo docker exec --user node $GATEWAY openclaw agent --agent $AGENT --message ping --timeout 60" \
     >/dev/null &
   AGENT_PID=$!
@@ -203,10 +203,10 @@ if [[ "$CONTAINER_STATUS" == "stopped" ]]; then
     # Container was removed but registry still had an entry (e.g. after restart-sandboxes.sh).
     # Clean the stale entry and trigger fresh sandbox creation via agent message.
     printf '\033[33mContainer no longer exists — cleaning stale entry and recreating...\033[0m\n'
-    ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+    TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
       "sudo docker exec --user node $GATEWAY openclaw sandbox recreate --all --force" >/dev/null 2>&1 || true
 
-    ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+    TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
       "sudo docker exec --user node $GATEWAY openclaw agent --agent $AGENT --message ping --timeout 60" \
       >/dev/null &
     AGENT_PID=$!
@@ -245,5 +245,5 @@ if [[ "$CONTAINER_STATUS" == "stopped" ]]; then
 fi
 
 printf '\033[32mExec into %s (%s agent)\033[0m\n' "$CONTAINER_NAME" "$AGENT"
-ssh -t -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+TERM=xterm-256color ssh -t -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
   "sudo docker exec -it $GATEWAY docker exec -it -u 1000:1000 -w /workspace $CONTAINER_NAME bash"

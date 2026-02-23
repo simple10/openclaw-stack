@@ -5,7 +5,7 @@
 # Image layer architecture:
 #   openclaw-sandbox:bookworm-slim                     (upstream base)
 #     -> openclaw-sandbox-base-root:bookworm-slim      (intermediate, cleaned up)
-#       -> openclaw-sandbox-packages:bookworm-slim     (apt + brew + bun + pnpm)
+#       -> openclaw-sandbox-packages:bookworm-slim     (apt + brew packages)
 #         -> openclaw-sandbox-toolkit:bookworm-slim    (tool installs from sandbox-toolkit.yaml)
 #   openclaw-sandbox-browser:bookworm-slim             (separate chain, FROM debian:bookworm-slim)
 #
@@ -338,7 +338,7 @@ build_packages() {
   fi
   if [ -z "$toolkit_packages" ]; then
     log "WARNING: No toolkit config, using fallback package list"
-    toolkit_packages="curl wget jq coreutils grep nodejs npm python3 git ca-certificates golang-go rustc cargo unzip pkg-config libasound2-dev build-essential file ffmpeg imagemagick"
+    toolkit_packages="curl wget jq coreutils grep nodejs python3 git ca-certificates golang-go rustc cargo unzip pkg-config libasound2-dev build-essential file ffmpeg imagemagick"
   fi
 
   # Step 1: Build rooted intermediate from base image

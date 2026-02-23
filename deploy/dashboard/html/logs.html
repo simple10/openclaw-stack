@@ -1,0 +1,558 @@
+<!-- logs.html — Logs explorer page body template.
+     Injected into layout chrome by pages/logs.mjs.
+     CSS from public/dashboard.css, themes from public/theme-engine.js.
+     Two-view SPA: session list (default) and session detail. -->
+
+<!-- ══════════════════════════════════════════════════════════════════
+     VIEW 1: Session List
+     ══════════════════════════════════════════════════════════════════ -->
+<div id="listView">
+
+  <!-- Summary Cards -->
+  <div class="health-row" id="summaryRow">
+    <div class="glass health-item"><div class="health-label">Sessions</div><div class="health-value" id="sSessions">--</div></div>
+    <div class="glass health-item"><div class="health-label">LLM Calls</div><div class="health-value" id="sLlmCalls">--</div></div>
+    <div class="glass health-item"><div class="health-label">Session Cost</div><div class="health-value" id="sCost">--</div></div>
+    <div class="glass health-item"><div class="health-label">LLM Cost</div><div class="health-value" id="sLlmCost">--</div></div>
+    <div class="glass health-item"><div class="health-label">Total Tokens</div><div class="health-value" id="sTokens">--</div></div>
+    <div class="glass health-item"><div class="health-label">Errors</div><div class="health-value" id="sErrors">--</div></div>
+  </div>
+
+  <!-- Filters -->
+  <div class="section-header" style="margin-bottom:14px">
+    <div class="section-title">Sessions</div>
+    <div class="logs-filters">
+      <select id="agentFilter" class="logs-filter" onchange="loadData()">
+        <option value="">All agents</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Sessions Table -->
+  <div class="glass panel" style="overflow-x:auto">
+    <table class="dtable" id="sessionsTable">
+      <thead><tr>
+        <th class="sortable" data-col="agent" onclick="sortBy('agent')">Agent</th>
+        <th class="sortable" data-col="sessionId" onclick="sortBy('sessionId')">Session</th>
+        <th class="sortable" data-col="timestamp" onclick="sortBy('timestamp')">Started</th>
+        <th class="sortable r" data-col="durationSeconds" onclick="sortBy('durationSeconds')">Duration</th>
+        <th class="sortable r" data-col="turns" onclick="sortBy('turns')">Turns</th>
+        <th class="sortable r" data-col="toolCalls" onclick="sortBy('toolCalls')">Tools</th>
+        <th class="sortable r" data-col="errors" onclick="sortBy('errors')">Errs</th>
+        <th class="sortable r" data-col="cost" onclick="sortBy('cost')">Cost</th>
+        <th class="sortable" data-col="stopReason" onclick="sortBy('stopReason')">Stop</th>
+        <th>Message</th>
+      </tr></thead>
+      <tbody id="sessionsBody"></tbody>
+    </table>
+    <div class="empty" id="sessionsEmpty" style="display:none">No sessions found</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     VIEW 2: Session Detail
+     ══════════════════════════════════════════════════════════════════ -->
+<div id="detailView" style="display:none">
+
+  <button class="back-link" onclick="showList()" style="margin-bottom:12px">Back to Sessions</button>
+
+  <!-- Session header -->
+  <div style="margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+      <span class="detail-title" id="detailTitle"></span>
+      <span id="detailStatus"></span>
+    </div>
+    <div class="detail-stats" id="detailStats"></div>
+  </div>
+
+  <!-- Metrics (always visible) -->
+  <div class="glass panel" style="margin-bottom:20px">
+    <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Metrics</div>
+    <div class="metrics-grid" id="metricsGrid">
+      <div class="empty">Loading metrics...</div>
+    </div>
+  </div>
+
+  <!-- Trace / LLM Calls toggle -->
+  <div class="section-header" style="margin-bottom:12px">
+    <div class="tab-group">
+      <button class="tab-btn active" id="tabTrace" onclick="switchDetailTab('trace')">Session Trace</button>
+      <button class="tab-btn" id="tabLlm" onclick="switchDetailTab('llm')">LLM Calls</button>
+    </div>
+  </div>
+
+  <!-- Trace sub-panel -->
+  <div id="tracePanel">
+    <div class="glass panel">
+      <div class="trace-output" id="traceOutput">
+        <div class="empty">Loading trace...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LLM Calls sub-panel (scoped to this session) -->
+  <div id="llmPanel" style="display:none">
+    <div class="glass panel" style="overflow-x:auto">
+      <table class="dtable" id="llmTable">
+        <thead><tr>
+          <th class="sortable" data-col="timestamp" onclick="sortLlm('timestamp')">Time</th>
+          <th class="sortable" data-col="model" onclick="sortLlm('model')">Model</th>
+          <th class="sortable r" data-col="durationMs" onclick="sortLlm('durationMs')">Dur</th>
+          <th class="sortable r" data-col="inputTokens" onclick="sortLlm('inputTokens')">In</th>
+          <th class="sortable r" data-col="outputTokens" onclick="sortLlm('outputTokens')">Out</th>
+          <th class="sortable r" data-col="cacheReadTokens" onclick="sortLlm('cacheReadTokens')">Cache R</th>
+          <th class="sortable r" data-col="cost" onclick="sortLlm('cost')">Cost</th>
+          <th class="sortable" data-col="stopReason" onclick="sortLlm('stopReason')">Stop</th>
+          <th>Tools</th>
+        </tr></thead>
+        <tbody id="llmBody"></tbody>
+      </table>
+      <div class="empty" id="llmEmpty" style="display:none">No LLM calls found for this session</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const BASE = window.__LOGS_BASE || '';
+const $ = id => document.getElementById(id);
+const esc = s => {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+};
+
+let sessionsData = [];
+let summaryData = null;
+let sortCol = 'timestamp';
+let sortAsc = false;
+let llmSortCol = 'timestamp';
+let llmSortAsc = false;
+let refreshTimer = null;
+
+// Current detail view state
+let selectedSession = null;  // { sessionId, agent }
+let detailTab = 'trace';
+let sessionLlmData = [];
+
+// ── View switching ──────────────────────────────────────────────
+
+function showList() {
+  selectedSession = null;
+  $('listView').style.display = '';
+  $('detailView').style.display = 'none';
+  scheduleRefresh();
+}
+
+function showDetail(sessionId, agent) {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  selectedSession = { sessionId, agent };
+  $('listView').style.display = 'none';
+  $('detailView').style.display = '';
+
+  // Set header
+  $('detailTitle').textContent = `${agent} / ${sessionId.slice(0, 12)}`;
+
+  // Reset to trace tab
+  detailTab = 'trace';
+  $('tabTrace').className = 'tab-btn active';
+  $('tabLlm').className = 'tab-btn';
+  $('tracePanel').style.display = '';
+  $('llmPanel').style.display = 'none';
+
+  // Clear previous data
+  $('metricsGrid').innerHTML = '<div class="empty">Loading metrics...</div>';
+  $('traceOutput').innerHTML = '<div class="empty">Loading trace...</div>';
+  $('detailStatus').innerHTML = '';
+  $('detailStats').innerHTML = '';
+  sessionLlmData = [];
+
+  // Load metrics + trace in parallel
+  loadMetrics(sessionId, agent);
+  loadTrace(sessionId, agent);
+}
+
+function switchDetailTab(tab) {
+  detailTab = tab;
+  $('tabTrace').className = tab === 'trace' ? 'tab-btn active' : 'tab-btn';
+  $('tabLlm').className = tab === 'llm' ? 'tab-btn active' : 'tab-btn';
+  $('tracePanel').style.display = tab === 'trace' ? '' : 'none';
+  $('llmPanel').style.display = tab === 'llm' ? '' : 'none';
+
+  if (tab === 'llm' && selectedSession && !sessionLlmData.length) {
+    loadSessionLlm(selectedSession.sessionId, selectedSession.agent);
+  }
+}
+
+// ── Data loading (list view) ────────────────────────────────────
+
+async function loadData() {
+  const agent = $('agentFilter').value;
+  const qs = new URLSearchParams();
+  if (agent) qs.set('agent', agent);
+  qs.set('t', Date.now());
+  const q = qs.toString();
+
+  try {
+    const [sessRes, sumRes] = await Promise.all([
+      fetch(`${BASE}/api/sessions?${q}`),
+      fetch(`${BASE}/api/summary?${q}`),
+    ]);
+    sessionsData = await sessRes.json();
+    summaryData = await sumRes.json();
+  } catch (e) {
+    console.error('Load error:', e);
+    return;
+  }
+
+  renderSummary();
+  populateFilters();
+  renderSessions();
+  scheduleRefresh();
+}
+
+function scheduleRefresh() {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  if (!selectedSession) refreshTimer = setTimeout(loadData, 60_000);
+}
+
+// ── Summary cards ───────────────────────────────────────────────
+
+function renderSummary() {
+  if (!summaryData) return;
+  $('sSessions').textContent = summaryData.totalSessions;
+  $('sLlmCalls').textContent = summaryData.totalLlmCalls;
+  $('sCost').textContent = summaryData.totalCostDisplay;
+  $('sLlmCost').textContent = summaryData.llmCostDisplay;
+  $('sTokens').textContent = summaryData.totalTokensDisplay;
+  const errEl = $('sErrors');
+  errEl.textContent = summaryData.totalErrors;
+  errEl.style.color = summaryData.totalErrors > 0 ? 'var(--red)' : '';
+}
+
+// ── Filter dropdowns ────────────────────────────────────────────
+
+function populateFilters() {
+  if (!summaryData) return;
+  const af = $('agentFilter');
+  const current = af.value;
+  const opts = af.querySelectorAll('option:not(:first-child)');
+  opts.forEach(o => o.remove());
+  for (const a of summaryData.agents) {
+    const o = document.createElement('option');
+    o.value = a; o.textContent = a;
+    af.appendChild(o);
+  }
+  af.value = current;
+}
+
+// ── Sorting (list view) ─────────────────────────────────────────
+
+function sortBy(col) {
+  if (sortCol === col) sortAsc = !sortAsc;
+  else { sortCol = col; sortAsc = true; }
+
+  $('sessionsTable').querySelectorAll('.sortable').forEach(th => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (th.dataset.col === col) th.classList.add(sortAsc ? 'sort-asc' : 'sort-desc');
+  });
+
+  renderSessions();
+}
+
+function sortData(data, col, asc) {
+  const dir = asc ? 1 : -1;
+  return [...data].sort((a, b) => {
+    let va = a[col], vb = b[col];
+    if (va == null) va = '';
+    if (vb == null) vb = '';
+    if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+    return String(va).localeCompare(String(vb)) * dir;
+  });
+}
+
+// ── Sessions table rendering ────────────────────────────────────
+
+function renderSessions() {
+  const sorted = sortData(sessionsData, sortCol, sortAsc);
+  const body = $('sessionsBody');
+  const empty = $('sessionsEmpty');
+
+  if (!sorted.length) {
+    body.innerHTML = '';
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+
+  body.innerHTML = sorted.map(s => {
+    const ts = s.timestamp ? fmtTs(s.timestamp) : '';
+    const errCls = s.errors > 0 ? ' style="color:var(--red)"' : '';
+    const costCls = s.cost > 10 ? ' style="color:var(--red);font-weight:700"'
+      : s.cost > 1 ? ' style="color:var(--yellow)"' : '';
+    const stopCls = (s.stopReason === 'stop' || s.stopReason === 'end_turn')
+      ? ' style="color:var(--green)"'
+      : (s.stopReason && s.stopReason.includes('error')) ? ' style="color:var(--red)"' : '';
+    const statusBadge = s.status !== 'active'
+      ? ` <span class="type-badge" style="font-size:8px;opacity:0.7">${esc(s.status)}</span>` : '';
+
+    return `<tr class="dr" data-sid="${esc(s.sessionId)}" data-agent="${esc(s.agent)}" style="cursor:pointer">
+      <td class="w">${esc(s.agent)}</td>
+      <td style="font-family:monospace;font-size:11px">${esc(s.sessionId.slice(0, 8))}${statusBadge}</td>
+      <td>${ts}</td>
+      <td class="r">${esc(s.durationDisplay)}</td>
+      <td class="r">${s.turns}</td>
+      <td class="r">${s.toolCalls}</td>
+      <td class="r"${errCls}>${s.errors}</td>
+      <td class="r cost"${costCls}>${esc(s.costDisplay)}</td>
+      <td${stopCls}>${esc(s.stopReason || '')}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dim)">${esc(s.firstMessage)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Timestamp formatting ────────────────────────────────────────
+
+function fmtTs(iso) {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch { return iso.slice(0, 16).replace('T', ' '); }
+}
+
+// ── Detail view: Metrics ────────────────────────────────────────
+
+async function loadMetrics(sessionId, agent) {
+  try {
+    const res = await fetch(`${BASE}/api/session/${encodeURIComponent(sessionId)}/metrics?agent=${encodeURIComponent(agent)}&t=${Date.now()}`);
+    const data = await res.json();
+    if (data) {
+      renderDetailHeader(data);
+      renderMetrics(data);
+    } else {
+      $('metricsGrid').innerHTML = '<div class="empty">Session not found</div>';
+    }
+  } catch (e) {
+    $('metricsGrid').innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderDetailHeader(d) {
+  // Status badge
+  const statusHtml = d.status !== 'active'
+    ? `<span class="type-badge" style="font-size:9px;opacity:0.7">${esc(d.status)}</span>` : '';
+  $('detailStatus').innerHTML = statusHtml;
+
+  // Inline stats
+  const parts = [];
+  if (d.durationDisplay) parts.push(`Duration: <strong>${esc(d.durationDisplay)}</strong>`);
+  parts.push(`Turns: <strong>${d.assistantTurns}</strong>`);
+  parts.push(`Tools: <strong>${d.toolCalls}</strong>`);
+  const errColor = d.toolErrors > 0 ? 'var(--red)' : 'var(--green)';
+  parts.push(`Errors: <strong style="color:${errColor}">${d.toolErrors}</strong>`);
+  parts.push(`Cost: <strong>${esc(d.costDisplay.total)}</strong>`);
+  if (d.model) parts.push(`Model: <strong>${esc(d.model)}</strong>`);
+  $('detailStats').innerHTML = parts.join('<span style="color:var(--dim);margin:0 2px">|</span>');
+}
+
+function renderMetrics(d) {
+  let toolRows = '';
+  if (d.tools && Object.keys(d.tools).length) {
+    const maxCount = Math.max(...Object.values(d.tools).map(t => t.count));
+    const sorted = Object.entries(d.tools).sort((a, b) => b[1].count - a[1].count);
+    toolRows = sorted.map(([name, t]) => {
+      const pct = maxCount > 0 ? (t.count / maxCount * 100) : 0;
+      const errBadge = t.errors > 0 ? ` <span style="color:var(--red)">(${t.errors} err)</span>` : '';
+      return `<div class="metrics-kv">
+        <span class="metrics-label">${esc(name)}</span>
+        <span class="metrics-value">${t.count}${errBadge}</span>
+        <div class="usage-bar" style="margin-top:2px"><div class="usage-fill" style="width:${pct}%;background:var(--accent)"></div></div>
+      </div>`;
+    }).join('');
+  }
+
+  let turnRows = '';
+  if (d.turns && d.turns.length) {
+    const maxCtx = Math.max(...d.turns.map(t => t.inputTokens + t.cacheRead));
+    const total = d.turns.length;
+    const indices = total <= 12
+      ? Array.from({ length: total }, (_, i) => i)
+      : [0, ...Array.from({ length: 8 }, (_, i) => Math.round((i + 1) * (total - 1) / 9)), total - 1];
+    const unique = [...new Set(indices)];
+
+    turnRows = unique.map(i => {
+      const t = d.turns[i];
+      const ctx = t.inputTokens + t.cacheRead;
+      const pct = maxCtx > 0 ? (ctx / maxCtx * 100) : 0;
+      return `<div style="display:flex;align-items:center;gap:8px;font-size:11px">
+        <span style="color:var(--dim);min-width:50px">Turn ${t.step}</span>
+        <div class="usage-bar" style="flex:1"><div class="usage-fill" style="width:${pct}%;background:var(--purple)"></div></div>
+        <span style="color:var(--muted);min-width:40px;text-align:right">${esc(t.totalTokensDisplay)}</span>
+      </div>`;
+    }).join('');
+  }
+
+  $('metricsGrid').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:16px">
+      <div>
+        <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Tokens</div>
+        <div class="metrics-kv"><span class="metrics-label">Input</span><span class="metrics-value">${esc(d.tokensDisplay.input)}</span></div>
+        <div class="metrics-kv"><span class="metrics-label">Output</span><span class="metrics-value">${esc(d.tokensDisplay.output)}</span></div>
+        <div class="metrics-kv"><span class="metrics-label">Cache Read</span><span class="metrics-value">${esc(d.tokensDisplay.cacheRead)}</span></div>
+        <div class="metrics-kv"><span class="metrics-label">Cache Write</span><span class="metrics-value">${esc(d.tokensDisplay.cacheWrite)}</span></div>
+        <div class="metrics-kv" style="border-top:1px solid var(--border);padding-top:6px;margin-top:6px">
+          <span class="metrics-label" style="font-weight:600">Total</span>
+          <span class="metrics-value" style="font-weight:600">${esc(d.tokensDisplay.totalTokens)}</span>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Cost</div>
+        <div class="metrics-kv"><span class="metrics-label">Input</span><span class="metrics-value">${esc(d.costDisplay.input)}</span></div>
+        <div class="metrics-kv"><span class="metrics-label">Output</span><span class="metrics-value">${esc(d.costDisplay.output)}</span></div>
+        <div class="metrics-kv"><span class="metrics-label">Cache Read</span><span class="metrics-value">${esc(d.costDisplay.cacheRead)}</span></div>
+        <div class="metrics-kv"><span class="metrics-label">Cache Write</span><span class="metrics-value">${esc(d.costDisplay.cacheWrite)}</span></div>
+        <div class="metrics-kv" style="border-top:1px solid var(--border);padding-top:6px;margin-top:6px">
+          <span class="metrics-label" style="font-weight:600">Total</span>
+          <span class="metrics-value" style="font-weight:700;color:var(--textStrong)">${esc(d.costDisplay.total)}</span>
+        </div>
+      </div>
+    </div>
+
+    ${toolRows ? `
+      <div style="margin-bottom:16px">
+        <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Tool Usage</div>
+        ${toolRows}
+      </div>
+    ` : ''}
+
+    ${turnRows ? `
+      <div>
+        <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Context Growth</div>
+        <div style="display:flex;flex-direction:column;gap:3px">${turnRows}</div>
+      </div>
+    ` : ''}
+  `;
+}
+
+// ── Detail view: Trace ──────────────────────────────────────────
+
+async function loadTrace(sessionId, agent) {
+  $('traceOutput').innerHTML = '<div class="empty">Loading trace...</div>';
+  try {
+    const res = await fetch(`${BASE}/api/session/${encodeURIComponent(sessionId)}/trace?agent=${encodeURIComponent(agent)}&t=${Date.now()}`);
+    const data = await res.json();
+    if (data && data.entries) renderTrace(data.entries);
+    else $('traceOutput').innerHTML = '<div class="empty">Session not found</div>';
+  } catch (e) {
+    $('traceOutput').innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderTrace(entries) {
+  const html = entries.map(e => {
+    switch (e.type) {
+      case 'session_start':
+        return `<div class="trace-meta">Started: ${fmtTs(e.text)}</div>`;
+      case 'model_change':
+        return `<div class="trace-meta">Model: ${esc(e.text)}</div>`;
+      case 'user':
+        return `<div class="trace-user"><div class="trace-role">USER</div><div class="trace-text">${esc(e.text)}</div></div>`;
+      case 'assistant_text':
+        return `<div class="trace-assistant-text">${esc(e.text)}</div>`;
+      case 'assistant_thinking':
+        return `<div class="trace-thinking">${esc(e.text)}</div>`;
+      case 'tool_call':
+        return `<div class="trace-tool-call"><span class="trace-step">[${e.step}]</span> <span class="trace-tool-name">${esc(e.name)}</span> <span class="trace-tool-summary">${esc(e.summary)}</span></div>`;
+      case 'tool_result':
+        const icon = e.isError ? '<span class="trace-tool-error">&#x2717;</span>' : '<span class="trace-tool-ok">&#x2713;</span>';
+        return `<div class="trace-tool-result">${e.step ? `<span class="trace-step">[${e.step}]</span> ` : ''}${icon} <span class="trace-tool-name">${esc(e.toolName)}</span> <span class="trace-result-text${e.isError ? ' trace-error-text' : ''}">${esc(e.text)}</span></div>`;
+      case 'turn_meta':
+        return `<div class="trace-turn-meta">${(e.parts || []).map(p => esc(p)).join(' | ')}</div>`;
+      default:
+        return '';
+    }
+  }).join('\n');
+
+  $('traceOutput').innerHTML = html || '<div class="empty">Empty session</div>';
+}
+
+// ── Detail view: LLM Calls (scoped to session) ─────────────────
+
+async function loadSessionLlm(sessionId, agent) {
+  $('llmBody').innerHTML = '';
+  $('llmEmpty').style.display = '';
+  $('llmEmpty').textContent = 'Loading LLM calls...';
+
+  try {
+    const qs = new URLSearchParams({ session: sessionId, t: Date.now() });
+    if (agent) qs.set('agent', agent);
+    const res = await fetch(`${BASE}/api/llm-calls?${qs}`);
+    sessionLlmData = await res.json();
+    renderLlm();
+  } catch (e) {
+    $('llmEmpty').textContent = `Error: ${e.message}`;
+    $('llmEmpty').style.display = '';
+  }
+}
+
+function sortLlm(col) {
+  if (llmSortCol === col) llmSortAsc = !llmSortAsc;
+  else { llmSortCol = col; llmSortAsc = true; }
+
+  $('llmTable').querySelectorAll('.sortable').forEach(th => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (th.dataset.col === col) th.classList.add(llmSortAsc ? 'sort-asc' : 'sort-desc');
+  });
+
+  renderLlm();
+}
+
+function renderLlm() {
+  const sorted = sortData(sessionLlmData, llmSortCol, llmSortAsc);
+  const body = $('llmBody');
+  const empty = $('llmEmpty');
+
+  if (!sorted.length) {
+    body.innerHTML = '';
+    empty.textContent = 'No LLM calls found for this session';
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+
+  body.innerHTML = sorted.map(c => {
+    const ts = c.timestamp ? fmtTs(c.timestamp) : '';
+    const costCls = (c.cost || 0) > 1 ? ' style="color:var(--red);font-weight:700"'
+      : (c.cost || 0) > 0.1 ? ' style="color:var(--yellow)"' : '';
+    const stopCls = (c.stopReason === 'stop' || c.stopReason === 'end_turn')
+      ? ' style="color:var(--green)"'
+      : (c.stopReason && c.stopReason.includes('error')) ? ' style="color:var(--red)"' : '';
+    const tools = (c.toolNames || []).slice(0, 4).join(', ');
+    const toolsExtra = (c.toolNames || []).length > 4 ? `+${c.toolNames.length - 4}` : '';
+
+    return `<tr class="dr">
+      <td>${ts}</td>
+      <td style="font-size:11px">${esc((c.model || '?').slice(0, 28))}</td>
+      <td class="r">${esc(c.durationDisplay)}</td>
+      <td class="r">${esc(c.inputTokensDisplay)}</td>
+      <td class="r">${esc(c.outputTokensDisplay)}</td>
+      <td class="r">${esc(c.cacheReadDisplay)}</td>
+      <td class="r cost"${costCls}>${esc(c.costDisplay)}</td>
+      <td${stopCls}>${esc(c.stopReason || '')}</td>
+      <td style="font-size:11px;color:var(--dim)">${esc(tools)}${toolsExtra ? `<span style="color:var(--muted)">${esc(toolsExtra)}</span>` : ''}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Init ────────────────────────────────────────────────────────
+
+// Event delegation for session row clicks
+$('sessionsBody').addEventListener('click', e => {
+  const row = e.target.closest('tr[data-sid]');
+  if (row) showDetail(row.dataset.sid, row.dataset.agent);
+});
+
+loadData();
+</script>

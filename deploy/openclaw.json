@@ -1,14 +1,3 @@
-//
-// OpenClaw Config
-//
-// This file is json5 compatible.
-// Use jsonc (JSON with comments) when editing to avoid IDE formatting errors.
-//
-// This file is what controls the core setup of OpenClaw. It's loaded by the OpenClaw Gateway.
-//
-// Some settings can be changed and hot-reloaded without a gateway restart.
-// Ask claude to deploy config changes.
-//
 // Hot-reloadable (no restart needed):
 //   - hooks — reloads hook handlers
 //   - cron — restarts cron jobs
@@ -51,7 +40,7 @@
     ],
     "controlUi": {
       // TEMPLATE: replace with value from OPENCLAW_DOMAIN_PATH in openclaw-config.env
-      // Use "" (empty string) for root path, or "/subpath" for a subpath — never leave as {{...}}
+      // Use "" (empty string) for root path, or "/subpath" for a subpath — never leave as OPENCLAW_DOMAIN_PATH var
       "basePath": "{{OPENCLAW_DOMAIN_PATH}}"
     }
   },
@@ -65,6 +54,8 @@
     }
   },
   "logging": {
+    "level": "info", // file log level
+    "consoleLevel": "info", // console/docker log level
     "consoleStyle": "json", // Send json logs to vector -> Log Worker
     "redactSensitive": "tools" // Redact sensitive info before shipping logs
   },
@@ -77,17 +68,9 @@
           "enabled": true
         },
         // Bundled with openclaw - when enabled, commands will be logged and shipped to the Log Worker via vector
-        // Only logs command events; see debug-logger for all events
+        // If telemetry plugin is enabled, there's no need for the command-logger
         "command-logger": {
-          "enabled": true
-        },
-        // Custom: Logs all openclaw commands - see hooks/debug-logger/
-        // Logs to /home/openclaw/.openclaw/logs/debug.log (on VPS) - logrotate manages the log files
-        // Bind mounted into openclaw-gateway container at /home/openclaw/.openclaw/logs/debug.log`
-        // Useful for claude to debug openclaw installations
-        // Recommendation: disable in production
-        "debug-logger": {
-          "enabled": true
+          "enabled": false
         }
       }
     }
@@ -95,6 +78,7 @@
   "agents": {
     // Agent sandbox default settings - all agents inherit these settings & can override per agent
     "defaults": {
+      "userTimezone": "America/Los_Angeles", // Default timezone - can be updated by OpenClaw
       "sandbox": {
         // all: every agent session runs sandboxed by default.
         // Main agent overrides to "non-main" so operator DMs run on host.
@@ -118,9 +102,9 @@
           // Sandbox env settings
           // OpenClaw reads these when processing agent requests. e.g. Can be used to override API Keys per agent.
           // Requires a custom patch to propagate env to the sandbox containers to be used for bins.
-          // See Patch #2 in build-openclaw.sh to properly set ENV vars in sandbox containers - patches missing openclaw feature.
-          // Env is only propagated into the containers at build time.
-          // Requires rebuilding & restarting sandboxes if you need any of these env settings in the sandbox container.
+          // See Patch #3 in build-openclaw.sh to properly set ENV vars in sandbox containers - patches missing openclaw feature.
+          // Env is only propagated into the containers at container creation time.
+          // Requires recreating sandboxes if you need any of these env settings in the sandbox container.
           "env": {
             "LANG": "C.UTF-8",
             // Add /opt/skill-bins to PATH so gateway passes skill binary preflight checks.
@@ -210,17 +194,25 @@
           // Main delegates browser tasks to other sandboxed agents with their own browser containers
           // If main is running in sandbox.mode:"all" then optionally remove "browser" from deny list to allow spawning it's own browser container
           // non-main -> host browser behavior is currently non-configurable here - can be somewhat controlled with a custom instruction in AGENTS.md
-          "deny": ["browser", "canvas", "nodes", "discord"]
+          "deny": ["browser", "canvas", "nodes", "discord", "group:plugins"]
         },
         "subagents": {
-          "allowAgents": ["code", "skills"]
+          "allowAgents": ["code", "skills"] // Add other agents here to allow main to spawn them; e.g. "personal", "work"
         }
       },
       // CODING AGENT
       {
         "id": "code",
         "name": "Code Agent",
-        "skills": ["coding-agent", "github", "clawhub", "skill-creator"],
+        "skills": [
+          "coding-agent",
+          "github",
+          "clawhub",
+          "skill-creator",
+          "gemini",
+          "mcporter",
+          "tmux"
+        ],
         "sandbox": {
           "workspaceAccess": "rw", // Code agent needs persistent read/write access to workspace
           "docker": {
@@ -252,24 +244,21 @@
         "name": "Skills Agent",
         "skills": [
           "blogwatcher",
-          "gemini",
           "gifgrep",
           "healthcheck",
           "himalaya",
-          "mcporter",
           "nano-pdf",
           "openai-image-gen",
           "openai-whisper-api",
           "oracle",
           "ordercli",
-          "tmux",
           "video-frames",
           "wacli",
           "weather"
         ],
         "tools": {
-          // Skills agent doesn't need to browse or spawn other agents — that's main's job
-          "deny": ["browser", "sessions_spawn"]
+          // Skills agent doesn't need to spawn other agents — that's main's job in this configuration
+          "deny": ["sessions_spawn"]
         },
         "sandbox": {
           "docker": {
@@ -288,8 +277,15 @@
     "enabled": true,
     "allow": [
       "coordinator", // Coordinator plugin — builds routing table from agent configs
-      "llm-logger" // LLM logger plugin — logs prompts/responses to llm.log
+      "telemetry", // Unified telemetry — replaces llm-logger plugin and debug-logger hook
+      "memory-core" // File-backed memory search tools
     ],
+    "load": {
+      "paths": ["/app/deploy/plugins"] // Load directly from deploy dir — avoids copying into OpenClaw's namespace
+    },
+    "slots": {
+      "memory": "memory-core" // Bundled memory plugin — provides memory_search and memory_get tools
+    },
     "entries": {
       // Coordinator Plugin
       // Auto-discovers routes from agents.list[].skills via loadConfig() and writes
@@ -302,20 +298,51 @@
           "coordinatorAgent": "main"
         }
       },
-      // LLM Logger Plugin
-      // Logs all LLM input/output events to ~/.openclaw/logs/llm.log (JSONL)
-      // For development debugging — disabled by default to avoid large log files.
-      // Enable with: openclaw config set plugins.entries.llm-logger.enabled true
+      // Telemetry Plugin
+      // Unified telemetry — captures LLM, session, tool, message, agent, and gateway events.
+      // Replaces both llm-logger plugin and debug-logger hook.
+      // Ships to: local JSONL file, Log Worker /events (D1), and Log Worker /llemtry (Langfuse).
       // Requires gateway restart (plugins.* not hot-reloadable).
-      "llm-logger": {
-        "enabled": false
+      "telemetry": {
+        "enabled": true,
+        "config": {
+          "instanceId": "{{OPENCLAW_INSTANCE_ID}}", // TEMPLATE: from openclaw-config.env
+          "hostname": "{{VPS_HOSTNAME}}", // TEMPLATE: from openclaw-config.env
+          "logFile": "telemetry.log", // Set to empty string to disable file logging
+          // Remote event shipping to Log Worker /events → D1 database
+          "events": {
+            "enabled": "{{ENABLE_EVENTS_LOGGING}}",
+            "url": "{{EVENTS_URL}}",
+            "authToken": "{{LOG_WORKER_TOKEN}}",
+            "batchSize": 50,
+            "flushIntervalMs": 10000
+          },
+          // LLM telemetry → Langfuse (via /llemtry endpoint)
+          "llemtry": {
+            "enabled": "{{ENABLE_LLEMTRY_LOGGING}}",
+            "url": "{{LLEMTRY_URL}}",
+            "authToken": "{{LOG_WORKER_TOKEN}}"
+          },
+          // Per-category granularity: "full" | "summary" | "metadata" | "off"
+          "categories": {
+            "llm": "full",
+            "session": "full",
+            "tool": "summary",
+            "message": "summary",
+            "agent": "full",
+            "gateway": "metadata"
+          }
+        }
+      },
+      // Memory Core Plugin
+      // Bundled file-backed memory — provides memory_search and memory_get tools.
+      // Loaded from /app/extensions/memory-core/ (ships with OpenClaw).
+      "memory-core": {
+        "enabled": true
       }
     }
   },
-  // Top-level Tools Config
-  // These are the default tool settings for all agents
-  // Add agent specific overrides in the agents list above
-  // It's highly recommended to restrict tool usage per agent in production to protect against prompt injection attacks
+  // Default tool settings — override per-agent in agents.list
   "tools": {
     // Elevated mode — escape hatch for running exec on host from a sandboxed session
     // Gated to specific sender IDs. Use /elevated on in chat to activate, /elevated off to deactivate.
@@ -346,13 +373,16 @@
           "sessions_send",
           "sessions_spawn", // Can spawn other agents
           "session_status",
-          "cron" // Enable for host status monitoring — agents can schedule checks on health/maintenance data
+          "cron", // Enable for host status monitoring — agents can schedule checks on health/maintenance data
+          "memory_search", // memory-core plugin — explicit allow since group:plugins is denied
+          "memory_get"
         ],
         "deny": [
           "canvas",
           "nodes",
           "discord",
-          "gateway" // Prevent sandboxed agents from manipulating the gateway — main gets it via per-agent allow
+          "gateway", // Prevent sandboxed agents from manipulating the gateway — main gets it via per-agent allow
+          "group:plugins" // Block unknown plugin tools — explicitly allow known ones above
         ]
       }
     }

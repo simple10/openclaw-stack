@@ -38,7 +38,7 @@ Then ask the user to fill in the required values (see section 0.2).
 
 Validate all of these fields:
 
-1. **`VPS1_IP`** — Must be set and not a placeholder (not `15.x.x.1` or containing `<`).
+1. **`VPS1_IP`** — Must be set and not a placeholder (not `x.x.x.x` or containing `<`).
 2. **`CF_TUNNEL_TOKEN`** — Must not be empty.
 3. **`OPENCLAW_DOMAIN`** — Must not be a placeholder (no `<example>` or angle brackets).
 4. **`OPENCLAW_DASHBOARD_DOMAIN`** — Must not be a placeholder.
@@ -53,7 +53,7 @@ Report **all** issues at once (don't stop at the first one). Present them as:
 
 > **Configuration issues found:**
 >
-> - `VPS1_IP` is still a placeholder (`15.x.x.1`) — set it to your VPS public IP
+> - `VPS1_IP` is still a placeholder (`x.x.x.x`) — set it to your VPS public IP
 > - `CF_TUNNEL_TOKEN` is empty — create a tunnel in Cloudflare Dashboard and paste
 >   the token (see [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md))
 > - `OPENCLAW_DOMAIN` is still a placeholder — set it to your actual domain
@@ -125,15 +125,12 @@ This returns two lines: CPU count (e.g., `6`) and total memory in bytes (e.g., `
 
 ### Compare Against Config
 
-Read current gateway resource limits from `deploy/docker-compose.override.yml`:
-
-- `deploy.resources.limits.cpus` (e.g., `"6"`)
-- `deploy.resources.limits.memory` (e.g., `10.5G`)
+Read current gateway resource limits from `GATEWAY_CPUS` and `GATEWAY_MEMORY` in `openclaw-config.env`. If not set, the compose file defaults apply (6 CPUs, 10.5G).
 
 ### Expected Values
 
-- **CPUs:** `limits.cpus` should equal the VPS CPU count from `nproc`
-- **Memory:** `limits.memory` should be total VPS memory minus 500M–1GB
+- **CPUs:** `GATEWAY_CPUS` should equal the VPS CPU count from `nproc`
+- **Memory:** `GATEWAY_MEMORY` should be total VPS memory minus 500M–1GB
   - Vector uses ~128M, system/kernel needs ~500M
   - Formula: `total_memory - 750M` (midpoint) is a good default
   - Acceptable range: `total - 1G` to `total - 500M`
@@ -142,20 +139,20 @@ Read current gateway resource limits from `deploy/docker-compose.override.yml`:
 
 **If values match** (CPUs equal, memory within the 500M–1G buffer range): Report that resource limits look correct and continue.
 
-**If mismatch detected:** Show the user a comparison:
+**If mismatch detected or not yet set:** Show the user a comparison:
 
 ```
 VPS Resources:
   CPUs:   <nproc result>
   Memory: <total from free, human-readable>
 
-Current gateway limits (docker-compose.override.yml):
-  CPUs:   <current cpus value>
-  Memory: <current memory value>
+Current gateway limits (openclaw-config.env):
+  GATEWAY_CPUS:   <current value or "(default: 6)">
+  GATEWAY_MEMORY: <current value or "(default: 10.5G)">
 
 Recommended gateway limits:
-  CPUs:   <nproc result>
-  Memory: <total - 750M, rounded to nearest 0.5G>
+  GATEWAY_CPUS:   <nproc result>
+  GATEWAY_MEMORY: <total - 750M, rounded to nearest 0.5G>
 ```
 
 Ask the user if they want to adjust the limits. They may choose:
@@ -164,7 +161,7 @@ Ask the user if they want to adjust the limits. They may choose:
 - Enter custom values
 - Keep the current values (skip)
 
-If the user confirms changes, update `deploy/docker-compose.override.yml` with the new `limits.cpus` and `limits.memory` values. Also update `reservations.cpus` if it exceeds the new limit (reservation cannot exceed limit).
+If the user confirms changes, update `GATEWAY_CPUS` and `GATEWAY_MEMORY` in `openclaw-config.env`. Also check that `reservations.cpus` in `deploy/docker-compose.override.yml` does not exceed the new CPU limit (reservation cannot exceed limit).
 
 ---
 
@@ -176,11 +173,11 @@ Verify the domain is protected by Cloudflare Access before deploying. Run from t
 curl -sI --connect-timeout 10 https://<OPENCLAW_DOMAIN><OPENCLAW_DOMAIN_PATH>/ 2>&1 | head -10
 ```
 
-### If 302/403 redirect (Location header contains `cloudflareaccess.com` or `access.`):
+### If 302/403 redirect (Location header contains `cloudflareaccess.com` or `access.`)
 
 Cloudflare Access is protecting the domain. Continue to next step.
 
-### If 200 (unprotected):
+### If 200 (unprotected)
 
 > "Your domain is accessible without Cloudflare Access. Anyone with the URL could
 > reach OpenClaw after deployment. Configure Cloudflare Access first — see
@@ -191,7 +188,7 @@ Cloudflare Access is protecting the domain. Continue to next step.
 
 Wait for user to confirm. Re-run the curl check to verify.
 
-### If connection refused, timeout, or DNS error:
+### If connection refused, timeout, or DNS error
 
 > "Your domain isn't resolving or the tunnel route isn't configured yet. You need to:
 >
@@ -203,7 +200,7 @@ Wait for user to confirm. Re-run the curl check to verify.
 
 Wait for user. Re-check.
 
-### Also verify the browser VNC domain:
+### Also verify the browser VNC domain
 
 ```bash
 curl -sI --connect-timeout 10 https://<OPENCLAW_DASHBOARD_DOMAIN><OPENCLAW_DASHBOARD_DOMAIN_PATH>/ 2>&1 | head -10
@@ -211,7 +208,7 @@ curl -sI --connect-timeout 10 https://<OPENCLAW_DASHBOARD_DOMAIN><OPENCLAW_DASHB
 
 Same logic: expect 302/403. If not, guide user to fix.
 
-### Opt-out:
+### Opt-out
 
 If the user cannot or does not want to set up Cloudflare Access right now, they can
 explicitly say so. Warn them:
@@ -240,27 +237,92 @@ Present the full deployment plan to the user:
 
 ```
 Deployment Plan:
-  1. [If needed] Deploy Cloudflare Workers (01-workers.md) — sets up infrastructure (AUTH_TOKEN only)
-  2. Base setup & hardening (02-base-setup.md)
-  3. Docker installation (03-docker.md)
-  4. OpenClaw deployment (04-vps1-openclaw.md)
-  5. Backup configuration (06-backup.md)
-  6. Reboot & verification (07-verification.md)
-  7. Post-deploy: AI proxy configuration, device pairing & deployment report (08-post-deploy.md)
+  1. [Parallel]
+     a. Deploy Cloudflare Workers (01-workers.md) — local              ~5 min
+     b. Base setup & hardening (02-base-setup.md) — VPS               ~10 min
+  2. Docker installation (03-docker.md)
+  3. OpenClaw deployment (04-vps1-openclaw.md)
+  4. Backup configuration (06-backup.md)
+  5. Reboot & verification (07-verification.md)
+  6. Post-deploy: AI proxy configuration, device pairing & deployment report (08-post-deploy.md)
 ```
 
 Domain and Cloudflare Access have been verified.
 
-> **Note:** AI proxy provider API keys (e.g., `ANTHROPIC_API_KEY`) are configured during post-deploy (step 7, `08-post-deploy.md` § 8.1), not during worker deployment (step 1). Worker deployment only sets up the infrastructure (`AUTH_TOKEN`).
+> **Note:** AI proxy provider API keys (e.g., `ANTHROPIC_API_KEY`) are configured during post-deploy (step 6, `08-post-deploy.md` § 8.1), not during worker deployment (step 1). Worker deployment only sets up the infrastructure (`AUTH_TOKEN`).
 
 Ask the user to confirm before proceeding with the deployment.
 
 ### Automation directive
 
-After the user confirms, execute playbooks 01 through 07 **continuously without pausing between steps**. Do not ask for confirmation between playbooks. Only stop if:
+After the user confirms, launch **01-workers and 02-base-setup as parallel subagents** (two Task tool calls in a single message). These have no shared dependencies — workers run locally via wrangler while base setup runs on the VPS via SSH. After both subagents return, execute playbooks 03 through 07 **continuously without pausing between steps**. Do not ask for confirmation between playbooks. Only stop if:
 
 - A command fails and the error requires user input to resolve
 - A playbook step explicitly says to wait for user input (e.g., a blocking error with multiple resolution paths)
 - **SSH verification (02-base-setup.md § 2.4 Step 3):** You MUST test SSH on port `<SSH_HARDENED_PORT>` from the local machine and confirm it works before proceeding. This is a mandatory stop point — do not skip it during automated deployment.
+- **07-verification.md:** Run in the main context (not a subagent) so the user sees real-time progress and errors can be handled directly. By this point, all heavy steps have been offloaded to subagents and the context window has room. Report the summary table before proceeding to 08-post-deploy.md.
 
 Normal informational output (progress updates, version notes, check results) should be reported inline without pausing. The first user interaction after confirmation should be device pairing in `08-post-deploy.md`.
+
+### Context window management
+
+A full deployment consumes significant context. To avoid mid-deploy compaction, **offload verbose steps to subagents** using the `Task` tool. Subagents run in their own context window — only their short summary returns to the main conversation.
+
+**Delegate to subagents:** Steps that produce verbose output but only need pass/fail + key values back:
+
+| Step | Why it's heavy | Return values | Read range |
+|------|---------------|---------------|------------|
+| 01: Workers deployment | npm install + wrangler deploy output | Worker URLs, auth tokens, D1 database ID | Full file |
+| 02: System update + package install | apt output (hundreds of lines) | pass/fail | Full file |
+| 02: System hardening (2.5–2.9) | swap, fail2ban, kernel config output | pass/fail, cloudflared version | Full file |
+| 04: Sysbox + infra (4.1–4.2) | dpkg + network/directory creation + SCP | pass/fail, OPENCLAW_GENERATED_TOKEN | Lines 1–162 |
+| 04: Deploy configuration (4.3) | deploy-config.sh runs on VPS | pass/fail | Lines 24–262 |
+| 04: Build + start (4.4) | Full Docker build log | pass/fail | Lines 263–447 |
+
+> **Read ranges:** Use `offset` and `limit` parameters when telling subagents to read playbook sections. This prevents subagents from loading troubleshooting, updating, and verification sections they don't need (~250 lines saved per 04 subagent).
+
+> **Parallel launch:** 01 and 02 subagents should be launched together in a single message (multiple Task tool calls). Both must return their values before step 04 can begin — 04 needs worker URLs/tokens from 01 and requires Docker (step 03, which depends on 02).
+
+**Keep in main context:** Steps that generate credentials stored in `openclaw-config.env` (user creation in 02, gateway token recording in 04 after setup-infra.sh returns it), SSH hardening port transition (02), **03-docker.md** (short — use `2>&1 | tail -5` for apt output), device pairing (04/08), **06-backup.md** (short — uses `SOURCE:` pattern, no verbose output), user-facing interactions (08), **07-verification.md** (all checks — runs after heavy steps are done, gives user real-time progress and direct error handling), and the **sandbox build wait** (04: §4.4 — use background task + progress polling pattern for user feedback, ~100 tokens per poll).
+
+**Critical: avoid reading playbooks before delegating.** Do NOT read a playbook into main context and then pass its contents to a subagent — this doubles the context cost. Instead, tell the subagent to read the playbook section itself:
+
+```
+Read playbooks/04-vps1-openclaw.md (offset: 1, limit: 162) for sections 4.1-4.2 and execute them.
+SSH: ssh -i <key> -p <port> <user>@<ip>
+Config values (pass as env vars to setup-infra.sh):
+  AI_GATEWAY_WORKER_URL=<value>
+  AI_GATEWAY_AUTH_TOKEN=<value>
+  ...
+Return: pass/fail, OPENCLAW_GENERATED_TOKEN from stdout.
+```
+
+**Template substitution in subagents:** Sections 4.2 and 4.3 now use standalone scripts (`deploy/scripts/setup-infra.sh` and `deploy/scripts/deploy-config.sh`) that are bulk-copied to `/tmp/deploy-staging/` as part of the `deploy/` directory copy in § 4.2 Step 1, then run remotely. Config values are passed as env vars — the subagent just needs the variable values, not the script contents.
+
+**Subagent deploy logs:** Each subagent must write its detailed execution log to `.deploy-logs/<timestamp>/` before returning its summary. This preserves the full output for post-deploy review without consuming main context.
+
+At the start of deployment (before launching subagents), create the log directory:
+
+```
+.deploy-logs/YYYYMMDD-HHMMSS/
+```
+
+Instruct each subagent to write its detailed report (all commands run, full output, errors encountered, recovery steps) to a file in this directory:
+
+```
+.deploy-logs/YYYYMMDD-HHMMSS/01-workers.md
+.deploy-logs/YYYYMMDD-HHMMSS/02-base-setup.md
+.deploy-logs/YYYYMMDD-HHMMSS/04-infra-config.md
+.deploy-logs/YYYYMMDD-HHMMSS/04-build-start.md
+```
+
+The subagent's return message to the main agent should still be a short summary (pass/fail + key values). The log file contains everything else. At the end of deployment, tell the user where the logs are so they can ask for review if needed.
+
+The `.deploy-logs/` directory is gitignored.
+
+**Additional techniques:**
+
+- Batch related SSH commands into single calls (e.g., all file deployments in one SSH session)
+- Use `2>&1 | tail -5` for build commands where only the final status matters
+- After a subagent completes successfully, its verbose output stays out of main context automatically
+- Run independent subagents in parallel when possible (e.g., 06-backup can overlap with sandbox build wait)

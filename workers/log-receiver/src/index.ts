@@ -1,9 +1,47 @@
 import { validateAuth } from './auth'
 import { handlePreflight, addCorsHeaders } from './cors'
 import { jsonError } from './errors'
+import { handleEvents } from './events'
+import { handleLlemtry } from './llemtry'
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  // Cron trigger: prune old events from D1
+  async scheduled(
+    _controller: ScheduledController,
+    env: Env,
+    ctx: ExecutionContext
+  ): Promise<void> {
+    if (!env.DB) {
+      console.error('[prune] D1 database binding "DB" not configured — skipping')
+      return
+    }
+
+    const retentionDays = parseInt(env.EVENT_RETENTION_DAYS || '30', 10)
+    if (!Number.isFinite(retentionDays) || retentionDays < 1) {
+      console.error(`[prune] Invalid EVENT_RETENTION_DAYS: ${env.EVENT_RETENTION_DAYS}`)
+      return
+    }
+
+    try {
+      const result = await env.DB.prepare(
+        `DELETE FROM events WHERE timestamp < datetime('now', '-' || ? || ' days')`
+      )
+        .bind(retentionDays)
+        .run()
+
+      const deleted = result.meta?.changes ?? 0
+      console.log({
+        _prune: true,
+        message: `[PRUNE] Deleted ${deleted} events older than ${retentionDays} days`,
+        deleted,
+        retentionDays,
+      })
+    } catch (err) {
+      console.error('[prune] Failed:', err instanceof Error ? err.message : err)
+    }
+  },
+
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     // CORS preflight
     if (request.method === 'OPTIONS') {
       return handlePreflight()
@@ -28,6 +66,33 @@ export default {
       }
 
       return addCorsHeaders(await handleLogs(request, env))
+    }
+
+    // POST /llemtry — receive LLM telemetry spans from telemetry plugin
+    if (request.method === 'POST' && pathname === '/llemtry') {
+      const authError = await validateAuth(request, env.AUTH_TOKEN)
+      if (authError) {
+        return addCorsHeaders(jsonError(authError, 401))
+      }
+
+      return addCorsHeaders(await handleLlemtry(request, env, ctx))
+    }
+
+    // POST /events — receive batched telemetry events for D1 storage
+    if (request.method === 'POST' && pathname === '/events') {
+      if (!env.DB) {
+        console.error('[events] D1 database binding "DB" not configured')
+        return addCorsHeaders(
+          jsonError('Events endpoint not available: D1 database not configured', 503)
+        )
+      }
+
+      const authError = await validateAuth(request, env.AUTH_TOKEN)
+      if (authError) {
+        return addCorsHeaders(jsonError(authError, 401))
+      }
+
+      return addCorsHeaders(await handleEvents(request, env, ctx))
     }
 
     return addCorsHeaders(jsonError('Not found', 404))

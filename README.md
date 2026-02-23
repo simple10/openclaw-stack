@@ -1,14 +1,14 @@
 # Claude > OpenClaw > VPS
 
-STATUS: THIS PROJECT IS NOT YET PRODUCTION READY
+> [!NOTE]
+> This project is in active development. Reach out if you need help.
 
-It's what I'm running for my personal setup - with some config changes.
+This project primarily solves the hard bits of deploying fully containerized OpenClaw, as securely as possible without crippling capabilities.
 
-It's fantastic for hacking on OpenClaw in a secure environment.
+It's also packed full of useful debugging tools to assist you or `claude code` in modifying your OpenClaw setup.
 
-It's packed full of useful tools.
-
-But the openclaw.json config is in rapid development. Star the project to follow along. It will be more fully baked by Feb 28.
+You'll likely want to customize the agents in `deploy/openclaw.json` before deploying.
+The default agent is configured as a coordinator to hand off tasks to sub-agents.
 
 ---
 
@@ -369,8 +369,6 @@ openclaw doctor --deep
 # Logs
 ./scripts/logs-openclaw.sh # Logs from OpenClaw command logger (built-in plugin)
 ./scripts/logs-docker.sh # Docker container logs, including gateway
-./scripts/logs-debug.sh # Logs from custom debug-logger OpenClaw plugin, similar to logs-openclaw but all messages
-./scripts/logs-llm.sh # All LLM request & response messages (from llm-logger plugin)
 ./scripts/logs-session.sh # OpenClaw chat session logs - one of the most useful debugging logs
 
 # Browser

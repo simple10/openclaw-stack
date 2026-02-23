@@ -1,0 +1,56 @@
+{
+  "name": "openclaw-log-receiver",
+  "main": "src/index.ts",
+  "workers_dev": true,
+  "preview_urls": false,
+
+  "compatibility_date": "2026-02-06",
+
+  // Workers Logs: enables console.log in the worker
+  "observability": {
+    "enabled": true,
+    "logs": {
+      // Disable automatic per-request invocation entries — we only want
+      // the explicit console.* output from our log processing code.
+      "invocation_logs": false
+    }
+  },
+
+  // Smart placement for reduced latency
+  "placement": {
+    "mode": "smart"
+  },
+
+  // D1 database for telemetry event storage
+  // Create with: wrangler d1 create <database_name>
+  // Apply schema: wrangler d1 execute <database_name> --file=src/schema.sql
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "openclaw-logs",
+      "database_id": "<run: npx wrangler d1 create>"
+    }
+  ],
+
+  // Cron trigger: prune old events from D1 daily at 04:00 UTC
+  "triggers": {
+    "crons": ["0 4 * * *"]
+  },
+
+  "vars": {
+    // Comma-separated log levels to output to console (changeable without redeploy via dashboard)
+    "LOGGABLE_LEVELS": "info,warn,error,fatal,panic",
+
+    // Number of days to retain events in D1 before auto-pruning (changeable via dashboard)
+    "EVENT_RETENTION_DAYS": "30"
+    //
+    // Secrets (set via `wrangler secret put`):
+    //
+    //    AUTH_TOKEN — token Vector uses to authenticate to this worker
+    //
+    // Langfuse
+    //    LANGFUSE_BASE_URL = base URL for llemtry backend (e.g. https://cloud.langfuse.com)
+    //    LANGFUSE_PUBLIC_KEY — Langfuse public key (enables llemtry → Langfuse backend)
+    //    LANGFUSE_SECRET_KEY — Langfuse secret key
+  }
+}

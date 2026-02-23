@@ -8,6 +8,7 @@ This playbook configures:
 
 - Backup script for OpenClaw configuration and data
 - Automated daily backups via cron
+- Session transcript and stale log file pruning
 - 30-day retention policy
 
 ## Prerequisites
@@ -24,48 +25,12 @@ No external variables required.
 
 ## 6.1 Create Backup Script
 
+IMPORTANT: Backup script must run as root because `.openclaw` is owned by uid 1000 (container's node user), not the host's `openclaw` user (uid 1002).
+
 ```bash
-#!/bin/bash
-# IMPORTANT: Backup script must run as root because:
-# - .openclaw directory is owned by uid 1000 (container's node user)
-# - openclaw user on host is uid 1002 (different from container user)
-# - Only root can reliably read/write to uid 1000 owned directories
+# SOURCE: deploy/backup.sh
 sudo tee /home/openclaw/scripts/backup.sh << 'EOF'
-#!/bin/bash
-set -euo pipefail
-
-BACKUP_DIR="/home/openclaw/.openclaw/backups"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-BACKUP_FILE="${BACKUP_DIR}/openclaw_backup_${TIMESTAMP}.tar.gz"
-RETENTION_DAYS=30
-
-# Ensure backup directory exists with correct permissions
-mkdir -p "${BACKUP_DIR}"
-chown 1000:1000 "${BACKUP_DIR}"
-
-# Create backup
-tar -czf "${BACKUP_FILE}" \
-    -C /home/openclaw \
-    .openclaw/openclaw.json \
-    .openclaw/credentials \
-    .openclaw/workspace \
-    openclaw/.env \
-    sandboxes-home \
-    2>/dev/null || true
-
-# Set ownership so container can also access backups if needed
-chown 1000:1000 "${BACKUP_FILE}"
-
-# Verify
-if tar -tzf "${BACKUP_FILE}" > /dev/null 2>&1; then
-    echo "$(date): Backup created: ${BACKUP_FILE}"
-else
-    echo "$(date): Backup failed!"
-    exit 1
-fi
-
-# Cleanup old backups
-find "${BACKUP_DIR}" -name "openclaw_backup_*.tar.gz" -mtime +${RETENTION_DAYS} -delete
+# <<< deploy/backup.sh >>>
 EOF
 
 sudo chmod +x /home/openclaw/scripts/backup.sh
@@ -123,17 +88,59 @@ sudo tar -tzf /home/openclaw/.openclaw/backups/openclaw_backup_*.tar.gz
 
 ---
 
+## 6.4 Session & Log Pruning
+
+Session transcripts (`~/.openclaw/agents/<agentId>/sessions/*.jsonl`) accumulate indefinitely. This cron job deletes session files and stale log files older than 30 days.
+
+### Install Prune Script
+
+```bash
+# SOURCE: deploy/session-prune.sh
+sudo tee /home/openclaw/scripts/session-prune.sh << 'EOF'
+# <<< deploy/session-prune.sh >>>
+EOF
+
+sudo chmod +x /home/openclaw/scripts/session-prune.sh
+```
+
+### Schedule Cron Job
+
+```bash
+sudo tee /etc/cron.d/openclaw-session-prune << 'EOF'
+# OpenClaw session & log pruning — runs as root (uid 1000 owned directories)
+30 3 * * * root /home/openclaw/scripts/session-prune.sh >> /home/openclaw/.openclaw/logs/session-prune.log 2>&1
+EOF
+
+sudo chmod 644 /etc/cron.d/openclaw-session-prune
+```
+
+### Test Manually
+
+```bash
+sudo /home/openclaw/scripts/session-prune.sh
+# Expected: "<date>: Pruned 0 session files, 0 stale log files (retention: 30 days)"
+
+# Optional: test with a shorter retention to verify it works
+# sudo /home/openclaw/scripts/session-prune.sh 1
+```
+
+---
+
 ## Verification
 
 ```bash
-# Check cron job is installed
+# Check cron jobs are installed
 cat /etc/cron.d/openclaw-backup
+cat /etc/cron.d/openclaw-session-prune
 
 # Check backup directory exists (sudo required — .openclaw is owned by uid 1000)
 sudo ls -la /home/openclaw/.openclaw/backups/
 
 # Check backup log (after first run)
 sudo cat /home/openclaw/.openclaw/logs/backup.log
+
+# Check prune log (after first run)
+sudo cat /home/openclaw/.openclaw/logs/session-prune.log
 ```
 
 ---

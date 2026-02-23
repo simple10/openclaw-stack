@@ -1,0 +1,739 @@
+<!-- home.html — Home page body template.
+     Injected into layout chrome by pages/home.mjs.
+     Same stats panels as stats.html, plus Agent Browsers and
+     Browser Downloads info boxes. Fetches /api/browsers and
+     /api/media/recent in parallel with stats data. -->
+
+<!-- Alerts Banner -->
+<div class="alerts-section" id="alertsSection"></div>
+
+<!-- System Health Row -->
+<div class="health-row" id="healthRow">
+  <div class="glass health-item"><div class="health-label">Gateway</div><div class="health-value" id="hGw">—</div></div>
+  <div class="glass health-item"><div class="health-label">Version</div><div class="health-value" id="hVer">—</div></div>
+  <div class="glass health-item"><div class="health-label">Active Sessions</div><div class="health-value" id="hSess">—</div></div>
+  <div class="glass health-item"><div class="health-label">Uptime</div><div class="health-value" id="hUp">—</div></div>
+  <div class="glass health-item"><div class="health-label">Memory</div><div class="health-value" id="hMem">—</div></div>
+  <div class="glass health-item"><div class="health-label">Compaction</div><div class="health-value" id="hComp">—</div></div>
+</div>
+
+<!-- Agent Browsers + Browser Downloads -->
+<div class="info-boxes">
+  <div class="glass info-box">
+    <div class="info-box-title">🌐 Agent Browsers <span class="info-box-subtitle" style="font-size:10px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim);margin-left:6px">Ask <a href="" id="openclawLink" target="_blank" style="color:var(--accent);text-decoration:none">OpenClaw</a> to start a browser if not running</span></div>
+    <div id="browsersPanel"><div class="empty">Loading...</div></div>
+  </div>
+  <div class="glass info-box">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div class="info-box-title" style="margin-bottom:0">📥 Browser Downloads</div><a href="" id="mediaLink" style="color:var(--accent);font-size:12px;font-weight:500;text-decoration:none">View All Media →</a></div>
+    <div id="mediaPanel"><div class="empty">Loading...</div></div>
+  </div>
+</div>
+
+<!-- Cost Row -->
+<div class="cost-row">
+  <div class="glass cost-card">
+    <div class="cost-label">Today's Cost</div>
+    <div class="cost-value" id="cToday">—</div>
+    <div class="cost-sub" id="cTodaySub"></div>
+  </div>
+  <div class="glass cost-card">
+    <div class="cost-label">All-Time Cost</div>
+    <div class="cost-value" id="cAll">—</div>
+    <div class="cost-sub" id="cAllSub"></div>
+  </div>
+  <div class="glass cost-card">
+    <div class="cost-label">Projected Monthly</div>
+    <div class="cost-value" id="cProj">—</div>
+    <div class="cost-sub">Based on today's rate</div>
+  </div>
+  <div class="glass cost-card" style="padding:12px 16px">
+    <div class="cost-label" style="margin-bottom:8px">Cost Breakdown</div>
+    <div class="donut-container">
+      <div class="donut" id="donut"><div class="donut-hole" id="donutCenter">$0</div></div>
+      <div class="donut-legend" id="donutLegend"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Charts Section -->
+<div class="charts-section">
+  <div class="section-header">
+    <span class="section-title">📈 Charts & Trends</span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="tab-group" id="chartTabGroup">
+        <button class="tab-btn active" id="cTab7" onclick="chartDays=7;renderCharts()">7 Days</button>
+        <button class="tab-btn" id="cTab30" onclick="chartDays=30;renderCharts()">30 Days</button>
+      </div>
+    </div>
+  </div>
+  <div id="chartsContainer">
+    <div class="grid-3">
+      <div class="glass chart-container"><div class="chart-title">Daily Cost Trend</div><div id="costChart"></div></div>
+      <div class="glass chart-container"><div class="chart-title">Cost by Model</div><div id="modelChart"></div></div>
+      <div class="glass chart-container"><div class="chart-title">Sub-Agent Activity</div><div id="subagentChart"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Cron Jobs Panel -->
+<div style="margin-bottom:24px">
+  <div class="section-header"><span class="section-title">⏰ Cron Jobs</span><span class="section-count" id="cronCount"></span></div>
+  <div class="glass panel" style="overflow-x:auto">
+    <table class="dtable" id="cronTable">
+      <thead><tr><th>Status</th><th>Name</th><th>Schedule</th><th>Last Run</th><th>Next Run</th><th class="r">Duration</th><th>Model</th></tr></thead>
+      <tbody id="cronBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Active Sessions Panel -->
+<div style="margin-bottom:24px">
+  <div class="section-header"><span class="section-title">📡 Active Sessions</span><span class="section-count" id="sessCount"></span></div>
+  <div class="card" style="margin-bottom:16px">
+    <div style="font-size:11px;color:var(--dim);margin-bottom:12px;text-transform:uppercase;letter-spacing:.05em">Agent Hierarchy</div>
+    <div id="agentTree"></div>
+  </div>
+  <div class="glass panel" style="overflow-x:auto;max-height:400px;overflow-y:auto">
+    <table class="dtable">
+      <thead><tr><th>Name</th><th>Model</th><th>Type</th><th>Context %</th><th>Last Activity</th><th class="r">Tokens</th></tr></thead>
+      <tbody id="sessBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Token Usage Table -->
+<div style="margin-bottom:24px">
+  <div class="section-header">
+    <span class="section-title">📊 Token Usage & Cost</span>
+    <div class="tab-group">
+      <button class="tab-btn active" id="uTabT" onclick="uTab='today';render()">Today</button>
+      <button class="tab-btn" id="uTab7" onclick="uTab='7d';render()">7 Days</button>
+      <button class="tab-btn" id="uTab30" onclick="uTab='30d';render()">30 Days</button>
+      <button class="tab-btn" id="uTabA" onclick="uTab='all';render()">All Time</button>
+    </div>
+  </div>
+  <div class="glass panel" style="overflow-x:auto">
+    <table class="dtable">
+      <thead><tr><th>Model</th><th class="r">Calls</th><th class="r">Input</th><th class="r">Output</th><th class="r">Cache</th><th class="r">Total</th><th class="r">Cost</th><th style="min-width:100px">Usage</th></tr></thead>
+      <tbody id="uBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Sub-Agent Usage Table -->
+<div style="margin-bottom:24px">
+  <div class="section-header">
+    <span class="section-title" style="color:var(--purple)">🤖 Sub-Agent Activity</span>
+    <div style="display:flex;align-items:center;gap:12px">
+      <span id="subCostLbl" style="font-size:12px;color:var(--muted);font-weight:500"></span>
+      <div class="tab-group">
+        <button class="tab-btn active-purple" id="srTabT" onclick="srTab='today';render()">Today</button>
+        <button class="tab-btn" id="srTab7" onclick="srTab='7d';render()">7 Days</button>
+        <button class="tab-btn" id="srTab30" onclick="srTab='30d';render()">30 Days</button>
+        <button class="tab-btn" id="srTabA" onclick="srTab='all';render()">All Time</button>
+      </div>
+    </div>
+  </div>
+  <div class="glass panel" style="overflow-x:auto">
+    <table class="dtable">
+      <thead><tr><th>Task</th><th>Agent</th><th>Model</th><th class="r">Cost</th><th class="r">Duration</th><th>Status</th><th>Time</th></tr></thead>
+      <tbody id="srBody"></tbody>
+    </table>
+    <div class="empty" id="srEmpty" style="display:none">No sub-agent runs</div>
+  </div>
+  <!-- Sub-agent token breakdown -->
+  <div style="margin-top:12px">
+    <div class="section-header">
+      <span class="section-title" style="color:var(--purple)">Sub-Agent Token Breakdown</span>
+      <div class="tab-group">
+        <button class="tab-btn active-purple" id="stTabT" onclick="stTab='today';render()">Today</button>
+        <button class="tab-btn" id="stTab7" onclick="stTab='7d';render()">7 Days</button>
+        <button class="tab-btn" id="stTab30" onclick="stTab='30d';render()">30 Days</button>
+        <button class="tab-btn" id="stTabA" onclick="stTab='all';render()">All Time</button>
+      </div>
+    </div>
+    <div class="glass panel" style="overflow-x:auto">
+      <table class="dtable">
+        <thead><tr><th>Model</th><th class="r">Calls</th><th class="r">Input</th><th class="r">Output</th><th class="r">Cache</th><th class="r">Total</th><th class="r">Cost</th><th style="min-width:100px">Usage</th></tr></thead>
+        <tbody id="stBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Bottom Row -->
+<div class="grid-3">
+  <div class="glass panel">
+    <div class="section-header"><span class="section-title">🧠 Available Models</span></div>
+    <div class="models-grid" id="modelsGrid"></div>
+  </div>
+  <div class="glass panel">
+    <div class="section-header"><span class="section-title">🔧 Enabled Skills</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:5px" id="skillsGrid"></div>
+  </div>
+  <div class="glass panel">
+    <div class="section-header"><span class="section-title">📜 Git Log</span></div>
+    <div id="gitPanel"></div>
+  </div>
+</div>
+
+<!-- Agent Configuration -->
+<div class="glass panel" style="margin-top:16px">
+  <div class="section-header">
+    <span class="section-title">⚙️ Agent &amp; Model Configuration</span>
+    <span class="section-count" id="agentCount"></span>
+  </div>
+  <div id="agentCards" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px">
+    <div style="background:var(--glass);border:1px solid var(--border);border-radius:8px;padding:12px">
+      <div style="font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">🔀 Model Routing</div>
+      <div id="modelRoutingPanel"></div>
+    </div>
+    <div style="background:var(--glass);border:1px solid var(--border);border-radius:8px;padding:12px">
+      <div style="font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">🛠️ Runtime Config</div>
+      <div id="runtimeConfigPanel"></div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:18px" id="extraConfigRow">
+    <div style="background:var(--glass);border:1px solid var(--border);border-radius:8px;padding:12px" id="searchPanel">
+      <div style="font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">🔍 Web Search</div>
+      <div id="searchPanelInner"></div>
+    </div>
+    <div style="background:var(--glass);border:1px solid var(--border);border-radius:8px;padding:12px" id="gatewayPanel">
+      <div style="font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">🌐 Gateway</div>
+      <div id="gatewayPanelInner"></div>
+    </div>
+    <div style="background:var(--glass);border:1px solid var(--border);border-radius:8px;padding:12px" id="subagentLimitsCell">
+      <div style="font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">🕸️ Subagent Limits</div>
+      <div id="subagentConfigPanel"></div>
+    </div>
+    <div style="background:var(--glass);border:1px solid var(--border);border-radius:8px;padding:12px" id="hooksPanel">
+      <div style="font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">🪝 Internal Hooks</div>
+      <div id="hooksPanelInner"></div>
+    </div>
+    <div style="background:var(--glass);border:1px solid var(--border);border-radius:8px;padding:12px" id="capsPanel">
+      <div style="font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">🔌 Plugins & Extras</div>
+      <div id="capsPanelInner"></div>
+    </div>
+  </div>
+  <div style="font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">🔗 Agent Bindings</div>
+  <div id="bindingsPanel" style="margin-bottom:16px"></div>
+  <div style="font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">📋 Agent Details</div>
+  <div style="overflow-x:auto">
+  <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px" id="agentTable">
+    <thead>
+      <tr style="color:var(--muted);text-transform:uppercase;font-size:9px;letter-spacing:.08em">
+        <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border)">Agent ID</th>
+        <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border)">Role</th>
+        <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border)">Model</th>
+        <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border)">Provider</th>
+        <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border)">Workspace</th>
+        <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border)">Fallbacks</th>
+        <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border)">Context 1M</th>
+      </tr>
+    </thead>
+    <tbody id="agentTableBody"></tbody>
+  </table>
+  </div>
+</div>
+
+<script>
+// ── Home page inline JS ──
+// Same render logic as stats page, plus browsers + media preview panels.
+// Fetches /stats/api/refresh + /api/browsers + /api/media/recent in parallel.
+
+let D={},prevD=null,prevChartDays=null,prevUTab=null,prevSrTab=null,prevStTab=null,uTab='today',srTab='today',stTab='today',timer=60;
+const COLORS=['#6366f1','#9333ea','#ec4899','#f59e0b','#10b981','#06b6d4','#f87171','#84cc16'];
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+const BASE=window.__DASHBOARD_BASE||'';
+
+// Set dynamic link hrefs
+{const ml=$('mediaLink');if(ml)ml.href=BASE+'/media/';}
+{const ol=$('openclawLink');if(ol)ol.href=(window.__CONTROL_UI_BASE||'')+'/';}
+
+function sectionChanged(keys){
+  if(!prevD)return true;
+  return keys.some(k=>JSON.stringify(D[k])!==JSON.stringify(prevD[k]));
+}
+
+function stableSnapshot(arr,fields){
+  if(!arr)return'';
+  return JSON.stringify(arr.map(item=>{
+    const out={};
+    fields.forEach(f=>{if(f in item)out[f]=item[f]});
+    return out;
+  }));
+}
+
+function relTime(ts){
+  if(!ts)return'—';
+  let d;
+  if(typeof ts==='number')d=new Date(ts);
+  else{d=new Date(ts);if(isNaN(d))return ts}
+  const diff=Math.floor((Date.now()-d)/1000);
+  if(diff<60)return diff+'s ago';
+  if(diff<3600)return Math.floor(diff/60)+'m ago';
+  if(diff<86400)return Math.floor(diff/3600)+'h ago';
+  return Math.floor(diff/86400)+'d ago';
+}
+
+// ── Browsers panel ──
+function renderBrowsers(browsers){
+  const el=$('browsersPanel');
+  if(!browsers||!browsers.length){
+    el.innerHTML='<div class="empty">No browser containers configured</div>';
+    return;
+  }
+  el.innerHTML=browsers.map(b=>{
+    const statusCls=b.running?'running':(b.denied?'disabled':'stopped');
+    const statusText=b.running?'Running':(b.denied?'Denied':'Stopped');
+    const dotCls=b.running?'sd-ok':(b.denied?'sd-none':'sd-none');
+    const nameCls=b.running?'browser-name':'browser-name dimmed';
+    const nameHtml=b.running&&b.url
+      ?`<a href="${esc(b.url)}" target="_blank" class="${nameCls}" style="color:var(--textStrong);text-decoration:none">${esc(b.name)}</a><a href="${esc(b.url)}" target="_blank" style="color:var(--accent);font-size:11px;margin-left:6px;text-decoration:none">Open →</a>`
+      :`<span class="${nameCls}">${esc(b.name)}</span>`;
+    return `<div class="browser-row">
+      <span class="sd ${dotCls}"></span>
+      ${nameHtml}
+      <span class="browser-status ${statusCls}">${statusText}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Media preview panel ──
+function renderMediaPreview(media){
+  const el=$('mediaPanel');
+  if(!media||!media.length){
+    el.innerHTML='<div class="empty">No media files yet</div>';
+    return;
+  }
+  el.innerHTML=media.map(m=>{
+    const icon=m.ext==='.pdf'?'📄':'🖼️';
+    return `<div class="media-row">
+      <span class="media-icon">${icon}</span>
+      <a href="${esc(m.url)}" target="_blank" class="media-name" style="color:var(--accent);text-decoration:none">${esc(m.name)}</a>
+      <span class="media-size">${esc(m.size)}</span>
+      <a href="${esc(m.url)}" download class="media-dl">⬇</a>
+    </div>`;
+  }).join('');
+}
+
+// ── Data loading (3 APIs in parallel) ──
+async function loadData(){
+  try{
+    const [statsRes,browsersRes,mediaRes]=await Promise.all([
+      fetch((window.__STATS_BASE||'')+'/api/refresh?t='+Date.now()),
+      fetch(BASE+'/api/browsers?t='+Date.now()),
+      fetch(BASE+'/api/media/recent?t='+Date.now()),
+    ]);
+    D=await statsRes.json();
+    const browsers=await browsersRes.json();
+    const media=await mediaRes.json();
+    requestAnimationFrame(()=>{
+      render();
+      renderBrowsers(browsers);
+      renderMediaPreview(media);
+    });
+    const lu=$('lastUpdate');if(lu)lu.textContent='Updated: '+new Date().toLocaleTimeString();
+    timer=60;
+  }catch(e){
+    $('alertsSection').innerHTML='<div class="alert-item alert-critical"><span class="alert-icon">⚠️</span><span class="alert-msg">Failed to load data</span></div>';
+  }
+}
+
+// ── Stats render (identical to stats page) ──
+function render(){
+  const gw=D.gateway||{};
+  const on=gw.status==='online';
+
+  document.title=D.botName||'OpenClaw Dashboard';
+
+  // Alerts
+  if(sectionChanged(['alerts'])){
+    const alerts=D.alerts||[];
+    $('alertsSection').innerHTML=alerts.length?alerts.map(a=>`<div class="alert-item alert-${esc(a.severity)||'low'}"><span class="alert-icon">${esc(a.icon)||'ℹ️'}</span><span class="alert-msg">${esc(a.message)}</span></div>`).join(''):'';
+  }
+
+  // Health
+  $('hGw').innerHTML=on?'<span style="color:var(--green)">●</span> Online':'<span style="color:var(--red)">●</span> Offline';
+  $('hGw').style.color='var(--textStrong)';
+  $('hVer').textContent=D.version||'—';
+  $('hUp').textContent=gw.uptime||'—';
+  $('hMem').textContent=gw.memoryLimit||gw.memory||'—';
+  $('hComp').textContent=D.compactionMode||'—';
+  $('hSess').textContent=D.sessionCount||0;
+
+  // Cost
+  if(sectionChanged(['totalCostToday','totalCostAllTime','projectedMonthly','subagentCostToday','subagentCostAllTime','costBreakdown'])){
+    $('cToday').textContent='$'+(D.totalCostToday||0).toFixed(2);
+    $('cTodaySub').textContent='Sub-agents: $'+(D.subagentCostToday||0).toFixed(2);
+    $('cAll').textContent='$'+(D.totalCostAllTime||0).toFixed(2);
+    $('cAllSub').textContent='Sub-agents: $'+(D.subagentCostAllTime||0).toFixed(2);
+    $('cProj').textContent='$'+(D.projectedMonthly||0).toFixed(0);
+
+    const bd=D.costBreakdown||[];
+    const realTotal=bd.reduce((a,d)=>a+d.cost,0);
+    const total=realTotal||1;
+    let grad='',cum=0,legend='';
+    bd.forEach((d,i)=>{
+      const pct=d.cost/total*100;
+      const c=COLORS[i%COLORS.length];
+      grad+=`${c} ${cum}% ${cum+pct}%,`;
+      cum+=pct;
+      legend+=`<div class="donut-legend-item"><span class="donut-legend-dot" style="background:${c}"></span>${esc(d.model)} $${d.cost.toFixed(0)} (${Math.round(pct)}%)</div>`;
+    });
+    $('donut').style.background=`conic-gradient(${grad.slice(0,-1)})`;
+    $('donutCenter').textContent='$'+realTotal.toFixed(0);
+    $('donutLegend').innerHTML=legend;
+  }
+
+  if(!prevD||stableSnapshot(D.crons,['lastStatus','name','schedule','lastDurationMs','lastError','model'])!==stableSnapshot(prevD.crons,['lastStatus','name','schedule','lastDurationMs','lastError','model'])){
+    const crons=D.crons||[];
+    $('cronCount').textContent=crons.length+' jobs';
+    const cronContainer=$('cronBody').closest('[style*="overflow"]')||$('cronBody').parentElement;
+    const cronScrollTop=cronContainer?cronContainer.scrollTop:0;
+    $('cronBody').innerHTML=crons.map(c=>{
+      const st=c.lastStatus;
+      const dotCls=st==='ok'?'sd-ok':st==='error'?'sd-error':st==='none'?'sd-none':'sd-pending';
+      const tip=c.lastError?` data-tip="${esc(c.lastError)}"`:'';
+      const dur=c.lastDurationMs?((c.lastDurationMs/1000).toFixed(1)+'s'):'—';
+      return `<tr class="dr"><td><span class="sd ${dotCls}"${tip}></span>${esc(st)||'—'}</td><td class="w">${esc(c.name)}</td><td>${esc(c.schedule)}</td><td>${esc(c.lastRun||'—')}</td><td>${esc(c.nextRun||'—')}</td><td class="r">${dur}</td><td>${esc(c.model||'—')}</td></tr>`;
+    }).join('');
+    if(cronContainer)cronContainer.scrollTop=cronScrollTop;
+  }
+
+  // Sessions
+  if(!prevD||stableSnapshot(D.sessions,['key','name','model','type','contextPct','totalTokens','active','spawnedBy','label','subject'])!==stableSnapshot(prevD.sessions,['key','name','model','type','contextPct','totalTokens','active','spawnedBy','label','subject'])){
+    const sess=(D.sessions||[]).slice(0,20);
+    $('sessCount').textContent=(D.sessionCount||sess.length)+' total, '+sess.length+' shown';
+    const sessContainer=$('sessBody').closest('[style*="overflow"]')||$('sessBody').parentElement;
+    const sessScrollTop=sessContainer?sessContainer.scrollTop:0;
+    $('sessBody').innerHTML=sess.map(s=>{
+      const pct=s.contextPct||0;
+      const color=pct>80?'var(--red)':pct>50?'var(--yellow)':'var(--green)';
+      const typeCls='type-'+(esc(s.type)||'main');
+      return `<tr class="dr"><td class="w" style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.name)}</td><td>${esc(s.model)}</td><td><span class="type-badge ${typeCls}">${esc(s.type)||'—'}</span></td><td><div class="ctx-bar"><div class="ctx-fill" style="width:${pct}%;background:${color}"></div></div> <span style="font-size:11px;color:${color}">${pct}%</span></td><td>${relTime(s.updatedAt)}</td><td class="r">${(s.totalTokens||0).toLocaleString()}</td></tr>`;
+    }).join('');
+    if(sessContainer)sessContainer.scrollTop=sessScrollTop;
+    renderAgentTree();
+  }
+
+  // Token usage
+  setTabCls4('uTab',uTab,'active');
+  if(sectionChanged(['tokenUsage','tokenUsageToday','tokenUsage7d','tokenUsage30d','subagentUsage','subagentUsageToday','subagentUsage7d','subagentUsage30d'])||uTab!==prevUTab){
+    const uData=uTab==='today'?D.tokenUsageToday:uTab==='7d'?D.tokenUsage7d:uTab==='30d'?D.tokenUsage30d:D.tokenUsage;
+    renderTokenTbl('uBody',uData,'var(--accent)');
+  }
+
+  // Sub runs
+  setTabCls4('srTab',srTab,'active-purple');
+  if((!prevD||['subagentRuns','subagentRuns7d','subagentRuns30d','subagentRunsToday'].some(k=>stableSnapshot(D[k],['task','model','cost','durationSec','status'])!==stableSnapshot(prevD[k],['task','model','cost','durationSec','status'])))||srTab!==prevSrTab){
+    const runs=srTab==='today'?(D.subagentRunsToday||[]):srTab==='7d'?(D.subagentRuns7d||[]):srTab==='30d'?(D.subagentRuns30d||[]):(D.subagentRuns||[]);
+    const srCost=srTab==='today'?(D.subagentCostToday||0):srTab==='7d'?(D.subagentCost7d||0):srTab==='30d'?(D.subagentCost30d||0):(D.subagentCostAllTime||0);
+    $('subCostLbl').textContent='Total: $'+srCost.toFixed(2);
+    $('srEmpty').style.display=runs.length?'none':'block';
+    $('srBody').innerHTML=runs.slice(0,20).map(r=>{
+      const dur=r.durationSec>=3600?(r.durationSec/3600).toFixed(1)+'h':r.durationSec>=60?Math.round(r.durationSec/60)+'m':r.durationSec+'s';
+      return `<tr class="dr"><td class="w" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.task)}</td><td>${esc(r.agent||'')}</td><td>${esc(r.model)}</td><td class="r cost">$${r.cost.toFixed(4)}</td><td class="r">${dur}</td><td><span class="badge badge-ok">${esc(r.status)}</span></td><td>${esc(r.timestamp)}</td></tr>`;
+    }).join('');
+  }
+
+  // Sub token
+  setTabCls4('stTab',stTab,'active-purple');
+  if(sectionChanged(['tokenUsage','tokenUsageToday','tokenUsage7d','tokenUsage30d','subagentUsage','subagentUsageToday','subagentUsage7d','subagentUsage30d'])||stTab!==prevStTab){
+    const stData=stTab==='today'?D.subagentUsageToday:stTab==='7d'?D.subagentUsage7d:stTab==='30d'?D.subagentUsage30d:D.subagentUsage;
+    renderTokenTbl('stBody',stData,'var(--purple)');
+  }
+
+  // Charts
+  if(sectionChanged(['dailyChart'])||chartDays!==prevChartDays){
+    renderCharts();
+  }
+
+  if(sectionChanged(['models','skills','gitLog','agentConfig','subagentConfig'])){
+    // Models
+    $('modelsGrid').innerHTML=(D.availableModels||[]).map(m=>`<div class="glass model-card"><span class="badge badge-${esc(m.status)}">${esc(m.status)}</span><div class="model-name">${esc(m.name)}</div><div class="model-id">${esc(m.provider)}</div></div>`).join('');
+
+    // Agent Configuration
+    const AC=D.agentConfig||{};
+    const PALETTE=['var(--green)','var(--blue)','var(--purple)','var(--yellow)','var(--cyan,#22d3ee)','var(--orange,#fb923c)'];
+    const EMOJIS=['🤖','⚙️','👥','🔧','🧠','🦾','🛠️'];
+    const agentList=AC.agents||[];
+    $('agentCount').textContent=agentList.length+(agentList.length===1?' agent':' agents');
+
+    $('agentCards').innerHTML=agentList.length?agentList.map((a,i)=>{
+      const col=PALETTE[i%PALETTE.length];
+      const em=EMOJIS[i%EMOJIS.length];
+      const provider=(a.modelId||'').split('/')[0]||'—';
+      return `<div style="background:var(--glass);border:1px solid var(--border);border-left:3px solid ${col};border-radius:8px;padding:12px 14px;min-width:180px;flex:1">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <span style="font-size:16px">${em}</span>
+          <span style="font-size:13px;font-weight:700;color:var(--textStrong)">${esc(a.id)}</span>
+          ${a.isDefault?'<span style="font-size:9px;background:rgba(74,222,128,.15);color:var(--green);border:1px solid rgba(74,222,128,.3);border-radius:4px;padding:1px 5px">DEFAULT</span>':''}
+        </div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:2px">Role</div>
+        <div style="font-size:13px;color:${col};font-weight:600;margin-bottom:8px">${esc(a.role||a.id)}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:2px">Model</div>
+        <div style="font-size:13px;color:var(--textStrong);font-weight:600;margin-bottom:2px">${esc(a.model||'—')}</div>
+        <div style="font-size:11px;color:var(--dim);font-family:monospace">${esc(provider)}</div>
+      </div>`;
+    }).join(''):'<div style="color:var(--dim);font-size:11px;padding:8px">No agents configured — using default model.</div>';
+
+    // Model Routing
+    const fallbacks=AC.fallbacks||[];
+    const routingChain=[
+      {label:'PRIMARY',model:AC.primaryModel||'—',color:'rgba(74,222,128,.3)',bg:'rgba(74,222,128,.1)',textCol:'var(--green)'},
+      ...fallbacks.map((f,i)=>({label:`FALLBACK ${i+1}`,model:f,color:'var(--border)',bg:'var(--glass)',textCol:'var(--text)',opacity:Math.max(0.5,1-i*0.15)}))
+    ];
+    const extraRows=[
+      AC.imageModel?{k:'🖼️ Image Model',v:AC.imageModel,c:'var(--purple)'}:null,
+      AC.streamMode?{k:'📡 Stream Mode',v:AC.streamMode,c:'var(--blue)'}:null,
+    ].filter(Boolean);
+    const subAgentRoutes=agentList.map((a,i)=>{
+      const col=PALETTE[i%PALETTE.length];
+      const purposeMap={'main':'🧠 General / Default','group':'🖥️ Dev / Coding','work':'⚙️ Work / Admin'};
+      const purpose=purposeMap[a.id]||`🤖 ${a.id}`;
+      return{purpose,agent:a.id,model:a.model,col,isDefault:a.isDefault};
+    });
+    $('modelRoutingPanel').innerHTML=`
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">General</div>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:${extraRows.length||subAgentRoutes.length?'10':'0'}px">
+        ${routingChain.map((r,i)=>`
+          ${i>0?'<div style="color:var(--dim);font-size:12px">→</div>':''}
+          <div style="background:${r.bg};border:1px solid ${r.color};border-radius:6px;padding:5px 9px;text-align:center${r.opacity?`;opacity:${r.opacity}`:''}">
+            <div style="font-size:9px;color:var(--muted);margin-bottom:1px">${r.label}</div>
+            <div style="font-size:13px;font-weight:700;color:${r.textCol}">${esc(r.model)}</div>
+          </div>`).join('')}
+      </div>
+      ${subAgentRoutes.length?`<div style="padding-top:8px;border-top:1px solid var(--border);margin-bottom:${extraRows.length?'8':'0'}px">
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Sub-agent Routing</div>
+        ${subAgentRoutes.map(r=>`
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="font-size:12px;color:var(--dim);min-width:130px">${esc(r.purpose)}</span>
+            <span style="color:var(--dim);font-size:11px">→</span>
+            <span style="background:var(--glass);border:1px solid var(--border);border-left:3px solid ${r.col};border-radius:5px;padding:3px 8px;font-size:12px;font-weight:700;color:${r.col}">${esc(r.model)}</span>
+            <span style="font-size:10px;color:var(--dim)">(${esc(r.agent)} agent)</span>
+          </div>`).join('')}
+      </div>`:''}
+      ${extraRows.length?`<div style="padding-top:8px;border-top:1px solid var(--border)">${
+        extraRows.map(r=>`<div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <span style="font-size:12px;color:var(--muted)">${esc(r.k)}</span>
+          <span style="font-size:12px;color:${r.c};font-weight:600">${esc(r.v)}</span>
+        </div>`).join('')
+      }</div>`:''}`.trim();
+
+    // Runtime Config
+    const comp=AC.compaction||{};
+    const compCards=[
+      comp.mode?{k:'Compaction Mode',v:comp.mode,c:'var(--yellow)'}:null,
+      comp.reserveTokensFloor?{k:'Reserve Tokens',v:comp.reserveTokensFloor.toLocaleString(),c:'var(--text)'}:null,
+      comp.memoryFlush!=null?{k:'Memory Flush',v:comp.memoryFlush?.enabled?'Enabled':'Disabled',c:comp.memoryFlush?.enabled?'var(--green)':'var(--dim)'}:null,
+      comp.softThresholdTokens?{k:'Soft Threshold',v:comp.softThresholdTokens.toLocaleString()+' tok',c:'var(--text)'}:null,
+    ].filter(Boolean);
+    const channelRows=[
+      (AC.channels||[]).length?{k:'Active Channels',v:(AC.channels).join(', ')}:null,
+      AC.telegramDmPolicy?{k:'Telegram DM Policy',v:AC.telegramDmPolicy}:null,
+      AC.telegramGroups?{k:'Telegram Groups',v:AC.telegramGroups+' configured'}:null,
+    ].filter(Boolean);
+    $('runtimeConfigPanel').innerHTML=[
+      compCards.length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px;margin-bottom:${channelRows.length?8:0}px">
+        ${compCards.map(r=>`<div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:5px;padding:6px 8px">
+          <div style="font-size:9px;color:var(--muted);margin-bottom:2px">${esc(r.k)}</div>
+          <div style="font-size:12px;font-weight:600;color:${r.c}">${esc(r.v)}</div>
+        </div>`).join('')}
+      </div>`:'',
+      channelRows.length?`<div style="${compCards.length?'padding-top:8px;border-top:1px solid var(--border)':''}">
+        ${channelRows.map(r=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span style="font-size:12px;color:var(--muted);min-width:140px">${esc(r.k)}</span>
+          <span style="font-size:12px;color:var(--text);font-weight:600">${esc(r.v)}</span>
+        </div>`).join('')}
+      </div>`:'',
+      !compCards.length&&!channelRows.length?'<div style="color:var(--dim);font-size:11px">No runtime config detected.</div>':''
+    ].join('');
+
+    const kv=(k,v,c='var(--text)')=>`<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:12px;color:var(--muted)">${esc(k)}</span><span style="font-size:12px;color:${c};font-weight:600">${esc(String(v))}</span></div>`;
+    const badge=(label,on)=>`<span style="display:inline-block;margin:2px 2px;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;background:${on?'rgba(74,222,128,.12)':'rgba(255,255,255,.05)'};color:${on?'var(--green)':'var(--dim)'};border:1px solid ${on?'rgba(74,222,128,.3)':'var(--border)'}">${esc(label)}</span>`;
+
+    // Search
+    const SR=AC.search||{};
+    $('searchPanelInner').innerHTML=SR.provider?[
+      kv('Provider',SR.provider,'var(--blue)'),
+      kv('Max Results',SR.maxResults),
+      kv('Cache TTL',(SR.cacheTtlMinutes||'—')+' min'),
+    ].join(''):'<span style="color:var(--dim);font-size:12px">Not configured</span>';
+
+    // Gateway
+    const GW=AC.gateway||{};
+    $('gatewayPanelInner').innerHTML=GW.port?[
+      kv('Port',GW.port,'var(--green)'),
+      kv('Mode',GW.mode),
+      kv('Bind',GW.bind),
+      kv('Auth Mode',GW.authMode),
+      kv('Tailscale',GW.tailscale),
+    ].join(''):'<span style="color:var(--dim);font-size:12px">Not configured</span>';
+
+    // Hooks
+    const hooks=AC.hooks||[];
+    $('hooksPanelInner').innerHTML=hooks.length
+      ?hooks.map(h=>badge(h.name,h.enabled)).join('')
+      :'<span style="color:var(--dim);font-size:12px">No hooks configured</span>';
+
+    // Plugins
+    const plugins=AC.plugins||[];
+    const skills=(AC.skills||[]).filter(s=>s.enabled);
+    $('capsPanelInner').innerHTML=[
+      plugins.length?`<div style="margin-bottom:6px"><div style="font-size:9px;color:var(--muted);margin-bottom:3px">Plugins</div>${plugins.map(p=>badge(p,true)).join('')}</div>`:'',
+      skills.length?`<div style="margin-bottom:6px"><div style="font-size:9px;color:var(--muted);margin-bottom:3px">Active Skills</div>${skills.map(s=>badge(s.name,true)).join('')}</div>`:'',
+      `<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">
+        ${badge('TTS',AC.tts)}
+        ${badge('Diagnostics',AC.diagnostics)}
+      </div>`,
+    ].join('');
+
+    // Bindings
+    const bindings=AC.bindings||[];
+    const agentColMap={};agentList.forEach((a,i)=>agentColMap[a.id]=PALETTE[i%PALETTE.length]);
+    $('bindingsPanel').innerHTML=bindings.length
+      ?`<div style="display:flex;flex-wrap:wrap;gap:8px">${bindings.map(b=>{
+          const col=agentColMap[b.agentId]||'var(--dim)';
+          const isDefault=b.kind==='default';
+          const displayName=b.name||(isDefault?'All unmatched channels':b.id);
+          const icon=isDefault?'🌐':b.channel==='telegram'?'✈️':'📡';
+          return `<div style="background:var(--glass);border:1px solid var(--border);border-left:3px solid ${col};border-radius:6px;padding:8px 12px;min-width:180px">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+              <span style="font-size:12px">${icon}</span>
+              <span style="font-size:12px;font-weight:700;color:${col}">${esc(b.agentId)}</span>
+              ${isDefault?'<span style="font-size:9px;background:rgba(74,222,128,.12);color:var(--green);border:1px solid rgba(74,222,128,.25);border-radius:3px;padding:1px 4px">DEFAULT</span>':''}
+            </div>
+            <div style="font-size:13px;font-weight:600;color:var(--textStrong)">${esc(displayName)}</div>
+            ${!isDefault?`<div style="font-size:10px;color:var(--dim);margin-top:2px;font-family:monospace">${esc(b.channel)} · ${esc(b.kind)} · ${esc(b.id)}</div>`:'<div style="font-size:10px;color:var(--dim);margin-top:2px">catch-all fallback</div>'}
+          </div>`;
+        }).join('')}</div>`
+      :'<span style="color:var(--dim);font-size:12px">No explicit bindings — all messages go to default agent</span>';
+
+    // Subagent config
+    const SC=AC.subagentConfig||{};
+    $('subagentConfigPanel').innerHTML=[
+      SC.maxSpawnDepth!=null?kv('Max Depth',SC.maxSpawnDepth,'var(--accent)'):'',
+      SC.maxChildrenPerAgent!=null?kv('Max Children/Agent',SC.maxChildrenPerAgent,'var(--text)'):'',
+      SC.maxConcurrent!=null?kv('Max Concurrent',SC.maxConcurrent,'var(--text)'):'',
+    ].join('')||'<span style="color:var(--dim);font-size:12px">Not configured</span>';
+
+    // Agent table
+    $('agentTableBody').innerHTML=agentList.map((a,i)=>{
+      const col=PALETTE[i%PALETTE.length];
+      const provider=(a.modelId||'').split('/')[0]||'—';
+      const ctx1m=a.context1m===true?'✅':a.context1m===false?'❌':'—';
+      const agentFallbacks=(a.fallbacks||AC.fallbacks||[]).join(' → ');
+      return `<tr class="dr">
+        <td style="padding:6px 8px;font-weight:700;color:${col}">${esc(a.id)}${a.isDefault?' <span style="font-size:9px;color:var(--green);font-weight:400">(default)</span>':''}</td>
+        <td style="padding:6px 8px;color:var(--text)">${esc(a.role||a.id)}</td>
+        <td style="padding:6px 8px;color:var(--textStrong);font-weight:600">${esc(a.model)}</td>
+        <td style="padding:6px 8px;color:var(--dim);font-size:12px">${esc(provider)}</td>
+        <td style="padding:6px 8px;color:var(--dim);font-size:12px;font-family:monospace">${esc(a.workspace)}</td>
+        <td style="padding:6px 8px;color:var(--dim);font-size:12px">${esc(agentFallbacks)}</td>
+        <td style="padding:6px 8px;text-align:center">${ctx1m}</td>
+      </tr>`;
+    }).join('')||'<tr><td colspan="7" style="padding:8px;color:var(--dim)">No agents configured</td></tr>';
+
+    // Skills
+    $('skillsGrid').innerHTML=(D.skills||[]).map(s=>{
+      const c=s.active?'color:var(--green);border-color:rgba(74,222,128,.2);background:rgba(74,222,128,.05)':'color:var(--dim);border-color:var(--border)';
+      const agents=(s.agents||[]).map(a=>`<span style="font-size:9px;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:1px 4px;margin-left:3px">${esc(a)}</span>`).join('');
+      return `<div style="display:inline-flex;align-items:center;gap:2px;margin:2px 0"><span class="skill-tag" style="${c}">${esc(s.name)}</span>${agents}</div>`;
+    }).join('');
+
+    // Git
+    $('gitPanel').innerHTML=(D.gitLog||[]).slice(0,5).map(g=>`<div class="git-item"><span class="git-hash">${esc(g.hash)}</span><span class="git-msg" title="${esc(g.message)}">${esc(g.message)}</span><span class="git-ago">${esc(g.ago)}</span></div>`).join('')||'<div class="empty">No git history</div>';
+  }
+
+  prevChartDays=chartDays;
+  prevUTab=uTab;prevSrTab=srTab;prevStTab=stTab;
+  prevD=JSON.parse(JSON.stringify(D));
+}
+
+function renderAgentTree(){
+  const el=document.getElementById('agentTree');
+  if(!el)return;
+  const sessions=(D.sessions||[]).filter(s=>s.active);
+  if(!sessions.length){el.innerHTML='<div style="color:var(--dim);font-size:12px;padding:8px 0">No active sessions</div>';return;}
+  const TC={main:'var(--green)',work:'var(--accent)',group:'var(--purple)',other:'var(--dim)'};
+  const byKey={};sessions.forEach(s=>byKey[s.key]=s);
+  const roots=sessions.filter(s=>s.type!=='subagent');
+  const subs=sessions.filter(s=>s.type==='subagent');
+  const childrenOf={};
+  subs.forEach(s=>{
+    const pk=s.spawnedBy||'';
+    if(pk&&byKey[pk])(childrenOf[pk]=childrenOf[pk]||[]).push(s);
+    else(childrenOf['__unknown__']=childrenOf['__unknown__']||[]).push(s);
+  });
+  const trueRoots=roots.filter(r=>r.type!=='subagent');
+  if((childrenOf['__unknown__']||[]).length)trueRoots.push({key:'__unknown__',name:'Unknown',agent:'other',model:'',active:false,label:'',subject:'',totalTokens:0,type:'other'});
+  if(!trueRoots.length){el.innerHTML='<div style="color:var(--dim);font-size:12px;padding:8px 0">No agent hierarchy</div>';return;}
+  function nodeCard(s,col){
+    const name=esc((s.name||s.agent||'agent').slice(0,40));
+    const model=esc((s.model||'').split('/').pop().slice(0,24));
+    const trigger=esc((s.subject||s.label||'').slice(0,30));
+    const bdg=s.active?'<span class="tree-badge live">● live</span>':'<span class="tree-badge idle">idle</span>';
+    return `<div class="tree-node-card" style="--node-color:${col}">
+      <div class="tree-dot"></div>
+      <span class="tree-name" title="${name}">${name}</span>
+      ${trigger?`<span class="tree-trigger">${trigger}</span>`:''}
+      <span class="tree-model">${model}</span>
+      ${bdg}
+    </div>`;
+  }
+  let html='<div class="tree-root">';
+  trueRoots.forEach(r=>{
+    const col=TC[r.agent]||TC.work;
+    const children=childrenOf[r.key]||[];
+    html+=nodeCard(r,col);
+    if(children.length){
+      html+='<div class="tree-children">';
+      children.forEach(c=>{
+        html+=nodeCard(c,col);
+        const gcs=childrenOf[c.key]||[];
+        if(gcs.length){
+          html+='<div class="tree-grandchildren">';
+          gcs.forEach(gc=>{html+=nodeCard(gc,'var(--dim)')});
+          html+='</div>';
+        }
+      });
+      html+='</div>';
+    }
+  });
+  html+='</div>';
+  el.innerHTML=html;
+}
+
+function renderTokenTbl(bodyId,data,accentColor){
+  data=data||[];
+  const max=Math.max(...data.map(u=>u.cost))||1;
+  $(bodyId).innerHTML=data.map(u=>{
+    const pct=Math.round(u.cost/max*100);
+    return `<tr class="dr"><td class="w">${esc(u.model)}</td><td class="r">${u.calls.toLocaleString()}</td><td class="r">${u.input}</td><td class="r">${u.output}</td><td class="r">${u.cacheRead}</td><td class="r" style="color:var(--textStrong);font-weight:500">${u.totalTokens}</td><td class="r cost">$${u.cost.toFixed(2)}</td><td><div class="usage-bar"><div class="usage-fill" style="width:${pct}%;background:${accentColor}"></div></div></td></tr>`;
+  }).join('')+(data.length?`<tr class="total-row"><td class="w">TOTAL</td><td class="r">${data.reduce((a,u)=>a+u.calls,0).toLocaleString()}</td><td colspan="4"></td><td class="r cost">$${data.reduce((a,u)=>a+u.cost,0).toFixed(2)}</td><td></td></tr>`:'');
+}
+
+function setTabCls4(prefix,tab,cls){
+  $(prefix+'T').className='tab-btn'+(tab==='today'?' '+cls:'');
+  $(prefix+'7').className='tab-btn'+(tab==='7d'?' '+cls:'');
+  $(prefix+'30').className='tab-btn'+(tab==='30d'?' '+cls:'');
+  $(prefix+'A').className='tab-btn'+(tab==='all'?' '+cls:'');
+}
+
+let chartDays=7;
+function renderCharts(){
+  $('cTab7').className='tab-btn'+(chartDays===7?' active':'');
+  $('cTab30').className='tab-btn'+(chartDays===30?' active':'');
+  const data=(D.dailyChart||[]).slice(-chartDays);
+  if(!data.length)return;
+  renderCostChart('costChart',data);
+  renderModelChart('modelChart',data);
+  renderSubagentChart('subagentChart',data);
+}
+
+setInterval(()=>{timer--;if(timer<=0){loadData();timer=60}$('countdown').textContent=timer+'s'},1000);
+loadData();
+</script>

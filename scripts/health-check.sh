@@ -42,7 +42,7 @@ for arg in "$@"; do
   esac
 done
 
-SSH_CMD="ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP}"
+SSH_CMD="TERM=xterm-256color ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP}"
 FAILURES=0
 
 log() {
