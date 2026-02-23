@@ -179,6 +179,10 @@ Capture the `OPENCLAW_GENERATED_TOKEN=<hex>` line from stdout (all other output 
 | `deploy/host-maintenance-check.sh` | `/home/openclaw/scripts/host-maintenance-check.sh` | static | |
 | `deploy/logrotate-openclaw` | `/etc/logrotate.d/openclaw` | static | |
 | `deploy/plugins/*` | `/home/openclaw/openclaw/deploy/plugins/` | static | Owned by uid 1000 |
+| `deploy/sandbox-toolkit.yaml` | `/home/openclaw/openclaw/deploy/` | static | Bind-mounted into container |
+| `deploy/parse-toolkit.mjs` | `/home/openclaw/openclaw/deploy/` | static | Bind-mounted into container |
+| `deploy/rebuild-sandboxes.sh` | `/home/openclaw/openclaw/deploy/` | static | Bind-mounted into container |
+| `deploy/dashboard/*` | `/home/openclaw/openclaw/deploy/dashboard/` | static | Bind-mounted into container |
 
 ### Template variables
 

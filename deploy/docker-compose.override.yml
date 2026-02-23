@@ -47,16 +47,8 @@ services:
       - /home/openclaw/sandboxes-home:/home/node/sandboxes-home
       # Persist nested Docker images across restarts (Sysbox auto-provisions ephemeral storage by default)
       - ./data/docker:/var/lib/docker
-      # Plugins: entrypoint copies these to ~/.openclaw/extensions/ where
-      # the gateway discovers them (e.g. coordinator for capability-based routing)
-      - ./deploy/plugins:/app/deploy/plugins:ro
-      # Sandbox toolkit config: entrypoint reads this for packages, tool installs, and shim generation
-      - ./deploy/sandbox-toolkit.yaml:/app/deploy/sandbox-toolkit.yaml:ro
-      - ./deploy/parse-toolkit.mjs:/app/deploy/parse-toolkit.mjs:ro
-      # Sandbox builder: extracted build logic called by entrypoint and update-sandboxes.sh
-      - ./deploy/rebuild-sandboxes.sh:/app/deploy/rebuild-sandboxes.sh:ro
-      # Dashboard server: browser sessions, media files, stats, and admin panels
-      - ./deploy/dashboard:/app/deploy/dashboard:ro
+      # Deploy directory: plugins, sandbox toolkit config, rebuild script, dashboard server
+      - ./deploy:/app/deploy:ro
     # Entrypoint handles pre-start tasks before exec-ing the command
     entrypoint: ["/app/scripts/entrypoint-gateway.sh"]
     # Full gateway command (entrypoint passes it through via exec "$@")

@@ -240,7 +240,21 @@ sudo chown -R 1000:1000 /home/openclaw/openclaw/deploy/plugins/
 echo "Deployed plugins." >&2
 
 # ============================================================
-# 10. Log rotation config (static)
+# 10. Sandbox toolkit, rebuild script, and dashboard (static)
+# ============================================================
+# These files are bind-mounted into the container via ./deploy:/app/deploy:ro.
+# They must exist on the host before the container starts, otherwise Docker
+# creates empty directories as mount targets and sandbox builds fail.
+sudo -u openclaw cp "${STAGING}/sandbox-toolkit.yaml" /home/openclaw/openclaw/deploy/sandbox-toolkit.yaml
+sudo -u openclaw cp "${STAGING}/parse-toolkit.mjs" /home/openclaw/openclaw/deploy/parse-toolkit.mjs
+sudo -u openclaw cp "${STAGING}/rebuild-sandboxes.sh" /home/openclaw/openclaw/deploy/rebuild-sandboxes.sh
+sudo chmod +x /home/openclaw/openclaw/deploy/rebuild-sandboxes.sh
+sudo -u openclaw mkdir -p /home/openclaw/openclaw/deploy/dashboard
+sudo -u openclaw cp -r "${STAGING}/dashboard/"* /home/openclaw/openclaw/deploy/dashboard/
+echo "Deployed sandbox toolkit, rebuild script, and dashboard." >&2
+
+# ============================================================
+# 11. Log rotation config (static)
 # ============================================================
 sudo cp "${STAGING}/logrotate-openclaw" /etc/logrotate.d/openclaw
 sudo chmod 644 /etc/logrotate.d/openclaw
