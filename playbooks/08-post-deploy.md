@@ -270,6 +270,8 @@ If the bot token is empty, skip this step — Telegram was not configured.
 
 **IMPORTANT:** After the user confirms the chat interface is working, output a complete deployment report. This is the final step — do NOT skip it.
 
+The report is saved to `.deploy-logs/<timestamp>/08-deploy-report.md` (same timestamp directory as the subagent logs) and displayed to the user. After outputting the report, include a clickable reference to the saved file.
+
 Collect the following values and present them in a single, neatly formatted report:
 
 ### Values to collect
@@ -403,9 +405,19 @@ Check `HOSTALERT_TELEGRAM_BOT_TOKEN` and `HOSTALERT_TELEGRAM_CHAT_ID` in `opencl
 
 > For additional AI provider configuration (OpenAI, Cloudflare AI Gateway, Claude Code subscription), see [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md).
 
-> **Deploy logs:** Detailed subagent execution logs are saved in `.deploy-logs/<timestamp>/`. Ask Claude to review a specific log if you need to investigate a deployment step.
-
 > **Note:** If user passwords are no longer in the conversation context, check `openclaw-config.env` for `# DEPLOYED:` lines first (`grep 'DEPLOYED' openclaw-config.env`). These are written automatically during deployment as a safety net. If those are also empty, the passwords can be reset via VNC/console access.
+
+### Save and display
+
+1. **Save** the report to `.deploy-logs/<timestamp>/08-deploy-report.md` using the `Write` tool. Use the same `<timestamp>` directory as the subagent logs created during deployment (find it with `ls .deploy-logs/` and use the most recent directory). If no deploy-logs directory exists yet, create one with the current timestamp (`YYYYMMDD-HHMMSS`).
+
+2. **Display** the full report to the user in the conversation.
+
+3. **Reference the file** at the end:
+
+   > Deployment report saved to `.deploy-logs/<timestamp>/08-deploy-report.md`
+   >
+   > Full deploy logs: `.deploy-logs/<timestamp>/`
 
 ---
 
