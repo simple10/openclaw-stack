@@ -38,7 +38,7 @@ Then ask the user to fill in the required values (see section 0.2).
 
 Validate all of these fields:
 
-1. **`VPS1_IP`** — Must be set and not a placeholder (not `15.x.x.1` or containing `<`).
+1. **`VPS1_IP`** — Must be set and not a placeholder (not `x.x.x.x` or containing `<`).
 2. **`CF_TUNNEL_TOKEN`** — Must not be empty.
 3. **`OPENCLAW_DOMAIN`** — Must not be a placeholder (no `<example>` or angle brackets).
 4. **`OPENCLAW_DASHBOARD_DOMAIN`** — Must not be a placeholder.
@@ -53,7 +53,7 @@ Report **all** issues at once (don't stop at the first one). Present them as:
 
 > **Configuration issues found:**
 >
-> - `VPS1_IP` is still a placeholder (`15.x.x.1`) — set it to your VPS public IP
+> - `VPS1_IP` is still a placeholder (`x.x.x.x`) — set it to your VPS public IP
 > - `CF_TUNNEL_TOKEN` is empty — create a tunnel in Cloudflare Dashboard and paste
 >   the token (see [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md))
 > - `OPENCLAW_DOMAIN` is still a placeholder — set it to your actual domain
@@ -176,11 +176,11 @@ Verify the domain is protected by Cloudflare Access before deploying. Run from t
 curl -sI --connect-timeout 10 https://<OPENCLAW_DOMAIN><OPENCLAW_DOMAIN_PATH>/ 2>&1 | head -10
 ```
 
-### If 302/403 redirect (Location header contains `cloudflareaccess.com` or `access.`):
+### If 302/403 redirect (Location header contains `cloudflareaccess.com` or `access.`)
 
 Cloudflare Access is protecting the domain. Continue to next step.
 
-### If 200 (unprotected):
+### If 200 (unprotected)
 
 > "Your domain is accessible without Cloudflare Access. Anyone with the URL could
 > reach OpenClaw after deployment. Configure Cloudflare Access first — see
@@ -191,7 +191,7 @@ Cloudflare Access is protecting the domain. Continue to next step.
 
 Wait for user to confirm. Re-run the curl check to verify.
 
-### If connection refused, timeout, or DNS error:
+### If connection refused, timeout, or DNS error
 
 > "Your domain isn't resolving or the tunnel route isn't configured yet. You need to:
 >
@@ -203,7 +203,7 @@ Wait for user to confirm. Re-run the curl check to verify.
 
 Wait for user. Re-check.
 
-### Also verify the browser VNC domain:
+### Also verify the browser VNC domain
 
 ```bash
 curl -sI --connect-timeout 10 https://<OPENCLAW_DASHBOARD_DOMAIN><OPENCLAW_DASHBOARD_DOMAIN_PATH>/ 2>&1 | head -10
@@ -211,7 +211,7 @@ curl -sI --connect-timeout 10 https://<OPENCLAW_DASHBOARD_DOMAIN><OPENCLAW_DASHB
 
 Same logic: expect 302/403. If not, guide user to fix.
 
-### Opt-out:
+### Opt-out
 
 If the user cannot or does not want to set up Cloudflare Access right now, they can
 explicitly say so. Warn them:
@@ -324,6 +324,7 @@ The subagent's return message to the main agent should still be a short summary 
 The `.deploy-logs/` directory is gitignored.
 
 **Additional techniques:**
+
 - Batch related SSH commands into single calls (e.g., all file deployments in one SSH session)
 - Use `2>&1 | tail -5` for build commands where only the final status matters
 - After a subagent completes successfully, its verbose output stays out of main context automatically

@@ -18,7 +18,7 @@ Setting up **a VPS instance** on OVHCloud:
 
 | VPS | Purpose | Hostname | IP (example) |
 |-----|---------|----------|--------------|
-| VPS-1 | OpenClaw (gateway + sandboxes) | `openclaw` | `51.x.x.1` |
+| VPS-1 | OpenClaw (gateway + sandboxes) | `openclaw` | `x.x.x.x` |
 
 ---
 
@@ -97,7 +97,7 @@ Record it in openclaw-config.env:
 ```bash
 # openclaw-config.env
 
-VPS1_IP=15.x.x.x
+VPS1_IP=x.x.x.x
 
 # SSH Configuration (required)
 SSH_KEY_PATH=~/.ssh/vps1_openclaw_ed25519 # Path to your ssh key generated in Step 2
