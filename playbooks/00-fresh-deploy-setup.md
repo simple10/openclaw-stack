@@ -125,15 +125,12 @@ This returns two lines: CPU count (e.g., `6`) and total memory in bytes (e.g., `
 
 ### Compare Against Config
 
-Read current gateway resource limits from `deploy/docker-compose.override.yml`:
-
-- `deploy.resources.limits.cpus` (e.g., `"6"`)
-- `deploy.resources.limits.memory` (e.g., `10.5G`)
+Read current gateway resource limits from `GATEWAY_CPUS` and `GATEWAY_MEMORY` in `openclaw-config.env`. If not set, the compose file defaults apply (6 CPUs, 10.5G).
 
 ### Expected Values
 
-- **CPUs:** `limits.cpus` should equal the VPS CPU count from `nproc`
-- **Memory:** `limits.memory` should be total VPS memory minus 500M–1GB
+- **CPUs:** `GATEWAY_CPUS` should equal the VPS CPU count from `nproc`
+- **Memory:** `GATEWAY_MEMORY` should be total VPS memory minus 500M–1GB
   - Vector uses ~128M, system/kernel needs ~500M
   - Formula: `total_memory - 750M` (midpoint) is a good default
   - Acceptable range: `total - 1G` to `total - 500M`
@@ -142,20 +139,20 @@ Read current gateway resource limits from `deploy/docker-compose.override.yml`:
 
 **If values match** (CPUs equal, memory within the 500M–1G buffer range): Report that resource limits look correct and continue.
 
-**If mismatch detected:** Show the user a comparison:
+**If mismatch detected or not yet set:** Show the user a comparison:
 
 ```
 VPS Resources:
   CPUs:   <nproc result>
   Memory: <total from free, human-readable>
 
-Current gateway limits (docker-compose.override.yml):
-  CPUs:   <current cpus value>
-  Memory: <current memory value>
+Current gateway limits (openclaw-config.env):
+  GATEWAY_CPUS:   <current value or "(default: 6)">
+  GATEWAY_MEMORY: <current value or "(default: 10.5G)">
 
 Recommended gateway limits:
-  CPUs:   <nproc result>
-  Memory: <total - 750M, rounded to nearest 0.5G>
+  GATEWAY_CPUS:   <nproc result>
+  GATEWAY_MEMORY: <total - 750M, rounded to nearest 0.5G>
 ```
 
 Ask the user if they want to adjust the limits. They may choose:
@@ -164,7 +161,7 @@ Ask the user if they want to adjust the limits. They may choose:
 - Enter custom values
 - Keep the current values (skip)
 
-If the user confirms changes, update `deploy/docker-compose.override.yml` with the new `limits.cpus` and `limits.memory` values. Also update `reservations.cpus` if it exceeds the new limit (reservation cannot exceed limit).
+If the user confirms changes, update `GATEWAY_CPUS` and `GATEWAY_MEMORY` in `openclaw-config.env`. Also check that `reservations.cpus` in `deploy/docker-compose.override.yml` does not exceed the new CPU limit (reservation cannot exceed limit).
 
 ---
 

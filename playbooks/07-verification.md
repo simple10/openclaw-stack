@@ -358,7 +358,7 @@ sudo docker exec --user node openclaw-gateway \
 
 ## 7.5c Verify Resource Limits
 
-Verify deployed gateway resource limits match VPS hardware. See `00-fresh-deploy-setup.md` § 0.4 for the full resource check procedure and expected values.
+Verify deployed gateway resource limits match VPS hardware. Resource limits are configured via `GATEWAY_CPUS` and `GATEWAY_MEMORY` in `openclaw-config.env` (see § 0.4).
 
 ```bash
 # On VPS: query hardware and deployed limits in one command
@@ -372,12 +372,21 @@ Compare: CPUs should equal `nproc`, memory should be total minus 500M–1GB. Nan
 
 **If mismatch during fresh deploy:** Resource limits were already reviewed in `00-fresh-deploy-setup.md` § 0.4. Auto-apply only if the gap is significant (CPUs differ or memory off by >2GB); otherwise report and continue.
 
-**If mismatch outside fresh deploy:** Show comparison and ask user. If confirmed, update local `deploy/docker-compose.override.yml`, then:
+**If mismatch outside fresh deploy:** Show comparison and ask user. If confirmed, update `GATEWAY_CPUS` and `GATEWAY_MEMORY` in `openclaw-config.env`, then redeploy the `.env` to the VPS and recreate the container:
 
 ```bash
-# NOTE: scp uses -P (uppercase) for port, unlike ssh's -p (lowercase)
-scp -i <SSH_KEY_PATH> -P <SSH_PORT> deploy/docker-compose.override.yml <SSH_USER>@<VPS1_IP>:/home/openclaw/openclaw/docker-compose.override.yml
-ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> "sudo chown openclaw:openclaw /home/openclaw/openclaw/docker-compose.override.yml && sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'"
+# Update the .env on VPS with new resource limits
+ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
+  "sudo -u openclaw bash -c \"grep -q '^GATEWAY_CPUS=' /home/openclaw/openclaw/.env && \
+    sed -i 's/^GATEWAY_CPUS=.*/GATEWAY_CPUS=<NEW_CPUS>/' /home/openclaw/openclaw/.env || \
+    echo 'GATEWAY_CPUS=<NEW_CPUS>' >> /home/openclaw/openclaw/.env; \
+    grep -q '^GATEWAY_MEMORY=' /home/openclaw/openclaw/.env && \
+    sed -i 's/^GATEWAY_MEMORY=.*/GATEWAY_MEMORY=<NEW_MEMORY>/' /home/openclaw/openclaw/.env || \
+    echo 'GATEWAY_MEMORY=<NEW_MEMORY>' >> /home/openclaw/openclaw/.env\""
+
+# Recreate container to pick up new limits (up -d re-reads .env)
+ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
+  "sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'"
 ```
 
 ---

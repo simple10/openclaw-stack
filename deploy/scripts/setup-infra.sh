@@ -10,7 +10,7 @@ set -euo pipefail
 #   Env vars in: AI_GATEWAY_WORKER_URL, AI_GATEWAY_AUTH_TOKEN,
 #                OPENCLAW_TELEGRAM_BOT_TOKEN, HOSTALERT_TELEGRAM_BOT_TOKEN,
 #                HOSTALERT_TELEGRAM_CHAT_ID, OPENCLAW_DASHBOARD_DOMAIN_PATH,
-#                OPENCLAW_DOMAIN_PATH
+#                OPENCLAW_DOMAIN_PATH, GATEWAY_CPUS, GATEWAY_MEMORY
 #   Stdout: single line OPENCLAW_GENERATED_TOKEN=<hex> (all other output -> stderr)
 #   Exit: 0 success, 1 failure
 
@@ -117,6 +117,10 @@ DASHBOARD_BASE_PATH=${DASHBOARD_BASE_PATH}
 # Used by Docker healthcheck and playbook verification commands.
 # Empty = Control UI served at root (no subpath).
 OPENCLAW_DOMAIN_PATH=${OPENCLAW_DOMAIN_PATH:-}
+
+# Gateway resource limits (from openclaw-config.env, defaults in docker-compose.override.yml)
+GATEWAY_CPUS=${GATEWAY_CPUS:-}
+GATEWAY_MEMORY=${GATEWAY_MEMORY:-}
 
 # Docker compose variables (required by repo's docker-compose.yml)
 OPENCLAW_CONFIG_DIR=/home/openclaw/.openclaw
