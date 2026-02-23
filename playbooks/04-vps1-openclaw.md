@@ -104,6 +104,33 @@ rm "${SYSBOX_DEB}"
 >
 > `sudo apt --fix-broken install -y`
 
+### AppArmor fusermount3 compatibility
+
+Ubuntu 25.04+ ships a `fusermount3` AppArmor profile in enforce mode that blocks sysbox-fs from creating FUSE mounts (used for container `/proc` and `/sys` virtualization). This causes containers to fail with `rpc error: code = DeadlineExceeded` during sysbox pre-registration.
+
+**Only needed when the profile is loaded and enforcing.** Run this check after installing Sysbox:
+
+```bash
+#!/bin/bash
+# Check if fusermount3 AppArmor profile is blocking sysbox-fs
+if sudo aa-status 2>/dev/null | grep -q 'fusermount3'; then
+  echo "fusermount3 AppArmor profile is enforcing — disabling for sysbox-fs compatibility"
+
+  # Disable the profile (persists across reboots)
+  sudo ln -sf /etc/apparmor.d/fusermount3 /etc/apparmor.d/disable/
+  sudo apparmor_parser -R /etc/apparmor.d/fusermount3 2>/dev/null || true
+
+  # Restart sysbox services to pick up the change
+  sudo systemctl restart sysbox-fs sysbox-mgr sysbox
+
+  echo "fusermount3 profile disabled, sysbox restarted"
+else
+  echo "fusermount3 AppArmor profile not enforcing — no action needed"
+fi
+```
+
+**Security note:** The fusermount3 profile restricts which processes can invoke FUSE mounts. Sysbox legitimately needs FUSE for filesystem virtualization. On a single-purpose VPS with key-only SSH + Cloudflare Access, disabling this profile has negligible security impact. This is not needed on Ubuntu 24.04 where the profile is absent or in complain mode.
+
 ---
 
 ## 4.2 Infrastructure Setup
