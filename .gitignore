@@ -16,6 +16,8 @@ tmp/
 _bak/
 source/
 
+.wrangler/
+
 openclaw-config.env
 node_modules/
 
