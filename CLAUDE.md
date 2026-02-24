@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document orchestrates the automated deployment of OpenClaw on a single OVHCloud VPS instance, with Cloudflare Workers handling observability and LLM API proxying.
+This document orchestrates the automated deployment of OpenClaw on a single VPS instance, with Cloudflare Workers handling observability and LLM API proxying.
 
 | Component | Role | Services |
 |-----------|------|----------|
@@ -45,7 +45,7 @@ See [playbooks/README.md](playbooks/README.md) for detailed playbook documentati
 
 ## Configuration
 
-IMPORTANT: Read configuration from `openclaw-config.env`. See `openclaw-config.env.example` for all fields. Required: `VPS1_IP`, `CF_TUNNEL_TOKEN`, domain config (`OPENCLAW_DOMAIN`, `OPENCLAW_DASHBOARD_DOMAIN`, paths). Domain config is validated during fresh deploy setup (`00-fresh-deploy-setup.md`).
+IMPORTANT: Read configuration from `openclaw-config.env`. See `openclaw-config.env.example` for all fields. Required: `VPS1_IP`, `CF_TUNNEL_TOKEN` or `CF_API_TOKEN` (at least one), domain config (`OPENCLAW_DOMAIN`, `OPENCLAW_DASHBOARD_DOMAIN`, paths). Domain config is validated during fresh deploy setup (`00-fresh-deploy-setup.md`).
 
 SSH_USER and SSH_PORT start as provider defaults (e.g., `ubuntu`/`22`) and are changed to `adminclaw`/`<SSH_HARDENED_PORT>` during hardening. `SSH_HARDENED_PORT` (default `222`) is set in config and removed after hardening completes.
 
@@ -74,7 +74,7 @@ See [00-fresh-deploy-setup.md](playbooks/00-fresh-deploy-setup.md) § 0.7 for ex
 
 ```bash
 # After base setup, SSH as adminclaw (not ubuntu)
-ssh -i <SSH_KEY_PATH:~/.ssh/vps1_openclaw_ed25519> -p <SSH_PORT:222> <SSH_USER:adminclaw>@<VPS1-IP>
+ssh -i <SSH_KEY_PATH:~/.ssh/vps1_openclaw_ed25519> -p <SSH_PORT:222> <SSH_USER:adminclaw>@<VPS1_IP>
 
 # Run commands as openclaw
 sudo -u openclaw <command>
@@ -88,9 +88,9 @@ sudo su - openclaw
 All docker compose commands run as openclaw (adminclaw can't cd into openclaw's home):
 
 ```bash
-# Gateway (main compose project):
+# OpenClaw (main compose project — starts all claws):
 # Pattern: sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose <cmd>'
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose up -d'       # Start gateway
+sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose up -d'       # Start all claws
 sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose ps'           # Status
 sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose logs -f'      # Follow logs
 

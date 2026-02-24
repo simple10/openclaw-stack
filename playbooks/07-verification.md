@@ -397,7 +397,7 @@ for CLAW in $CLAWS; do
 done
 ```
 
-Compare: CPUs should equal `nproc`, memory should be total minus 500M–1GB. NanoCpus = CPUs × 1e9.
+Compare per-claw limits against VPS hardware divided by claw count (see `00-fresh-deploy-setup.md` § 0.4). NanoCpus = CPUs × 1e9, Memory is in bytes.
 
 **If match:** Report correctly sized and continue.
 
@@ -449,8 +449,12 @@ cat /etc/cron.d/openclaw-alerts
 
 ```bash
 # On VPS: verify claw ports bind to localhost only (Docker bypasses UFW)
-sudo ss -tlnp | grep -E '187(89|90)'
-# Expected: 127.0.0.1:18789 and 127.0.0.1:18790 (NOT 0.0.0.0)
+for CLAW in $CLAWS; do
+  PORT=$(sudo docker port "$CLAW" 2>/dev/null | grep -oP '0\.0\.0\.0:\K\d+' | head -1)
+  BIND=$(sudo ss -tlnp | grep ":${PORT} " | awk '{print $4}')
+  echo "$CLAW (port $PORT): $BIND"
+done
+# Expected: 127.0.0.1:<port> for each claw (NOT 0.0.0.0)
 
 # Full port audit — only <SSH_PORT> should be on 0.0.0.0 or [::]
 sudo ss -tlnp
@@ -464,11 +468,14 @@ done
 
 ```bash
 # From LOCAL machine: confirm claw ports aren't externally reachable
-nc -zv -w 5 <VPS1_IP> 18789 2>&1 || echo "Port 18789 not reachable (expected)"
-nc -zv -w 5 <VPS1_IP> 18790 2>&1 || echo "Port 18790 not reachable (expected)"
+for CLAW in $CLAWS; do
+  PORT=$(ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
+    "sudo docker port $CLAW 2>/dev/null | grep -oP '0\.0\.0\.0:\K\d+' | head -1")
+  nc -zv -w 5 <VPS1_IP> $PORT 2>&1 || echo "Port $PORT not reachable (expected)"
+done
 ```
 
-**Expected:** Both connections fail. If either succeeds, Docker daemon.json localhost binding is misconfigured — see `03-docker.md`.
+**Expected:** All connections fail. If any succeed, Docker daemon.json localhost binding is misconfigured — see `03-docker.md`.
 
 ### OpenClaw Security Audit & Doctor (on VPS)
 
@@ -645,7 +652,7 @@ Deployment is complete when:
 6. Cloudflare Tunnel running and domain protected by Cloudflare Access (302/403 on unauthenticated curl)
 7. Backup cron job configured on VPS-1
 8. Host alerter and maintenance checker cron jobs configured on VPS-1
-9. Claw ports (18789, 18790) not reachable from external network
+9. Claw ports not reachable from external network (bound to localhost only)
 10. Security audit passes with no critical or warning findings
 11. All sandbox toolkit binaries operational in sandbox container (7.1a)
 

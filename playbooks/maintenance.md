@@ -218,7 +218,7 @@ sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose restart op
 
 ## Adding a New Claw
 
-1. Create `deploy/openclaws/<name>/config.env` (copy from `_example-claw/config.env`)
+1. Create `deploy/openclaws/<name>/config.env` (copy from `_example/config.env`)
 2. Set per-claw overrides (domain, resources, etc.) in the new `config.env`
 3. SCP deploy files to VPS:
    ```bash

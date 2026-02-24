@@ -123,7 +123,7 @@ Check for additional claws beyond the default `main-claw`:
 ls -d deploy/openclaws/*/ 2>/dev/null | xargs -I{} basename {} | grep -v '^_'
 ```
 
-If only `main-claw` is found (or no directories exist), this is a standard single-claw deployment — proceed normally.
+If only `main-claw` is found (or no directories exist), this is a single-claw deployment — proceed normally. The deployment process is the same regardless of claw count.
 
 If multiple active claws are found, inform the user:
 
@@ -146,7 +146,7 @@ ssh -i <SSH_KEY_PATH> -o ConnectTimeout=10 -o BatchMode=yes -p <SSH_PORT> <SSH_U
 
 **"Connection refused" or "Connection timed out":**
 
-> "Can't reach the VPS on port 22. Possible causes:
+> "Can't reach the VPS on port <SSH_PORT>. Possible causes:
 >
 > - The VPS isn't running or hasn't finished booting
 > - The IP address is incorrect — double-check `VPS1_IP` in `openclaw-config.env`
@@ -271,7 +271,7 @@ Wait for user. Re-check.
 > a single Cloudflare Access application with a wildcard domain (e.g., `openclaw*.example.com`)
 > can protect all instance subdomains. This must still be configured manually in the CF Dashboard.
 
-### Also verify the browser VNC domain
+### Also verify the dashboard domain
 
 ```bash
 curl -sI --connect-timeout 10 https://<OPENCLAW_DASHBOARD_DOMAIN><OPENCLAW_DASHBOARD_DOMAIN_PATH>/ 2>&1 | head -10
@@ -341,16 +341,16 @@ A full deployment consumes significant context. To avoid mid-deploy compaction, 
 
 **Delegate to subagents:** Steps that produce verbose output but only need pass/fail + key values back:
 
-| Step | Why it's heavy | Return values | Read range |
-|------|---------------|---------------|------------|
+| Step | Why it's heavy | Return values | Scope |
+|------|---------------|---------------|-------|
 | 01: Workers deployment | npm install + wrangler deploy output | Worker URLs, auth tokens, D1 database ID | Full file |
 | 02: System update + package install | apt output (hundreds of lines) | pass/fail | Full file |
 | 02: System hardening (2.5–2.9) | swap, fail2ban, kernel config output | pass/fail, cloudflared version | Full file |
-| 04: Sysbox + infra (4.1–4.2) | dpkg + network/directory creation + SCP | pass/fail, OPENCLAW_GENERATED_TOKEN | Lines 1–162 |
-| 04: Deploy configuration (4.3) | deploy-config.sh runs on VPS | pass/fail | Lines 24–262 |
-| 04: Build + start (4.4) | Full Docker build log | pass/fail | Lines 263–447 |
+| 04: Sysbox + infra (4.1–4.2) | dpkg + network/directory creation + SCP | pass/fail, OPENCLAW_GENERATED_TOKEN | §4.1–4.2 |
+| 04: Deploy configuration (4.3) | deploy-config.sh runs on VPS | pass/fail | §4.3 |
+| 04: Build + start (4.4) | Full Docker build log | pass/fail | §4.4 |
 
-> **Read ranges:** Use `offset` and `limit` parameters when telling subagents to read playbook sections. This prevents subagents from loading troubleshooting, updating, and verification sections they don't need (~250 lines saved per 04 subagent).
+> **Scoping:** Tell subagents which sections to read (e.g., "Read §4.1–4.2 of playbooks/04-vps1-openclaw.md"). This prevents subagents from loading troubleshooting, updating, and verification sections they don't need.
 
 > **Parallel launch:** 01 and 02 subagents should be launched together in a single message (multiple Task tool calls). Both must return their values before step 04 can begin — 04 needs worker URLs/tokens from 01 and requires Docker (step 03, which depends on 02).
 
