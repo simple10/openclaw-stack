@@ -19,3 +19,6 @@ media/
 agents/
 screencasts/
 .deploy-logs/
+
+# CLI binary (built from cli/)
+/claw
