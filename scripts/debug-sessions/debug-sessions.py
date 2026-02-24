@@ -24,12 +24,13 @@ Session JSONL schema (OpenClaw):
   Assistant content blocks: text, thinking, toolCall (arguments field, not input)
   Error detection: isError is always false — check details.status and content text
 
-LLM log schema (from telemetry plugin):
-  Each LLM round-trip produces two JSONL entries paired by runId:
-  - llm_input: timestamp, agentId, sessionKey, runId, sessionId, provider, model, ...
-  - llm_output: timestamp, agentId, sessionKey, runId, sessionId, provider, model,
-                 usage{inputTokens,outputTokens,cacheReadTokens,cacheWriteTokens},
-                 stopReason, durationMs, toolCalls[{name,id}]
+Telemetry log schema (telemetry.log):
+  Each entry is wrapped in an envelope: { type, category, timestamp, agentId,
+  sessionId, sessionKey, data: {...} }. LLM round-trips produce two entries:
+  - type=llm_input: data.{runId, provider, model, toolCount, toolNames, ...}
+  - type=llm_output: data.{runId, provider, model, inputTokens, outputTokens,
+      cacheReadTokens, cacheWriteTokens, stopReason, durationMs, toolCalls}
+  The parser also handles legacy flat-format entries (event field instead of type).
 """
 
 import argparse
@@ -581,6 +582,29 @@ def estimate_cost(model, input_tok, output_tok, cache_read=0, cache_write=0):
     )
 
 
+def _flatten_entry(raw):
+    """Normalize a telemetry log entry to a flat dict.
+
+    The telemetry plugin (v2) wraps data in an envelope:
+      { type, category, timestamp, agentId, sessionId, sessionKey, data: {...} }
+    The old llmetry plugin wrote flat entries:
+      { event, agentId, model, ... }
+    This function merges both formats into a flat dict with an "event" key.
+    """
+    data = raw.get("data")
+    if data and isinstance(data, dict):
+        # Telemetry v2 envelope — merge top-level envelope fields with nested data
+        flat = {**data}
+        flat["event"] = raw.get("type")
+        for k in ("timestamp", "agentId", "sessionId", "sessionKey"):
+            if raw.get(k) and not flat.get(k):
+                flat[k] = raw[k]
+        return flat
+    # Legacy flat format (or unknown) — use as-is
+    raw.setdefault("event", raw.get("type"))
+    return raw
+
+
 def parse_llm_log(filepath):
     """Parse LLM log JSONL, pair input/output into call records.
 
@@ -600,9 +624,11 @@ def parse_llm_log(filepath):
             if not line:
                 continue
             try:
-                entry = json.loads(line)
+                raw = json.loads(line)
             except json.JSONDecodeError:
                 continue
+
+            entry = _flatten_entry(raw)
 
             event = entry.get("event")
             if event not in ("llm_input", "llm_output"):
