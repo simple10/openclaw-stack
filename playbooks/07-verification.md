@@ -371,9 +371,13 @@ Re-run the CLI pairing step from `08-post-deploy.md` § 8.3:
 
 ```bash
 FIRST_CLAW=$(echo "$CLAWS" | head -1)
-GATEWAY_TOKEN=$(sudo grep OPENCLAW_GATEWAY_TOKEN <INSTALL_DIR>/openclaw/.env | cut -d= -f2)
+# Read token from the claw's own openclaw.json (not shared .env)
+GATEWAY_TOKEN=$(sudo docker exec --user node "$FIRST_CLAW" \
+  node -e "console.log(require('/home/node/.openclaw/openclaw.json').gateway.auth.token)")
+# Discover the claw's gateway port
+PORT=$(sudo docker port "$FIRST_CLAW" | grep -oP '0\.0\.0\.0:\K\d+' | head -1)
 sudo docker exec --user node "$FIRST_CLAW" \
-  openclaw devices list --url ws://localhost:18789 --token "$GATEWAY_TOKEN"
+  openclaw devices list --url ws://localhost:${PORT} --token "$GATEWAY_TOKEN"
 ```
 
 ---

@@ -701,9 +701,12 @@ sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose up -d'
 
 # 5. Verify new version
 openclaw --version
-# Verify — use the assigned port for the claw being tested
-# First claw defaults to 18789; check actual ports: docker compose ps
-curl -s http://localhost:18789${OPENCLAW_DOMAIN_PATH}/
+# Verify each claw is responding
+for CLAW in $(sudo docker ps --format '{{.Names}}' --filter 'name=^openclaw-' | grep -v '^openclaw-cli$' | grep -v '^openclaw-sbx-'); do
+  GW_PORT=$(sudo docker port "$CLAW" | grep -oP '0\.0\.0\.0:\K\d+' | head -1)
+  echo "$CLAW (port $GW_PORT):"
+  curl -s "http://localhost:${GW_PORT}${OPENCLAW_DOMAIN_PATH}/" | head -3
+done
 
 # 6. Cleanup old rollback images (keep last 3)
 docker images --format '{{.Repository}}:{{.Tag}}' | grep 'openclaw:rollback-' | sort -r | tail -n +4 | xargs -r docker rmi
@@ -728,9 +731,12 @@ sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose up -d'
 
 # 4. Verify
 openclaw --version
-# Use the assigned port for the claw being tested
-# First claw defaults to 18789; check actual ports: docker compose ps
-curl -s http://localhost:18789${OPENCLAW_DOMAIN_PATH}/
+# Verify each claw is responding
+for CLAW in $(sudo docker ps --format '{{.Names}}' --filter 'name=^openclaw-' | grep -v '^openclaw-cli$' | grep -v '^openclaw-sbx-'); do
+  GW_PORT=$(sudo docker port "$CLAW" | grep -oP '0\.0\.0\.0:\K\d+' | head -1)
+  echo "$CLAW (port $GW_PORT):"
+  curl -s "http://localhost:${GW_PORT}${OPENCLAW_DOMAIN_PATH}/" | head -3
+done
 ```
 
 > If the rollback date tag doesn't match today, list available rollback images with:

@@ -10,7 +10,7 @@ All secrets should be rotated on a regular cadence. If a token is suspected comp
 
 | Token | Location | Rotation Cadence |
 |-------|----------|-----------------|
-| `OPENCLAW_GATEWAY_TOKEN` | VPS `<INSTALL_DIR>/openclaw/.env` | 90 days |
+| Gateway token (per-claw) | VPS `<INSTALL_DIR>/instances/<name>/.openclaw/openclaw.json` | 90 days |
 | `AI_GATEWAY_AUTH_TOKEN` | VPS `.env` + AI Gateway Worker secret | 90 days |
 | `LOG_WORKER_TOKEN` | VPS `.env` + Log Receiver Worker secret | 90 days |
 | Provider API keys (Anthropic, OpenAI, etc.) | AI Gateway Worker secrets (Cloudflare Dashboard) | Per provider policy |
@@ -27,19 +27,19 @@ Each claw has its own `GATEWAY_TOKEN` baked into its `openclaw.json` by `deploy-
 # 1. Generate new token
 NEW_TOKEN=$(openssl rand -hex 32)
 
-# 2. Update .env on VPS
-# Edit <INSTALL_DIR>/openclaw/.env — change OPENCLAW_GATEWAY_TOKEN value
-
-# 3. Update the claw's openclaw.json on VPS
+# 2. Update the claw's openclaw.json on VPS
 # Edit <INSTALL_DIR>/instances/<CLAW_NAME>/.openclaw/openclaw.json
 #   — update gateway.auth.token and gateway.remote.token
+# Note: The gateway rewrites openclaw.json on startup, so use sed or jq, not manual edit.
 
-# 4. Recreate the claw to pick up new .env values (see CLAUDE.md: restart vs up -d)
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose up -d openclaw-<CLAW_NAME>'
+# 3. Restart the claw to pick up the new token (restart is fine — token is read from disk)
+sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose restart openclaw-<CLAW_NAME>'
 
-# 5. Update all paired devices with new token (existing browser URLs will need the new token parameter)
-# Repeat steps 3-5 for each claw being rotated
+# 4. Update all paired devices with new token (existing browser URLs will need the new token parameter)
+# Repeat steps 2-4 for each claw being rotated
 ```
+
+> **Note:** The shared `.env` contains `OPENCLAW_GATEWAY_TOKEN` from initial setup, but this is not used by multi-claw containers. Each claw reads its token from its own `openclaw.json`. You do not need to update `.env` when rotating a claw's token.
 
 #### AI Gateway Auth Token
 
@@ -197,6 +197,7 @@ scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r deploy/* ${SSH_USER}@${VPS1_IP}:/tmp/de
 # 2. Deploy config for one claw only
 ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP} \
   "env INSTANCE_NAME=personal-claw \
+    OPENCLAW_DOMAIN='${OPENCLAW_DOMAIN}' \
     OPENCLAW_DOMAIN_PATH='${OPENCLAW_DOMAIN_PATH}' \
     YOUR_TELEGRAM_ID='${YOUR_TELEGRAM_ID}' \
     OPENCLAW_INSTANCE_ID='${OPENCLAW_INSTANCE_ID}' \
