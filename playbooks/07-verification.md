@@ -74,13 +74,17 @@ done
 
 **If containers are not running after reboot:**
 
-> "Containers didn't auto-start after reboot. Start them manually:"
+This is expected on the first reboot after deployment. Docker Compose services use `restart: unless-stopped`, but the Sysbox runtime (required for these containers) starts as a separate systemd service. On boot, Docker may attempt to restart containers before Sysbox is fully ready, causing them to fail with a runtime error. Docker does not retry after this initial failure.
+
+> "Containers didn't auto-start after reboot. This is a known first-reboot issue — Sysbox wasn't ready when Docker tried to restart the containers. Start them manually:"
 
 ```bash
 sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose up -d'
 ```
 
-> If they fail to start, check logs: `for CLAW in $CLAWS; do sudo docker logs "$CLAW"; done`
+> Subsequent reboots typically work because Sysbox starts faster on warm boots. If containers consistently fail to start after reboot, check that Sysbox is enabled: `sudo systemctl is-enabled sysbox`.
+
+> If they fail to start even manually, check logs: `for CLAW in $CLAWS; do sudo docker logs "$CLAW"; done`
 
 ---
 

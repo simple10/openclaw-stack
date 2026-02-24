@@ -510,6 +510,13 @@ cmd_sync_images() {
 
   [ -n "$source_container" ] || die "No source claw with sandbox images found"
 
+  # Verify source container is actually running
+  local source_running=false
+  for rc in "${running_claws[@]}"; do
+    [ "$rc" = "$source_container" ] && source_running=true && break
+  done
+  [ "$source_running" = true ] || die "Source container ${source_container} is not running. Start it first: docker compose up -d ${source_container}"
+
   # Verify source has all 3 sandbox images
   local images=(
     "openclaw-sandbox:bookworm-slim"

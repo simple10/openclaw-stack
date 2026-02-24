@@ -161,15 +161,23 @@ Tell the user to wait ~15 seconds for browser auto-retry.
 If `openclaw --instance <CLAW_NAME> devices list` fails with "pairing required", the CLI identity was lost.
 
 ```bash
+# Discover the claw's gateway port (each claw gets a unique port: 18789, 18790, ...)
+PORT=$(ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
+  "sudo docker port openclaw-<CLAW_NAME> | grep -oP '0\.0\.0\.0:\K\d+' | head -1")
+echo "Claw port: $PORT"
+
 # Read token from the claw's openclaw.json
 TOKEN=$(ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
   "sudo docker exec --user node openclaw-<CLAW_NAME> \
     node -e \"console.log(require('/home/node/.openclaw/openclaw.json').gateway.auth.token)\"")
-# Re-pair CLI with explicit token
+
+# Re-pair CLI with explicit token and port
 ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
   "sudo docker exec --user node openclaw-<CLAW_NAME> \
-    openclaw devices list --url ws://localhost:18789 --token $TOKEN"
+    openclaw devices list --url ws://localhost:${PORT} --token $TOKEN"
 ```
+
+> **Port assignment:** The first claw (alphabetically) gets port 18789, the second gets 18790, etc. You can also check `docker compose ps` to see assigned ports.
 
 This re-pairs the CLI. Now retry Approach 1.
 

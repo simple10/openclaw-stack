@@ -244,7 +244,11 @@ These are substituted server-side via `sed` after copying from staging:
 | `EVENTS_URL` | Derived: `LOG_WORKER_URL` with `/logs` → `/events` | `openclaw.json` |
 | `LLEMTRY_URL` | Derived: `LOG_WORKER_URL` with `/logs` → `/llemtry` | `openclaw.json` |
 | `LOG_WORKER_TOKEN` | `openclaw-config.env` | `openclaw.json` |
+| `OPENCLAW_DOMAIN` | `openclaw-config.env` (or per-claw `config.env`) | Used to derive `ALLOWED_ORIGIN` |
+| `ALLOWED_ORIGIN` | Derived: `https://${OPENCLAW_DOMAIN}` | `openclaw.json` |
 | `AI_GATEWAY_WORKER_URL` | `openclaw-config.env` | `models.json` |
+
+> **`controlUi.allowedOrigins` is required.** When the gateway binds to `lan` (non-loopback), which is always the case for Docker/Tunnel deployments, `controlUi.allowedOrigins` must be set in `openclaw.json`. Without it, the gateway crashes on startup with a security check error. The `deploy-config.sh` script handles this automatically by deriving `ALLOWED_ORIGIN` from `OPENCLAW_DOMAIN` (or from the per-claw `config.env` override). If a claw's `OPENCLAW_DOMAIN` is empty, the origin will be `https://` which will fail — every claw must have a domain configured.
 
 ### Step 1: Query server timezone
 
@@ -262,6 +266,7 @@ Use the returned timezone to compute `CRON_MINUTE`, `CRON_HOUR`, `CRON_MAINTENAN
 ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP} \
   "env \
     INSTALL_DIR='${INSTALL_DIR}' \
+    OPENCLAW_DOMAIN='${OPENCLAW_DOMAIN}' \
     OPENCLAW_DOMAIN_PATH='${OPENCLAW_DOMAIN_PATH}' \
     YOUR_TELEGRAM_ID='${YOUR_TELEGRAM_ID}' \
     OPENCLAW_INSTANCE_ID='${OPENCLAW_INSTANCE_ID}' \
@@ -592,6 +597,20 @@ free -h
 df -h
 ```
 
+### Gateway Crashes: "non-loopback Control UI requires allowedOrigins"
+
+When the gateway binds to `lan` (which all Docker/Tunnel deployments do via `--bind lan`), it requires `controlUi.allowedOrigins` to be set in `openclaw.json`. If missing or empty, the gateway exits immediately with a security check error.
+
+**Cause:** `OPENCLAW_DOMAIN` was not passed to `deploy-config.sh`, so `{{ALLOWED_ORIGIN}}` was substituted as `https://` (empty domain).
+
+**Fix:** Ensure `OPENCLAW_DOMAIN` is set in `openclaw-config.env` (or overridden per-claw in `config.env`), then re-run the deploy-config step from § 4.3 Step 2. Restart the claw container after updating the config.
+
+```bash
+# Verify the deployed config has a valid allowedOrigins
+sudo grep -A2 'allowedOrigins' <INSTALL_DIR>/instances/<name>/.openclaw/openclaw.json
+# Should show: "allowedOrigins": ["https://your-domain.example.com"]
+```
+
 ### Permission Denied on .openclaw
 
 The gateway creates subdirectories (`identity/`, `devices/`, `memory/`) during startup
@@ -625,6 +644,16 @@ sudo docker exec vector wget -q -O- <LOG_WORKER_URL_WITHOUT_PATH>/health
 # Restart Vector after fixing (use `up -d` instead if .env values changed)
 sudo -u openclaw bash -c 'cd <INSTALL_DIR>/vector && docker compose restart'
 ```
+
+### Config Overwritten After Manual Edit
+
+The OpenClaw gateway rewrites `openclaw.json` on startup. It strips JSONC comments, converts to plain JSON, and adds `meta` fields (file hash, timestamps). This means:
+
+- **Manual edits to deployed `openclaw.json` may be partially overwritten** — the gateway preserves config values but reformats the file and removes comments.
+- **File size changes are expected** — the rewritten file is typically smaller (comments removed) or larger (meta fields added) than the deployed version.
+- **The gateway creates a `.bak` backup** before rewriting, so the previous version is recoverable.
+
+To make persistent config changes, update the template in `deploy/openclaws/_defaults/openclaw.json` (or a per-claw override) and re-run `deploy-config.sh`, then restart the container.
 
 ### CLI Commands Failing
 
