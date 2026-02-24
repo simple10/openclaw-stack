@@ -24,9 +24,20 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
 fi
 
 source "$CONFIG_FILE"
+source "$SCRIPT_DIR/lib/resolve-gateway.sh"
 
-GATEWAY="openclaw-gateway"
-AGENT_ARG="${1:-}"
+# Extract --instance before positional args
+INSTANCE_ARGS=()
+POSITIONAL_ARGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --instance) INSTANCE_ARGS=(--instance "$2"); shift 2 ;;
+    *) POSITIONAL_ARGS+=("$1"); shift ;;
+  esac
+done
+
+GATEWAY=$(resolve_gateway "${INSTANCE_ARGS[@]}" ) || exit 1
+AGENT_ARG="${POSITIONAL_ARGS[0]:-}"
 MAX_WAIT=90  # seconds to wait for browser container
 
 # Helper: run a command inside the gateway container as node

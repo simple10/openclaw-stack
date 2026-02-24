@@ -4,7 +4,8 @@
 # detects the new image and recreates the container automatically.
 #
 # Usage:
-#   scripts/update-openclaw.sh
+#   scripts/update-openclaw.sh                      # auto-detect instance
+#   scripts/update-openclaw.sh --instance test-claw # target specific instance
 
 set -euo pipefail
 
@@ -17,9 +18,10 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
 fi
 
 source "$CONFIG_FILE"
+source "$SCRIPT_DIR/lib/resolve-gateway.sh"
 
 OPENCLAW_DIR="/home/openclaw/openclaw"
-GATEWAY="openclaw-gateway"
+GATEWAY=$(resolve_gateway "$@") || exit 1
 
 printf '\033[32mUpdating OpenClaw on %s...\033[0m\n' "$VPS1_IP"
 

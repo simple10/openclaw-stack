@@ -6,10 +6,10 @@
 # to trigger creation, waits for it to appear, then execs in.
 #
 # Usage:
-#   ./ssh-agent.sh              # interactive: pick from available agents
-#   ./ssh-agent.sh main         # exec into the main agent sandbox
-#   ./ssh-agent.sh code         # exec into the code agent sandbox
-#   ./ssh-agent.sh skills       # exec into the skills agent sandbox
+#   ./ssh-agent.sh                      # interactive: pick from available agents
+#   ./ssh-agent.sh main                 # exec into the main agent sandbox
+#   ./ssh-agent.sh code                 # exec into the code agent sandbox
+#   ./ssh-agent.sh --instance test-claw # target specific instance
 
 set -euo pipefail
 
@@ -21,13 +21,24 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
   exit 1
 fi
 
-printf '\033[33mGetting agents list from openclaw gateway...\033[0m\n'
-
-
 source "$CONFIG_FILE"
+source "$SCRIPT_DIR/lib/resolve-gateway.sh"
 
-GATEWAY="openclaw-gateway"
-AGENT_ARG="${1:-}"
+# Extract --instance before positional args
+INSTANCE_ARGS=()
+POSITIONAL_ARGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --instance) INSTANCE_ARGS=(--instance "$2"); shift 2 ;;
+    *) POSITIONAL_ARGS+=("$1"); shift ;;
+  esac
+done
+
+GATEWAY=$(resolve_gateway "${INSTANCE_ARGS[@]}" ) || exit 1
+
+printf '\033[33mGetting agents list from %s...\033[0m\n' "$GATEWAY"
+
+AGENT_ARG="${POSITIONAL_ARGS[0]:-}"
 MAX_WAIT=60  # seconds to wait for sandbox to appear
 
 # Helper: run a command on the VPS inside the gateway container as node

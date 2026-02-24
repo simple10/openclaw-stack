@@ -4,6 +4,7 @@ import {
   dockerCompose,
   dockerComposeSafe,
   dockerComposeStream,
+  gatewayContainer,
   sshSafe,
   sshStream,
   sshInteractive,
@@ -58,13 +59,13 @@ export async function gatewayMenu(cfg: Config): Promise<void> {
         });
         if (mode === 'follow') {
           info('Streaming gateway logs... Press Ctrl+C to stop.');
-          await sshStream(cfg, 'vps1', 'sudo docker logs -f openclaw-gateway');
+          await sshStream(cfg, 'vps1', `sudo docker logs -f ${gatewayContainer(cfg)}`);
         } else if (mode === 'tailn') {
           const n = await input({ message: 'Number of lines:', default: '50' });
-          const r = await sshSafe(cfg, 'vps1', `sudo docker logs --tail ${n} openclaw-gateway`);
+          const r = await sshSafe(cfg, 'vps1', `sudo docker logs --tail ${n} ${gatewayContainer(cfg)}`);
           printOutput(r.stdout || r.stderr);
         } else {
-          const r = await sshSafe(cfg, 'vps1', 'sudo docker logs --tail 100 openclaw-gateway');
+          const r = await sshSafe(cfg, 'vps1', `sudo docker logs --tail 100 ${gatewayContainer(cfg)}`);
           printOutput(r.stdout || r.stderr);
         }
         break;
@@ -86,7 +87,7 @@ export async function gatewayMenu(cfg: Config): Promise<void> {
         break;
       case 'shell':
         info('Opening shell in gateway container... Type "exit" to return.');
-        await sshInteractive(cfg, 'vps1', 'sudo docker exec -it openclaw-gateway /bin/sh');
+        await sshInteractive(cfg, 'vps1', `sudo docker exec -it ${gatewayContainer(cfg)} /bin/sh`);
         break;
     }
   }

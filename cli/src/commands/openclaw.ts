@@ -1,6 +1,6 @@
 import { select, input } from '@inquirer/prompts';
 import type { Config } from '../types.ts';
-import { openclawCmd, openclawCmdSafe, sshStream, sshInteractive, OPENCLAW_EXEC, OPENCLAW_EXEC_IT } from '../ssh.ts';
+import { openclawCmd, openclawCmdSafe, sshStream, sshInteractive, openclawExecPrefix, openclawExecItPrefix } from '../ssh.ts';
 import { header, printOutput, info, fail } from '../ui.ts';
 
 async function runAndPrint(cfg: Config, args: string): Promise<void> {
@@ -65,7 +65,7 @@ async function configMenu(cfg: Config): Promise<void> {
       const section = await input({ message: 'Section (leave blank for all):' });
       const args = section ? `configure --section ${section}` : 'configure';
       // Interactive command needs PTY
-      await sshInteractive(cfg, 'vps1', `${OPENCLAW_EXEC_IT} ${args}`);
+      await sshInteractive(cfg, 'vps1', `${openclawExecItPrefix(cfg)} ${args}`);
       break;
     }
   }
@@ -198,7 +198,7 @@ async function cronMenu(cfg: Config): Promise<void> {
       break;
     case 'add':
       // Interactive — needs PTY
-      await sshInteractive(cfg, 'vps1', `${OPENCLAW_EXEC_IT} cron add`);
+      await sshInteractive(cfg, 'vps1', `${openclawExecItPrefix(cfg)} cron add`);
       break;
     case 'run': {
       const id = await input({ message: 'Job ID:' });
@@ -307,7 +307,7 @@ export async function openclawMenu(cfg: Config): Promise<void> {
         });
         if (follow === 'follow') {
           info('Streaming logs... Press Ctrl+C to stop.');
-          await sshStream(cfg, 'vps1', `${OPENCLAW_EXEC} logs --follow`);
+          await sshStream(cfg, 'vps1', `${openclawExecPrefix(cfg)} logs --follow`);
         } else {
           await runAndPrint(cfg, 'logs');
         }

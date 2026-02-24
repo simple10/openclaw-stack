@@ -5,7 +5,8 @@
 # after config changes (e.g. adding env vars, changing auth settings).
 #
 # Usage:
-#   scripts/restart-gateway.sh
+#   scripts/restart-gateway.sh                      # auto-detect instance
+#   scripts/restart-gateway.sh --instance test-claw  # target specific instance
 
 set -euo pipefail
 
@@ -18,8 +19,9 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
 fi
 
 source "$CONFIG_FILE"
+source "$SCRIPT_DIR/lib/resolve-gateway.sh"
 
-GATEWAY="openclaw-gateway"
+GATEWAY=$(resolve_gateway "$@") || exit 1
 
 # Check gateway container exists
 if ! ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \

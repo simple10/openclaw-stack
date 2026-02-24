@@ -4,9 +4,10 @@
 # containers launched by agents automatically use the fresh images.
 #
 # Usage:
-#   scripts/update-sandboxes.sh              # rebuild toolkit (+ base if needed)
-#   scripts/update-sandboxes.sh --all        # also rebuild browser sandbox
-#   scripts/update-sandboxes.sh --dry-run    # show what would be rebuilt
+#   scripts/update-sandboxes.sh                      # rebuild toolkit (+ base if needed)
+#   scripts/update-sandboxes.sh --all                # also rebuild browser sandbox
+#   scripts/update-sandboxes.sh --dry-run            # show what would be rebuilt
+#   scripts/update-sandboxes.sh --instance test-claw # target specific instance
 
 set -euo pipefail
 
@@ -19,31 +20,35 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
 fi
 
 source "$CONFIG_FILE"
+source "$SCRIPT_DIR/lib/resolve-gateway.sh"
 
 # Pass through flags to rebuild-sandboxes.sh
 FLAGS="--force"
-for arg in "$@"; do
-  case "$arg" in
-    --all)     FLAGS="$FLAGS --all" ;;
-    --dry-run) FLAGS="$FLAGS --dry-run" ;;
+INSTANCE_ARGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --all)      FLAGS="$FLAGS --all"; shift ;;
+    --dry-run)  FLAGS="$FLAGS --dry-run"; shift ;;
+    --instance) INSTANCE_ARGS=(--instance "$2"); shift 2 ;;
     --help|-h)
-      echo "Usage: $(basename "$0") [--all] [--dry-run]"
+      echo "Usage: $(basename "$0") [--all] [--dry-run] [--instance <name>]"
       echo ""
       echo "Force-rebuild sandbox images on the VPS without gateway downtime."
       echo ""
       echo "Options:"
-      echo "  --all       Also rebuild browser sandbox image"
-      echo "  --dry-run   Show what would be rebuilt without executing"
+      echo "  --all              Also rebuild browser sandbox image"
+      echo "  --dry-run          Show what would be rebuilt without executing"
+      echo "  --instance <name>  Target a specific OpenClaw instance"
       exit 0
       ;;
     *)
-      echo "Unknown flag: $arg" >&2
+      echo "Unknown flag: $1" >&2
       exit 1
       ;;
   esac
 done
 
-GATEWAY="openclaw-gateway"
+GATEWAY=$(resolve_gateway "${INSTANCE_ARGS[@]}" ) || exit 1
 
 printf '\033[32mRebuilding sandbox images on %s...\033[0m\n' "$VPS1_IP"
 

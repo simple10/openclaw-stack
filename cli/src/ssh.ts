@@ -91,6 +91,15 @@ export async function sshInteractive(cfg: Config, target: VpsTarget, cmd: string
 const COMPOSE_DIR = '/home/openclaw/openclaw';
 
 /**
+ * Resolve the gateway container name for a given config.
+ * Uses OPENCLAW_INSTANCE from config, defaulting to 'main-claw'.
+ */
+function gatewayContainer(cfg: Config): string {
+  const instance = cfg['OPENCLAW_INSTANCE'] || 'main-claw';
+  return `openclaw-${instance}`;
+}
+
+/**
  * Run docker compose commands on the VPS.
  * adminclaw can't cd into /home/openclaw, so we use sudo sh -c.
  */
@@ -125,17 +134,17 @@ export async function dockerComposeStream(
 }
 
 /**
- * Execute a command inside the openclaw-gateway container on VPS-1.
+ * Execute a command inside the OpenClaw gateway container on VPS-1.
  */
 export async function gatewayExec(cfg: Config, cmd: string): Promise<string> {
-  return ssh(cfg, 'vps1', `sudo docker exec --user node openclaw-gateway ${cmd}`);
+  return ssh(cfg, 'vps1', `sudo docker exec --user node ${gatewayContainer(cfg)} ${cmd}`);
 }
 
 /**
  * Safe version of gatewayExec (never throws).
  */
 export async function gatewayExecSafe(cfg: Config, cmd: string): Promise<SshResult> {
-  return sshSafe(cfg, 'vps1', `sudo docker exec --user node openclaw-gateway ${cmd}`);
+  return sshSafe(cfg, 'vps1', `sudo docker exec --user node ${gatewayContainer(cfg)} ${cmd}`);
 }
 
 // The openclaw CLI in the container is invoked via node, not a bin symlink
@@ -156,5 +165,12 @@ export async function openclawCmdSafe(cfg: Config, args: string): Promise<SshRes
 }
 
 /** The command prefix for openclaw inside the gateway container */
-export const OPENCLAW_EXEC = `sudo docker exec --user node openclaw-gateway ${OPENCLAW_BIN}`;
-export const OPENCLAW_EXEC_IT = `sudo docker exec --user node -it openclaw-gateway ${OPENCLAW_BIN}`;
+export function openclawExecPrefix(cfg: Config): string {
+  return `sudo docker exec --user node ${gatewayContainer(cfg)} ${OPENCLAW_BIN}`;
+}
+export function openclawExecItPrefix(cfg: Config): string {
+  return `sudo docker exec --user node -it ${gatewayContainer(cfg)} ${OPENCLAW_BIN}`;
+}
+
+/** Exported for use in gateway.ts and other commands needing the container name */
+export { gatewayContainer };

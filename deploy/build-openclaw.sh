@@ -74,4 +74,4 @@ docker build -t openclaw:local .
 git checkout -- Dockerfile "$DOCKER_FILE" .dockerignore 2>/dev/null || true
 rm -f .git-info
 
-echo "[build] Done. Run: docker compose up -d openclaw-gateway"
+echo "[build] Done. Run: docker compose up -d"

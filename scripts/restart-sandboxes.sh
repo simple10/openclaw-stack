@@ -9,9 +9,10 @@
 # until the gateway is restarted.
 #
 # Usage:
-#   scripts/restart-sandboxes.sh              # restart agent sandboxes
-#   scripts/restart-sandboxes.sh --all        # also restart browser sandboxes
-#   scripts/restart-sandboxes.sh --dry-run    # show what would be removed
+#   scripts/restart-sandboxes.sh                      # restart agent sandboxes
+#   scripts/restart-sandboxes.sh --all                # also restart browser sandboxes
+#   scripts/restart-sandboxes.sh --dry-run            # show what would be removed
+#   scripts/restart-sandboxes.sh --instance test-claw # target specific instance
 
 set -euo pipefail
 
@@ -24,36 +25,40 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
 fi
 
 source "$CONFIG_FILE"
+source "$SCRIPT_DIR/lib/resolve-gateway.sh"
 
 ALL=false
 DRY_RUN=false
 FORCE=false
+INSTANCE_ARGS=()
 
-for arg in "$@"; do
-  case "$arg" in
-    --all)     ALL=true ;;
-    --dry-run) DRY_RUN=true ;;
-    --force|-f) FORCE=true ;;
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --all)      ALL=true; shift ;;
+    --dry-run)  DRY_RUN=true; shift ;;
+    --force|-f) FORCE=true; shift ;;
+    --instance) INSTANCE_ARGS=(--instance "$2"); shift 2 ;;
     --help|-h)
-      echo "Usage: $(basename "$0") [--all] [--force] [--dry-run]"
+      echo "Usage: $(basename "$0") [--all] [--force] [--dry-run] [--instance <name>]"
       echo ""
       echo "Remove sandbox containers so OpenClaw recreates them from current images."
       echo "Containers are recreated automatically on the next agent request."
       echo ""
       echo "Options:"
-      echo "  --all       Also restart browser sandbox containers"
-      echo "  --force     Skip confirmation prompt"
-      echo "  --dry-run   Show what would be removed without executing"
+      echo "  --all              Also restart browser sandbox containers"
+      echo "  --force            Skip confirmation prompt"
+      echo "  --dry-run          Show what would be removed without executing"
+      echo "  --instance <name>  Target a specific OpenClaw instance"
       exit 0
       ;;
     *)
-      echo "Unknown flag: $arg" >&2
+      echo "Unknown flag: $1" >&2
       exit 1
       ;;
   esac
 done
 
-GATEWAY="openclaw-gateway"
+GATEWAY=$(resolve_gateway "${INSTANCE_ARGS[@]}" ) || exit 1
 
 # Check gateway container is running
 if ! ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \

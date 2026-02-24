@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Stream logs from the openclaw-gateway container on VPS-1
+# Stream logs from an OpenClaw gateway container on VPS-1
 #
 # Usage:
-#   ./scripts/logs-openclaw.sh              # stream all logs (tail -f)
-#   ./scripts/logs-openclaw.sh 100          # show last 100 lines then follow
-#   ./scripts/logs-openclaw.sh --no-follow  # dump all logs and exit
+#   ./scripts/logs-openclaw.sh                      # stream all logs (tail -f)
+#   ./scripts/logs-openclaw.sh 100                  # show last 100 lines then follow
+#   ./scripts/logs-openclaw.sh --no-follow          # dump all logs and exit
+#   ./scripts/logs-openclaw.sh --instance test-claw # target specific instance
 
 set -euo pipefail
 
@@ -17,17 +18,27 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
 fi
 
 source "$CONFIG_FILE"
+source "$SCRIPT_DIR/lib/resolve-gateway.sh"
 
-CONTAINER="openclaw-gateway"
+# Extract --instance before other args
+INSTANCE_ARGS=()
+POSITIONAL_ARGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --instance) INSTANCE_ARGS=(--instance "$2"); shift 2 ;;
+    *) POSITIONAL_ARGS+=("$1"); shift ;;
+  esac
+done
+
+CONTAINER=$(resolve_gateway "${INSTANCE_ARGS[@]}" ) || exit 1
 DOCKER_ARGS=("logs")
 
-if [[ "${1:-}" == "--no-follow" ]]; then
+if [[ "${POSITIONAL_ARGS[0]:-}" == "--no-follow" ]]; then
   # Dump all logs without following
-  shift
-elif [[ "${1:-}" =~ ^[0-9]+$ ]]; then
+  true
+elif [[ "${POSITIONAL_ARGS[0]:-}" =~ ^[0-9]+$ ]]; then
   # Tail N lines then follow
-  DOCKER_ARGS+=("--tail" "$1" "-f")
-  shift
+  DOCKER_ARGS+=("--tail" "${POSITIONAL_ARGS[0]}" "-f")
 else
   # Default: follow from current position
   DOCKER_ARGS+=("--tail" "100" "-f")

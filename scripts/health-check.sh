@@ -2,8 +2,9 @@
 # Run health checks on the VPS: Docker containers and OpenClaw gateway
 #
 # Usage:
-#   scripts/health-check.sh           # run all checks
-#   scripts/health-check.sh --quiet   # exit code only (0 = healthy, 1 = unhealthy)
+#   scripts/health-check.sh                      # run all checks (auto-detect instance)
+#   scripts/health-check.sh --quiet               # exit code only (0 = healthy, 1 = unhealthy)
+#   scripts/health-check.sh --instance test-claw  # target specific instance
 
 set -euo pipefail
 
@@ -16,27 +17,31 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
 fi
 
 source "$CONFIG_FILE"
+source "$SCRIPT_DIR/lib/resolve-gateway.sh"
 
 QUIET=false
-for arg in "$@"; do
-  case "$arg" in
-    --quiet|-q) QUIET=true ;;
+INSTANCE_ARGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --quiet|-q) QUIET=true; shift ;;
+    --instance) INSTANCE_ARGS=(--instance "$2"); shift 2 ;;
     --help|-h)
-      echo "Usage: $(basename "$0") [--quiet]"
+      echo "Usage: $(basename "$0") [--quiet] [--instance <name>]"
       echo ""
       echo "Run health checks on the VPS."
       echo ""
       echo "Checks:"
-      echo "  - Docker container status (openclaw-gateway, vector if enabled)"
+      echo "  - Docker container status (gateway, vector if enabled)"
       echo "  - Docker container health (healthcheck status)"
       echo "  - OpenClaw gateway health (openclaw health)"
       echo ""
       echo "Options:"
-      echo "  --quiet, -q   Suppress output, exit code only (0 = healthy, 1 = unhealthy)"
+      echo "  --quiet, -q        Suppress output, exit code only (0 = healthy, 1 = unhealthy)"
+      echo "  --instance <name>  Target a specific OpenClaw instance"
       exit 0
       ;;
     *)
-      echo "Unknown flag: $arg" >&2
+      echo "Unknown flag: $1" >&2
       exit 1
       ;;
   esac
@@ -79,7 +84,8 @@ pass "SSH connection OK"
 log ""
 log "Checking Docker containers..."
 
-CONTAINERS="openclaw-gateway"
+GATEWAY=$(resolve_gateway "${INSTANCE_ARGS[@]}" ) || exit 1
+CONTAINERS="$GATEWAY"
 if [ "${ENABLE_VECTOR_LOG_SHIPPING:-true}" = "true" ]; then
   CONTAINERS="$CONTAINERS vector"
 fi

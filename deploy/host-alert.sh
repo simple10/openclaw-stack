@@ -68,11 +68,13 @@ if ! docker info >/dev/null 2>&1; then
   docker_ok=false
 fi
 
-# Gateway container check
+# Gateway container check (any openclaw-* container, excluding utility containers)
 gateway_ok=true
 if $docker_ok; then
-  if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^openclaw-gateway$'; then
-    alerts+=("🔴 openclaw-gateway container is NOT running")
+  gateway_containers=$(docker ps --format '{{.Names}}' 2>/dev/null \
+    | grep '^openclaw-' | grep -v '^openclaw-cli$' | grep -v '^openclaw-sbx-' || true)
+  if [[ -z "$gateway_containers" ]]; then
+    alerts+=("🔴 No OpenClaw gateway containers running")
     gateway_ok=false
   fi
 fi
@@ -88,18 +90,41 @@ if $docker_ok; then
 fi
 
 # Backup freshness (warn if no backup in last 36 hours)
-backup_dir="/home/openclaw/.openclaw/backups"
+# Check all instance backup directories
 backup_ok=true
 backup_age_hours=""
-if [[ -d "$backup_dir" ]]; then
+found_any_backup_dir=false
+for inst_dir in /home/openclaw/instances/*/; do
+  [[ -d "$inst_dir" ]] || continue
+  backup_dir="${inst_dir}.openclaw/backups"
+  [[ -d "$backup_dir" ]] || continue
+  found_any_backup_dir=true
   latest_backup=$(find "$backup_dir" -name "openclaw_backup_*.tar.gz" -mmin -2160 | head -1)
   if [[ -z "$latest_backup" ]]; then
-    alerts+=("⚠️ No backup in last 36 hours")
+    inst_name=$(basename "$inst_dir")
+    alerts+=("⚠️ No backup in last 36 hours for ${inst_name}")
     backup_ok=false
   else
-    # Calculate age for report mode
     backup_age_seconds=$(( $(date +%s) - $(stat -c %Y "$latest_backup" 2>/dev/null || echo 0) ))
-    backup_age_hours=$(( backup_age_seconds / 3600 ))
+    age_hours=$(( backup_age_seconds / 3600 ))
+    # Track the most recent backup age across all instances
+    if [[ -z "$backup_age_hours" ]] || (( age_hours < backup_age_hours )); then
+      backup_age_hours=$age_hours
+    fi
+  fi
+done
+# Fallback: check legacy single-instance backup path
+if ! $found_any_backup_dir; then
+  backup_dir="/home/openclaw/.openclaw/backups"
+  if [[ -d "$backup_dir" ]]; then
+    latest_backup=$(find "$backup_dir" -name "openclaw_backup_*.tar.gz" -mmin -2160 | head -1)
+    if [[ -z "$latest_backup" ]]; then
+      alerts+=("⚠️ No backup in last 36 hours")
+      backup_ok=false
+    else
+      backup_age_seconds=$(( $(date +%s) - $(stat -c %Y "$latest_backup" 2>/dev/null || echo 0) ))
+      backup_age_hours=$(( backup_age_seconds / 3600 ))
+    fi
   fi
 fi
 

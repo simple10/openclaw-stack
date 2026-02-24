@@ -10,11 +10,12 @@
 #   3. Rebuild sandbox images (quick by default, full with --full)
 #
 # Usage:
-#   scripts/update-sandbox-toolkit.sh              # sync + shims + detect changes + quick-layer
-#   scripts/update-sandbox-toolkit.sh --full       # sync + shims + full rebuild of toolkit layer
-#   scripts/update-sandbox-toolkit.sh --full --all # full rebuild including browser
-#   scripts/update-sandbox-toolkit.sh --sync-only  # sync + shims, skip image rebuild
-#   scripts/update-sandbox-toolkit.sh --dry-run    # show what would happen
+#   scripts/update-sandbox-toolkit.sh                      # sync + shims + detect changes + quick-layer
+#   scripts/update-sandbox-toolkit.sh --full               # sync + shims + full rebuild of toolkit layer
+#   scripts/update-sandbox-toolkit.sh --full --all         # full rebuild including browser
+#   scripts/update-sandbox-toolkit.sh --sync-only          # sync + shims, skip image rebuild
+#   scripts/update-sandbox-toolkit.sh --dry-run            # show what would happen
+#   scripts/update-sandbox-toolkit.sh --instance test-claw # target specific instance
 
 set -euo pipefail
 
@@ -28,40 +29,44 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
 fi
 
 source "$CONFIG_FILE"
+source "$SCRIPT_DIR/lib/resolve-gateway.sh"
 
 SYNC_ONLY=false
 DRY_RUN=false
 ALL=false
 FULL=false
+INSTANCE_ARGS=()
 
-for arg in "$@"; do
-  case "$arg" in
-    --all)       ALL=true ;;
-    --full)      FULL=true ;;
-    --sync-only) SYNC_ONLY=true ;;
-    --dry-run)   DRY_RUN=true ;;
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --all)       ALL=true; shift ;;
+    --full)      FULL=true; shift ;;
+    --sync-only) SYNC_ONLY=true; shift ;;
+    --dry-run)   DRY_RUN=true; shift ;;
+    --instance)  INSTANCE_ARGS=(--instance "$2"); shift 2 ;;
     --help|-h)
-      echo "Usage: $(basename "$0") [--full] [--all] [--sync-only] [--dry-run]"
+      echo "Usage: $(basename "$0") [--full] [--all] [--sync-only] [--dry-run] [--instance <name>]"
       echo ""
       echo "Sync sandbox toolkit files to VPS and rebuild sandbox images."
       echo ""
       echo "Default: detect new/changed tools and quick-layer them on the toolkit image."
       echo ""
       echo "Options:"
-      echo "  --full        Full rebuild of packages + toolkit layers (slower, proper layer ordering)"
-      echo "  --all         Also rebuild browser sandbox image (requires --full)"
-      echo "  --sync-only   Sync files + regenerate shims, skip image rebuild"
-      echo "  --dry-run     Show what would be synced/rebuilt without executing"
+      echo "  --full             Full rebuild of packages + toolkit layers (slower, proper layer ordering)"
+      echo "  --all              Also rebuild browser sandbox image (requires --full)"
+      echo "  --sync-only        Sync files + regenerate shims, skip image rebuild"
+      echo "  --dry-run          Show what would be synced/rebuilt without executing"
+      echo "  --instance <name>  Target a specific OpenClaw instance"
       exit 0
       ;;
     *)
-      echo "Unknown flag: $arg" >&2
+      echo "Unknown flag: $1" >&2
       exit 1
       ;;
   esac
 done
 
-GATEWAY="openclaw-gateway"
+GATEWAY=$(resolve_gateway "${INSTANCE_ARGS[@]}" ) || exit 1
 OPENCLAW_DIR="/home/openclaw/openclaw"
 
 # Files to sync: local path -> VPS host path
