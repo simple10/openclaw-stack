@@ -21,6 +21,8 @@ All secrets should be rotated on a regular cadence. If a token is suspected comp
 
 #### Gateway Token
 
+> **Multi-claw:** Each claw has its own `GATEWAY_TOKEN` baked into its `openclaw.json` by `deploy-config.sh`. Rotate each claw's token independently.
+
 ```bash
 # 1. Generate new token
 NEW_TOKEN=$(openssl rand -hex 32)
@@ -176,3 +178,62 @@ scripts/update-openclaw.sh
 ```
 
 Brief downtime (~5-10s) during container swap. The script waits for the health check to pass before reporting success.
+
+---
+
+## Updating a Single Claw's Configuration
+
+To update just one claw's `openclaw.json` or `models.json` without affecting other claws:
+
+```bash
+# From local machine
+# 1. SCP updated deploy files to VPS
+scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r deploy/* ${SSH_USER}@${VPS1_IP}:/tmp/deploy-staging/
+
+# 2. Deploy config for one claw only
+ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP} \
+  "env INSTANCE_NAME=personal-claw \
+    OPENCLAW_DOMAIN_PATH='${OPENCLAW_DOMAIN_PATH}' \
+    YOUR_TELEGRAM_ID='${YOUR_TELEGRAM_ID}' \
+    OPENCLAW_INSTANCE_ID='${OPENCLAW_INSTANCE_ID}' \
+    VPS_HOSTNAME='${VPS_HOSTNAME}' \
+    ENABLE_EVENTS_LOGGING='${ENABLE_EVENTS_LOGGING}' \
+    ENABLE_LLEMTRY_LOGGING='${ENABLE_LLEMTRY_LOGGING}' \
+    LOG_WORKER_TOKEN='${LOG_WORKER_TOKEN}' \
+    LOG_WORKER_URL='${LOG_WORKER_URL}' \
+    AI_GATEWAY_WORKER_URL='${AI_GATEWAY_WORKER_URL}' \
+    ENABLE_VECTOR_LOG_SHIPPING='${ENABLE_VECTOR_LOG_SHIPPING}' \
+  bash /tmp/deploy-staging/scripts/deploy-config.sh"
+
+# 3. Restart that claw to pick up new config
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart openclaw-personal-claw'
+```
+
+---
+
+## Adding a New Claw
+
+1. Create `deploy/openclaws/<name>/config.env` (copy from `_example-claw/config.env`)
+2. Set per-claw overrides (domain, resources, etc.) in the new `config.env`
+3. SCP deploy files to VPS:
+   ```bash
+   scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r deploy/* ${SSH_USER}@${VPS1_IP}:/tmp/deploy-staging/
+   scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} openclaw-config.env ${SSH_USER}@${VPS1_IP}:/tmp/openclaw-config.env
+   ```
+4. Run `openclaw-multi.sh generate` to update `docker-compose.override.yml`:
+   ```bash
+   ssh ... "bash /tmp/deploy-staging/scripts/openclaw-multi.sh generate"
+   ```
+5. Run `deploy-config.sh` for the new claw:
+   ```bash
+   ssh ... "env INSTANCE_NAME=<name> ... bash /tmp/deploy-staging/scripts/deploy-config.sh"
+   ```
+6. If using `CF_API_TOKEN`, configure tunnel routes and DNS:
+   ```bash
+   ssh ... "bash /tmp/deploy-staging/scripts/openclaw-multi.sh tunnel-config --apply"
+   ```
+7. Start the new claw:
+   ```bash
+   sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d openclaw-<name>'
+   ```
+8. Clean up secrets: `ssh ... "rm -f /tmp/openclaw-config.env"`

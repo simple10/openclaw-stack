@@ -115,6 +115,24 @@ When `CF_API_TOKEN` is set, automate tunnel creation, route configuration, and D
 
 ---
 
+## 0.2c Multi-Claw Detection
+
+Check for additional claws beyond the default `main-claw`:
+
+```bash
+ls -d deploy/openclaws/*/ 2>/dev/null | xargs -I{} basename {} | grep -v '^_'
+```
+
+If only `main-claw` is found (or no directories exist), this is a standard single-claw deployment — proceed normally.
+
+If multiple active claws are found, inform the user:
+
+> "Found N claw configurations: main-claw, personal-claw, ..."
+> "Each will get its own container, domain, and gateway token."
+> "Ensure each claw's `config.env` has the correct `OPENCLAW_DOMAIN` if using separate subdomains."
+
+---
+
 ## 0.3 SSH Check
 
 1. Validate `SSH_KEY_PATH` exists on the local system (default: `~/.ssh/vps1_openclaw_ed25519`).

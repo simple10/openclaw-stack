@@ -49,17 +49,28 @@ ssh -i <SSH_KEY_PATH> -p <SSH_PORT> -o ConnectTimeout=10 adminclaw@<VPS1_IP> "ec
 > **Batch:** Steps 7.1-7.2 run on VPS via SSH; step 7.3 runs locally. Execute VPS checks in one SSH session and worker checks in parallel from the local machine.
 
 ```bash
+# Discover all running claw containers for per-claw checks
+CLAWS=$(sudo docker ps --format '{{.Names}}' --filter 'name=^openclaw-' | grep -v '^openclaw-cli$' | grep -v '^openclaw-sbx-' | sort)
+echo "Claw containers: $CLAWS"
+
 # Check containers are running
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose ps'
 
-# Check gateway logs for errors
-sudo docker logs --tail 50 openclaw-main-claw
+# Check gateway logs for errors (each claw)
+for CLAW in $CLAWS; do
+  echo "=== $CLAW ==="
+  sudo docker logs --tail 50 "$CLAW"
+done
 
-# Test internal endpoint (must include basePath if controlUi.basePath is set)
-curl -s http://localhost:18789<OPENCLAW_DOMAIN_PATH>/ | head -5
+# Test each claw's health endpoint
+for CLAW in $CLAWS; do
+  PORT=$(sudo docker inspect "$CLAW" --format '{{range .NetworkSettings.Ports}}{{range .}}{{.HostPort}}{{end}}{{end}}' | head -1)
+  echo "$CLAW (port $PORT):"
+  curl -s "http://localhost:${PORT}<OPENCLAW_DOMAIN_PATH>/" | head -5
+done
 ```
 
-**Expected:** All containers running, endpoint returns the Control UI HTML.
+**Expected:** All containers running, each endpoint returns the Control UI HTML.
 
 **If containers are not running after reboot:**
 
@@ -69,7 +80,7 @@ curl -s http://localhost:18789<OPENCLAW_DOMAIN_PATH>/ | head -5
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'
 ```
 
-> If they fail to start, check `sudo docker logs openclaw-main-claw` for errors.
+> If they fail to start, check logs: `for CLAW in $CLAWS; do sudo docker logs "$CLAW"; done`
 
 ---
 
@@ -80,28 +91,30 @@ Verify all tool binaries from `deploy/sandbox-toolkit.yaml` are installed and op
 > **Why docker exec into the gateway first?** Sandbox containers run as nested Docker inside the gateway container (Sysbox). To inspect them, you must first enter the gateway, then exec into the sandbox.
 
 ```bash
+FIRST_CLAW=$(echo "$CLAWS" | head -1)
+
 # Get the list of all tool binaries from sandbox-toolkit.yaml
-BINS=$(sudo docker exec --user node openclaw-main-claw \
+BINS=$(sudo docker exec --user node "$FIRST_CLAW" \
   node /app/deploy/parse-toolkit.mjs /app/deploy/sandbox-toolkit.yaml \
   | jq -r '.allBins[]')
 echo "Bins to test: $BINS"
 
 # Find a running sandbox-toolkit container (code or skills agent)
-SANDBOX=$(sudo docker exec --user node openclaw-main-claw \
+SANDBOX=$(sudo docker exec --user node "$FIRST_CLAW" \
   docker ps --filter "ancestor=openclaw-sandbox-toolkit:bookworm-slim" --format '{{.Names}}' | head -1)
 
 # If no sandbox is running, trigger one via the openclaw CLI.
 # This creates the container with correct env (PATH, etc.) from openclaw.json.
 if [ -z "$SANDBOX" ]; then
   echo "No sandbox running — triggering skills agent sandbox..."
-  sudo docker exec --user node openclaw-main-claw \
+  sudo docker exec --user node "$FIRST_CLAW" \
     openclaw agent --agent skills --message ping --timeout 60 >/dev/null 2>&1 &
   AGENT_PID=$!
 
   # Wait for the sandbox container to appear
   for i in $(seq 1 20); do
     sleep 3
-    SANDBOX=$(sudo docker exec --user node openclaw-main-claw \
+    SANDBOX=$(sudo docker exec --user node "$FIRST_CLAW" \
       docker ps --filter "ancestor=openclaw-sandbox-toolkit:bookworm-slim" --format '{{.Names}}' | head -1)
     [ -n "$SANDBOX" ] && break
     echo "  waiting... ($((i*3))s)"
@@ -114,13 +127,13 @@ if [ -z "$SANDBOX" ]; then
   fi
 fi
 
-echo "Testing sandbox: $SANDBOX"
+echo "Testing sandbox: $SANDBOX (via $FIRST_CLAW)"
 
 # Test each binary inside the sandbox — use `which` to verify it's on PATH
 PASS=0; FAIL=0; TOTAL=0
 for bin in $BINS; do
   TOTAL=$((TOTAL+1))
-  if sudo docker exec --user node openclaw-main-claw \
+  if sudo docker exec --user node "$FIRST_CLAW" \
     docker exec "$SANDBOX" which "$bin" > /dev/null 2>&1; then
     echo "  ✓ $bin"
     PASS=$((PASS+1))
@@ -139,8 +152,8 @@ echo "Results: $PASS passed, $FAIL failed, $TOTAL total"
 
 **If tools are missing:**
 
-- Rebuild the sandbox image: `sudo docker exec --user node openclaw-main-claw /app/deploy/rebuild-sandboxes.sh --force`
-- Then recreate containers: `sudo docker exec --user node openclaw-main-claw openclaw sandbox recreate --all --force`
+- Rebuild the sandbox image: `sudo docker exec --user node $FIRST_CLAW /app/deploy/rebuild-sandboxes.sh --force`
+- Then recreate containers: `sudo docker exec --user node $FIRST_CLAW openclaw sandbox recreate --all --force`
 
 ---
 
@@ -349,8 +362,9 @@ openclaw devices list
 Re-run the CLI pairing step from `08-post-deploy.md` § 8.3:
 
 ```bash
+FIRST_CLAW=$(echo "$CLAWS" | head -1)
 GATEWAY_TOKEN=$(sudo grep OPENCLAW_GATEWAY_TOKEN /home/openclaw/openclaw/.env | cut -d= -f2)
-sudo docker exec --user node openclaw-main-claw \
+sudo docker exec --user node "$FIRST_CLAW" \
   openclaw devices list --url ws://localhost:18789 --token "$GATEWAY_TOKEN"
 ```
 
@@ -361,9 +375,14 @@ sudo docker exec --user node openclaw-main-claw \
 Verify deployed gateway resource limits match VPS hardware. Resource limits are configured via `GATEWAY_CPUS` and `GATEWAY_MEMORY` in `openclaw-config.env` (see § 0.4).
 
 ```bash
-# On VPS: query hardware and deployed limits in one command
-nproc && free -b | awk '/^Mem:/{print $2}' && \
-sudo docker inspect openclaw-main-claw --format '{{.HostConfig.NanoCpus}} {{.HostConfig.Memory}}'
+# On VPS: query hardware and deployed limits
+nproc && free -b | awk '/^Mem:/{print $2}'
+
+# Check resource limits for each claw
+for CLAW in $CLAWS; do
+  echo "=== $CLAW ==="
+  sudo docker inspect "$CLAW" --format '{{.HostConfig.NanoCpus}} {{.HostConfig.Memory}}'
+done
 ```
 
 Compare: CPUs should equal `nproc`, memory should be total minus 500M–1GB. NanoCpus = CPUs × 1e9.
@@ -425,8 +444,10 @@ sudo ss -tlnp | grep -E '187(89|90)'
 sudo ss -tlnp
 
 # Verify pids_limit set (prevents fork bombs)
-sudo docker inspect openclaw-main-claw --format '{{.HostConfig.PidsLimit}}'
-# Expected: 1024
+for CLAW in $CLAWS; do
+  echo "$CLAW: $(sudo docker inspect "$CLAW" --format '{{.HostConfig.PidsLimit}}')"
+done
+# Expected: 1024 for each claw
 ```
 
 ```bash
@@ -501,7 +522,8 @@ curl -s -X POST "$LLEMTRY_URL" \
 **3. Plugin startup validation** (on VPS):
 
 ```bash
-sudo docker logs openclaw-main-claw 2>&1 | grep -i '\[telemetry\]'
+FIRST_CLAW=$(echo "$CLAWS" | head -1)
+sudo docker logs "$FIRST_CLAW" 2>&1 | grep -i '\[telemetry\]'
 # Expected: "[telemetry] Plugin registered — outputs: [file:telemetry.log, events:/events, llemtry]"
 # If misconfigured: "[telemetry] events.enabled is true but events.url or events.authToken is missing..."
 ```

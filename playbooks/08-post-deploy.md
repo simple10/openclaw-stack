@@ -103,14 +103,20 @@ Ask the user to open this URL in their browser:
 https://<OPENCLAW_DOMAIN><OPENCLAW_DOMAIN_PATH>/chat?token=<TOKEN>
 ```
 
+> **Multi-claw:** Each claw has its own gateway token. Read per-claw tokens from the deployed config:
+> ```
+> sudo python3 -c "import json; print(json.load(open('/home/openclaw/instances/<CLAW_NAME>/.openclaw/openclaw.json'))['gateway']['auth']['token'])"
+> ```
+> Construct separate URLs for each claw using its domain (from per-claw `config.env`) and token.
+
 **Expected behavior:** The browser will connect to the gateway. Because this is a new (unpaired) device, the gateway will close the WebSocket connection with code `1008: pairing required`. The UI will show a "disconnected" or "pairing required" message. This is normal.
 
 **If the page doesn't load at all (connection error or timeout):**
 
 1. Check the tunnel is running:
    - `ssh ... "sudo systemctl status cloudflared"`
-2. Check the gateway is running: `ssh ... "sudo docker ps | grep openclaw-main-claw"`
-3. Check gateway logs: `ssh ... "sudo docker logs --tail 20 openclaw-main-claw"`
+2. Check the gateway is running: `ssh ... "sudo docker ps --filter 'name=^openclaw-'"`
+3. Check gateway logs: `ssh ... "sudo docker logs --tail 20 openclaw-<name>"`
 4. Verify DNS is resolving to the correct destination
 
 Ask the user to confirm they can see the page (even with the pairing error) before proceeding.
@@ -120,6 +126,8 @@ Ask the user to confirm they can see the page (even with the pairing error) befo
 ## 8.3 Approve Device Pairing
 
 After the user opens the URL and sees "pairing required", approve their device.
+
+> **Multi-claw:** Repeat device pairing for each claw. Use `openclaw --instance <name> devices list` and `openclaw --instance <name> devices approve <requestId>`.
 
 ### Approach 1: Standard CLI Pairing (try first)
 
@@ -353,6 +361,8 @@ ssh -i <SSH_KEY_PATH> -p <SSH_PORT> adminclaw@<VPS1_IP>
 
 All URLs are protected by Cloudflare Access.
 
+> **Multi-claw:** List each claw's URLs in the table with a "Claw" column, using each claw's domain and token.
+
 ---
 
 ### Workers
@@ -443,7 +453,7 @@ Check `HOSTALERT_TELEGRAM_BOT_TOKEN` and `HOSTALERT_TELEGRAM_CHAT_ID` in `opencl
 
 - Hard-refresh the browser page.
 - Check gateway logs for errors after the approval.
-- Verify the gateway container hasn't restarted: `sudo docker ps | grep openclaw-main-claw`
+- Verify the gateway container hasn't restarted: `sudo docker ps --filter 'name=^openclaw-'`
 
 ### Control UI shows "unauthorized" or "disconnected" (was working before)
 
