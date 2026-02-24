@@ -21,7 +21,8 @@ All deployment steps are in modular playbooks under `playbooks/`:
 | `01-workers.md` | Cloudflare Workers deployment (AI Gateway + Log Receiver) |
 | `02-base-setup.md` | Users, SSH, UFW, fail2ban, kernel |
 | `03-docker.md` | Docker installation and hardening |
-| `04-vps1-openclaw.md` | Sysbox, networks, gateway, Vector |
+| `03b-sysbox.md` | Sysbox runtime for secure Docker-in-Docker |
+| `04-vps1-openclaw.md` | Networks, gateway, Vector, host alerter |
 | `06-backup.md` | Backup scripts and cron jobs |
 | `07-verification.md` | Testing and verification |
 | `maintenance.md` | Token rotation, image updates, and maintenance |

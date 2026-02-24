@@ -311,7 +311,7 @@ Deployment Plan:
   1. [Parallel]
      a. Deploy Cloudflare Workers (01-workers.md) — local              ~5 min
      b. Base setup & hardening (02-base-setup.md) — VPS               ~10 min
-  2. Docker installation (03-docker.md)
+  2. Docker + Sysbox (03-docker.md → 03b-sysbox.md)
   3. OpenClaw deployment (04-vps1-openclaw.md)
   4. Backup configuration (06-backup.md)
   5. Reboot & verification (07-verification.md)
@@ -326,7 +326,7 @@ Ask the user to confirm before proceeding with the deployment.
 
 ### Automation directive
 
-After the user confirms, launch **01-workers and 02-base-setup as parallel subagents** (two Task tool calls in a single message). These have no shared dependencies — workers run locally via wrangler while base setup runs on the VPS via SSH. After both subagents return, execute playbooks 03 through 07 **continuously without pausing between steps**. Do not ask for confirmation between playbooks. Only stop if:
+After the user confirms, launch **01-workers and 02-base-setup as parallel subagents** (two Task tool calls in a single message). These have no shared dependencies — workers run locally via wrangler while base setup runs on the VPS via SSH. After both subagents return, execute playbooks 03, 03b, then 04 through 07 **continuously without pausing between steps**. Do not ask for confirmation between playbooks. Only stop if:
 
 - A command fails and the error requires user input to resolve
 - A playbook step explicitly says to wait for user input (e.g., a blocking error with multiple resolution paths)
@@ -346,11 +346,12 @@ A full deployment consumes significant context. To avoid mid-deploy compaction, 
 | 01: Workers deployment | npm install + wrangler deploy output | Worker URLs, auth tokens, D1 database ID | Full file |
 | 02: System update + package install | apt output (hundreds of lines) | pass/fail | Full file |
 | 02: System hardening (2.5–2.9) | swap, fail2ban, kernel config output | pass/fail, cloudflared version | Full file |
-| 04: Sysbox + infra (4.1–4.2) | dpkg + network/directory creation + SCP | pass/fail, OPENCLAW_GENERATED_TOKEN | §4.1–4.2 |
+| 03b: Sysbox runtime | dpkg install + AppArmor check | pass/fail | Full file |
+| 04: Infrastructure setup (4.2) | network/directory creation + SCP | pass/fail, OPENCLAW_GENERATED_TOKEN | §4.2 |
 | 04: Deploy configuration (4.3) | deploy-config.sh runs on VPS | pass/fail | §4.3 |
 | 04: Build + start (4.4) | Full Docker build log | pass/fail | §4.4 |
 
-> **Scoping:** Tell subagents which sections to read (e.g., "Read §4.1–4.2 of playbooks/04-vps1-openclaw.md"). This prevents subagents from loading troubleshooting, updating, and verification sections they don't need.
+> **Scoping:** Tell subagents which sections to read (e.g., "Read §4.2 of playbooks/04-vps1-openclaw.md"). This prevents subagents from loading troubleshooting, updating, and verification sections they don't need.
 
 > **Parallel launch:** 01 and 02 subagents should be launched together in a single message (multiple Task tool calls). Both must return their values before step 04 can begin — 04 needs worker URLs/tokens from 01 and requires Docker (step 03, which depends on 02).
 
@@ -359,7 +360,7 @@ A full deployment consumes significant context. To avoid mid-deploy compaction, 
 **Critical: avoid reading playbooks before delegating.** Do NOT read a playbook into main context and then pass its contents to a subagent — this doubles the context cost. Instead, tell the subagent to read the playbook section itself:
 
 ```
-Read playbooks/04-vps1-openclaw.md (offset: 1, limit: 162) for sections 4.1-4.2 and execute them.
+Read playbooks/04-vps1-openclaw.md §4.2 and execute the infrastructure setup.
 SSH: ssh -i <key> -p <port> <user>@<ip>
 Config values (pass as env vars to setup-infra.sh):
   AI_GATEWAY_WORKER_URL=<value>
