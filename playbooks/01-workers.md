@@ -30,7 +30,7 @@ From `../openclaw-config.env`:
 
 The AI Gateway Worker proxies LLM API requests to providers (Anthropic, OpenAI), keeping real API keys off the VPS. It routes directly to provider APIs by default, or optionally through Cloudflare AI Gateway for analytics/caching when configured.
 
-> **Note:** During deployment, only `AUTH_TOKEN` is set. Provider API keys (e.g., `ANTHROPIC_API_KEY`) and optional CF AI Gateway configuration are added post-deploy — see `08-post-deploy.md` § 8.1 and [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md).
+> **Note:** During deployment, only `AUTH_TOKEN` is set. Provider API keys (e.g., `ANTHROPIC_API_KEY`) and optional CF AI Gateway configuration are added post-deploy — see `08a-configure-llm-proxy.md` and [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md).
 
 ### Setup AI Gateway Worker
 
@@ -94,7 +94,7 @@ curl -s https://<worker-url>/health
 # Expected: {"status":"ok"}
 ```
 
-> **What about provider API keys?** The worker is now deployed and healthy, but won't proxy LLM requests until provider API keys are added. This is configured during post-deploy (`08-post-deploy.md` § 8.1) so the VPS deployment can proceed uninterrupted.
+> **What about provider API keys?** The worker is now deployed and healthy, but won't proxy LLM requests until provider API keys are added. This is configured during post-deploy (`08a-configure-llm-proxy.md`) so the VPS deployment can proceed uninterrupted.
 
 ---
 

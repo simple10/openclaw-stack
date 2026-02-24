@@ -153,7 +153,7 @@ curl -s https://<AI_GATEWAY_WORKER_URL>/health
 
 **Expected:** Returns `{"status":"ok"}`.
 
-> **Note:** The health check passing confirms the worker is deployed and reachable. It does NOT verify that provider API keys (e.g., `ANTHROPIC_API_KEY`) are configured — that is tested during post-deploy (`08-post-deploy.md` § 8.1). On a fresh deploy, the worker is healthy but won't proxy LLM requests until keys are added.
+> **Note:** The health check passing confirms the worker is deployed and reachable. It does NOT verify that provider API keys (e.g., `ANTHROPIC_API_KEY`) are configured — that is tested during post-deploy (`08a-configure-llm-proxy.md`). On a fresh deploy, the worker is healthy but won't proxy LLM requests until keys are added.
 
 **If either worker health check fails:**
 
@@ -469,7 +469,7 @@ openclaw devices list
 
 **If it fails with "pairing required":**
 
-Re-run the CLI pairing step from `08-post-deploy.md` § 8.3:
+Re-run the CLI pairing step from `08b-pair-devices.md`:
 
 ```bash
 FIRST_CLAW=$(echo "$CLAWS" | head -1)
@@ -588,7 +588,7 @@ npx wrangler d1 execute <D1_DATABASE_NAME> --command="SELECT type, category, age
 
 1. **User: Access OpenClaw** via configured domain (authenticate through Cloudflare Access)
 2. **User: Send a test message** via webchat
-3. **User: Verify LLM response** comes back (confirms AI Gateway Worker is routing to a provider). May fail until provider API keys are configured — see `08-post-deploy.md` § 8.1.
+3. **User: Verify LLM response** comes back (confirms AI Gateway Worker is routing to a provider). May fail until provider API keys are configured — see `08a-configure-llm-proxy.md`.
 4. **(CF AI Gateway mode only)** Check Cloudflare AI Gateway dashboard for the request
 5. **Check Cloudflare Workers logs** for container log entries (Workers & Pages -> log-receiver -> Logs)
 
@@ -669,4 +669,4 @@ Deployment is complete when:
 10. Security audit passes with no critical or warning findings
 11. All sandbox toolkit binaries operational in sandbox container (7.1a)
 
-> **Note:** Full end-to-end verification (user authenticating through Cloudflare Access, sending messages) is covered in `08-post-deploy.md` (device pairing) and [`docs/TESTING.md`](../docs/TESTING.md) (browser automation via Chrome DevTools).
+> **Note:** Full end-to-end verification (user authenticating through Cloudflare Access, sending messages) is covered in `08b-pair-devices.md` (device pairing) and [`docs/TESTING.md`](../docs/TESTING.md) (browser automation via Chrome DevTools).

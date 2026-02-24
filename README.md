@@ -542,7 +542,9 @@ openclaw-vps/
     ├── 04-vps1-openclaw.md           # Gateway deployment and configuration
     ├── 06-backup.md                  # Automated backup setup
     ├── 07-verification.md            # Security audit and service verification
-    ├── 08-post-deploy.md             # Domain, tunnel routes, device pairing
+    ├── 08a-configure-llm-proxy.md     # AI proxy provider key setup
+    ├── 08b-pair-devices.md            # Browser & Telegram device pairing
+    ├── 08c-deploy-report.md           # Deployment report generation
     └── maintenance.md                # Token rotation and maintenance procedures
 
 ```

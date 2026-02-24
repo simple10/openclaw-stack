@@ -106,7 +106,7 @@ Capture the `OPENCLAW_GENERATED_TOKEN=<hex>` line from stdout (all other output 
 
 **Record gateway token locally:** Immediately after the script runs, use the `Edit` tool to update the `GATEWAY_TOKEN` and `GATEWAY_URL` values in the `# DEPLOYED:` section of `openclaw-config.env`. Replace the existing `# DEPLOYED: GATEWAY_TOKEN=` and `# DEPLOYED: GATEWAY_URL=` lines with the generated token and composed URL (`https://<OPENCLAW_DOMAIN><OPENCLAW_DOMAIN_PATH>/chat?token=<TOKEN>`). Do NOT use `sed` — it creates backup files on macOS.
 
-> These are comments — `source openclaw-config.env` won't export them. They're a safety net in case the session ends before the deployment report (§ 8.5).
+> These are comments — `source openclaw-config.env` won't export them. They're a safety net in case the session ends before the deployment report (`08c-deploy-report.md`).
 
 ---
 

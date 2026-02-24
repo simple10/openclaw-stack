@@ -6,7 +6,7 @@ Optional configuration steps to run after the automated deployment.
 
 ### Configure Provider API Keys
 
-Provider API keys are configured during post-deploy (`08-post-deploy.md` § 8.1). The automated deployment only sets up the worker infrastructure (`AUTH_TOKEN`).
+Provider API keys are configured during post-deploy (`08a-configure-llm-proxy.md`). The automated deployment only sets up the worker infrastructure (`AUTH_TOKEN`).
 
 The worker supports two modes:
 

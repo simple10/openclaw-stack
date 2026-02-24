@@ -315,12 +315,12 @@ Deployment Plan:
   3. OpenClaw deployment (04-vps1-openclaw.md)
   4. Backup configuration (06-backup.md)
   5. Reboot & verification (07-verification.md)
-  6. Post-deploy: AI proxy configuration, device pairing & deployment report (08-post-deploy.md)
+  6. Post-deploy: AI proxy (08a) → device pairing (08b) → deployment report (08c)
 ```
 
 Domain and Cloudflare Access have been verified.
 
-> **Note:** AI proxy provider API keys (e.g., `ANTHROPIC_API_KEY`) are configured during post-deploy (step 6, `08-post-deploy.md` § 8.1), not during worker deployment (step 1). Worker deployment only sets up the infrastructure (`AUTH_TOKEN`).
+> **Note:** AI proxy provider API keys (e.g., `ANTHROPIC_API_KEY`) are configured during post-deploy (step 6, `08a-configure-llm-proxy.md`), not during worker deployment (step 1). Worker deployment only sets up the infrastructure (`AUTH_TOKEN`).
 
 Ask the user to confirm before proceeding with the deployment.
 
@@ -331,9 +331,9 @@ After the user confirms, launch **01-workers and 02-base-setup as parallel subag
 - A command fails and the error requires user input to resolve
 - A playbook step explicitly says to wait for user input (e.g., a blocking error with multiple resolution paths)
 - **SSH verification (02-base-setup.md § 2.4 Step 3):** You MUST test SSH on port `<SSH_HARDENED_PORT>` from the local machine and confirm it works before proceeding. This is a mandatory stop point — do not skip it during automated deployment.
-- **07-verification.md:** Run in the main context (not a subagent) so the user sees real-time progress and errors can be handled directly. By this point, all heavy steps have been offloaded to subagents and the context window has room. Report the summary table before proceeding to 08-post-deploy.md.
+- **07-verification.md:** Run in the main context (not a subagent) so the user sees real-time progress and errors can be handled directly. By this point, all heavy steps have been offloaded to subagents and the context window has room. Report the summary table before proceeding to 08a-configure-llm-proxy.md.
 
-Normal informational output (progress updates, version notes, check results) should be reported inline without pausing. The first user interaction after confirmation should be device pairing in `08-post-deploy.md`.
+Normal informational output (progress updates, version notes, check results) should be reported inline without pausing. The first user interaction after confirmation should be device pairing in `08b-pair-devices.md`.
 
 ### Context window management
 

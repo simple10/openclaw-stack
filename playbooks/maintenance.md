@@ -41,7 +41,7 @@ sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose restart op
 
 > **Note:** The shared `.env` contains `OPENCLAW_GATEWAY_TOKEN` from initial setup, but this is not used by multi-claw containers. Each claw reads its token from its own `openclaw.json`. You do not need to update `.env` when rotating a claw's token.
 
-> **Verify:** Run § 7.1 — each rotated claw's health endpoint responds. Re-pair devices per `08-post-deploy.md` § 8.3.
+> **Verify:** Run § 7.1 — each rotated claw's health endpoint responds. Re-pair devices per `08b-pair-devices.md`.
 
 #### AI Gateway Auth Token
 

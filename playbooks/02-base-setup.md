@@ -154,7 +154,7 @@ echo "========================================="
 
 **Record passwords locally:** Immediately after the script above runs, use the `Edit` tool to update the `ADMINCLAW_PASSWORD` and `OPENCLAW_PASSWORD` values in the `# DEPLOYED:` section of `openclaw-config.env`. Replace the existing `# DEPLOYED: ADMINCLAW_PASSWORD=` and `# DEPLOYED: OPENCLAW_PASSWORD=` lines with the generated passwords. Do NOT use `sed` — it creates backup files on macOS.
 
-> These are comments — `source openclaw-config.env` won't export them. They're a safety net in case the session ends before the deployment report (§ 8.5).
+> These are comments — `source openclaw-config.env` won't export them. They're a safety net in case the session ends before the deployment report (`08c-deploy-report.md`).
 
 **Workflow after setup:**
 
