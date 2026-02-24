@@ -18,7 +18,7 @@ fi
 
 source "$CONFIG_FILE"
 
-COMPOSE_DIR="/home/openclaw/openclaw"
+COMPOSE_DIR="${INSTALL_DIR:-/home/openclaw}/openclaw"
 COMPOSE_ARGS=("logs")
 
 if [[ "${1:-}" == "--no-follow" ]]; then

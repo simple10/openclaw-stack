@@ -224,9 +224,11 @@ def categorize_error(text):
 # ─── Session Discovery ───────────────────────────────────────────────────────
 
 
+_install_dir = os.environ.get("INSTALL_DIR", "/home/openclaw")
+
 DEFAULT_PATHS = [
     "/home/node/.openclaw/agents",  # Inside gateway container
-    "/home/openclaw/.openclaw/agents",  # On host via Sysbox mapping
+    f"{_install_dir}/.openclaw/agents",  # On host via Sysbox mapping
 ]
 
 
@@ -528,9 +530,9 @@ MODEL_PRICING = {
 
 DEFAULT_LLM_LOG_PATHS = [
     "/home/node/.openclaw/logs/telemetry.log",
-    "/home/openclaw/.openclaw/logs/telemetry.log",
+    f"{_install_dir}/.openclaw/logs/telemetry.log",
     "/home/node/.openclaw/logs/llm.log",        # legacy fallback
-    "/home/openclaw/.openclaw/logs/llm.log",     # legacy fallback
+    f"{_install_dir}/.openclaw/logs/llm.log",     # legacy fallback
 ]
 
 

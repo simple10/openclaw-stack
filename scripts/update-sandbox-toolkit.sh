@@ -67,7 +67,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 GATEWAY=$(resolve_gateway ${INSTANCE_ARGS[@]+"${INSTANCE_ARGS[@]}"}) || exit 1
-OPENCLAW_DIR="/home/openclaw/openclaw"
+OPENCLAW_DIR="${INSTALL_DIR:-/home/openclaw}/openclaw"
 
 # Files to sync: local path -> VPS host path
 # These are bind-mounted into the container (docker-compose.override.yml lines 48-52)

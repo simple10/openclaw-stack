@@ -32,7 +32,7 @@ fi
 
 printf '\033[33mRestarting %s...\033[0m\n' "$GATEWAY"
 TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
-  "sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart $GATEWAY'"
+  "sudo -u openclaw bash -c 'cd ${INSTALL_DIR:-/home/openclaw}/openclaw && docker compose restart $GATEWAY'"
 
 # Wait for gateway to be healthy
 printf '\033[33mWaiting for gateway to be healthy...\033[0m\n'

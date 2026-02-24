@@ -27,7 +27,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-SESSIONS_DIR="/home/openclaw/.openclaw/agents/${AGENT}/sessions"
+SESSIONS_DIR="${INSTALL_DIR:-/home/openclaw}/.openclaw/agents/${AGENT}/sessions"
 
 if $LIST_MODE; then
   $SSH_CMD "sudo python3 -c \"

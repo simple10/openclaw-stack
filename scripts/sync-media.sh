@@ -18,7 +18,7 @@ fi
 source "$CONFIG_FILE"
 
 LOCAL_DIR="${1:-$SCRIPT_DIR/../media}"
-REMOTE_PATH="/home/openclaw/.openclaw/media/"
+REMOTE_PATH="${INSTALL_DIR:-/home/openclaw}/.openclaw/media/"
 
 mkdir -p "$LOCAL_DIR"
 
