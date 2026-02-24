@@ -28,22 +28,25 @@ for inst_dir in "${INSTANCES_DIR}"/*/; do
   chown 1000:1000 "${BACKUP_DIR}"
 
   # Create backup of this claw's config and data
+  # || true: continue to other instances if one fails (error still printed)
   tar -czf "${BACKUP_FILE}" \
       -C "${inst_dir}" \
       .openclaw/openclaw.json \
       .openclaw/credentials \
       .openclaw/workspace \
       sandboxes-home \
-      2>/dev/null || true
+      || true
 
   # Set ownership so container can also access backups if needed
-  chown 1000:1000 "${BACKUP_FILE}"
+  if [ -f "${BACKUP_FILE}" ]; then
+    chown 1000:1000 "${BACKUP_FILE}"
+  fi
 
-  # Verify
-  if tar -tzf "${BACKUP_FILE}" > /dev/null 2>&1; then
+  # Verify archive integrity
+  if [ -f "${BACKUP_FILE}" ] && tar -tzf "${BACKUP_FILE}" > /dev/null 2>&1; then
       echo "$(date): Backup created for ${inst_name}: ${BACKUP_FILE}"
   else
-      echo "$(date): Backup failed for ${inst_name}!"
+      echo "$(date): Backup FAILED for ${inst_name} — check disk space and permissions" >&2
   fi
 
   # Cleanup old backups for this instance

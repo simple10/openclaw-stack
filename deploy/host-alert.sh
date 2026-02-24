@@ -351,10 +351,13 @@ $(printf '  - %s\n' "${alerts[@]}")"
 fi
 
 hostname=$(hostname)
-curl -s "https://api.telegram.org/bot${HOSTALERT_TELEGRAM_BOT_TOKEN}/sendMessage" \
+response=$(curl -s "https://api.telegram.org/bot${HOSTALERT_TELEGRAM_BOT_TOKEN}/sendMessage" \
   -d "chat_id=${HOSTALERT_TELEGRAM_CHAT_ID}" \
   -d "text=${hostname}: ${message}" \
-  -d "parse_mode=HTML" \
-  >/dev/null 2>&1
+  -d "parse_mode=HTML")
+
+if ! echo "$response" | grep -q '"ok":true'; then
+  echo "$(date): Telegram alert send failed: $response" >&2
+fi
 
 exit 0
