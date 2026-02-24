@@ -192,15 +192,17 @@ Read current gateway resource limits from `GATEWAY_CPUS` and `GATEWAY_MEMORY` in
 
 ### Expected Values
 
-- **CPUs:** `GATEWAY_CPUS` should equal the VPS CPU count from `nproc`
-- **Memory:** `GATEWAY_MEMORY` should be total VPS memory minus 500M–1GB
-  - Vector uses ~128M, system/kernel needs ~500M
-  - Formula: `total_memory - 750M` (midpoint) is a good default
-  - Acceptable range: `total - 1G` to `total - 500M`
+`GATEWAY_CPUS` and `GATEWAY_MEMORY` are **per-container** limits — each claw gets these resources. With multiple claws, divide the available VPS resources by the number of active claws.
+
+1. Count active claws from § 0.2c (directories in `deploy/openclaws/` excluding `_`-prefixed).
+2. Calculate system overhead: Vector (~128M) + system/kernel (~500M) = ~750M total.
+3. Compute per-claw resources:
+   - **CPUs per claw:** `floor(nproc / claw_count)`
+   - **Memory per claw:** `floor((total_memory - 750M) / claw_count)`, rounded down to nearest 0.5G
 
 ### Action
 
-**If values match** (CPUs equal, memory within the 500M–1G buffer range): Report that resource limits look correct and continue.
+**If values match** (per-claw CPUs and memory within expected range): Report that resource limits look correct and continue.
 
 **If mismatch detected or not yet set:** Show the user a comparison:
 
@@ -208,14 +210,16 @@ Read current gateway resource limits from `GATEWAY_CPUS` and `GATEWAY_MEMORY` in
 VPS Resources:
   CPUs:   <nproc result>
   Memory: <total from free, human-readable>
+  Active claws: <count> (<names>)
 
-Current gateway limits (openclaw-config.env):
+Current per-claw limits (openclaw-config.env):
   GATEWAY_CPUS:   <current value or "(default: 6)">
   GATEWAY_MEMORY: <current value or "(default: 10.5G)">
 
-Recommended gateway limits:
-  GATEWAY_CPUS:   <nproc result>
-  GATEWAY_MEMORY: <total - 750M, rounded to nearest 0.5G>
+Recommended per-claw limits (<count> claws):
+  GATEWAY_CPUS:   <floor(nproc / claw_count)>
+  GATEWAY_MEMORY: <floor((total - 750M) / claw_count), rounded to 0.5G>
+  Total allocated: <cpus * count> CPUs, <memory * count> memory
 ```
 
 Ask the user if they want to adjust the limits. They may choose:
@@ -224,7 +228,7 @@ Ask the user if they want to adjust the limits. They may choose:
 - Enter custom values
 - Keep the current values (skip)
 
-If the user confirms changes, update `GATEWAY_CPUS` and `GATEWAY_MEMORY` in `openclaw-config.env`. Also check that `reservations.cpus` in `deploy/docker-compose.override.yml` does not exceed the new CPU limit (reservation cannot exceed limit).
+If the user confirms changes, update `GATEWAY_CPUS` and `GATEWAY_MEMORY` in `openclaw-config.env`. Per-claw overrides can also be set in each claw's `config.env` (e.g., `deploy/openclaws/main-claw/config.env`) using `GATEWAY_CPUS` and `GATEWAY_MEMORY` — these override the global defaults for that specific claw.
 
 ---
 
