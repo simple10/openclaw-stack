@@ -1,0 +1,17 @@
+# .github/workflows/sync-releases.yml
+name: Sync release branches
+
+on:
+  push:
+    branches: ['release/**']
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          git remote add public-repo https://x-access-token:${{ secrets.PUBLIC_REPO_TOKEN }}@github.com/simple10/openclaude.git
+          git push public-repo HEAD:${{ github.ref_name }}
