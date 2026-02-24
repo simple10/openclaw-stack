@@ -16,6 +16,7 @@ set -euo pipefail
 #   stop            Docker compose down
 #   status          Show running instance containers
 #   tunnel-config   Print Cloudflare tunnel rules for all instances
+#     --apply         Apply routes via CF API (requires CF_API_TOKEN)
 
 # Resolve paths relative to the deploy directory
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -477,6 +478,38 @@ cmd_status() {
 }
 
 cmd_tunnel_config() {
+  local apply=false
+  local extra_args=()
+
+  # Parse flags
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --apply)    apply=true; shift ;;
+      --instance) extra_args+=(--instance "$2"); shift 2 ;;
+      *)          die "Unknown flag for tunnel-config: $1" ;;
+    esac
+  done
+
+  if [ "$apply" = true ]; then
+    # Apply routes via CF API
+    local cf_script="${SCRIPT_DIR}/cf-tunnel-setup.sh"
+    [ -x "$cf_script" ] || die "cf-tunnel-setup.sh not found at ${cf_script}"
+    # Source config to get CF_API_TOKEN if not already in environment
+    local config_env="${REPO_ROOT}/openclaw-config.env"
+    if [ -z "${CF_API_TOKEN:-}" ] && [ -f "$config_env" ]; then
+      set -a; source "$config_env"; set +a
+    fi
+    [ -n "${CF_API_TOKEN:-}" ] || die "CF_API_TOKEN required for --apply. Set it in openclaw-config.env or environment."
+    exec "$cf_script" setup-routes "${extra_args[@]}"
+  fi
+
+  # Default: print rules (existing behavior)
+  # Source config to check for CF_API_TOKEN (for --apply hint)
+  local config_env="${REPO_ROOT}/openclaw-config.env"
+  if [ -z "${CF_API_TOKEN:-}" ] && [ -f "$config_env" ]; then
+    CF_API_TOKEN=$(grep -E '^CF_API_TOKEN=' "$config_env" 2>/dev/null | cut -d= -f2- | tr -d '"' || true)
+  fi
+
   local instances
   mapfile -t instances < <(discover_instances)
   [ ${#instances[@]} -gt 0 ] || die "No active instances found"
@@ -488,6 +521,10 @@ cmd_tunnel_config() {
   echo ""
   echo "Add these routes in: CF Dashboard > Zero Trust > Networks > Tunnels > Configure"
   echo "Order matters — more specific paths first, then catch-all."
+  if [ -n "${CF_API_TOKEN:-}" ]; then
+    echo ""
+    echo "Tip: Run 'openclaw-multi.sh tunnel-config --apply' to configure these automatically via CF API."
+  fi
   echo ""
   echo "| Subdomain | Path | Service | URL |"
   echo "|-----------|------|---------|-----|"
@@ -528,7 +565,7 @@ Commands:
   start                   Generate + docker compose up -d
   stop                    Docker compose down
   status                  Show running instance containers
-  tunnel-config           Print Cloudflare tunnel rules for all instances
+  tunnel-config [--apply] Print Cloudflare tunnel rules (--apply to configure via CF API)
 
 Instance directories: deploy/openclaws/<name>/
   - Active: any name without _ prefix + has config.env
@@ -546,7 +583,7 @@ case "$command" in
   start)          cmd_start ;;
   stop)           cmd_stop ;;
   status)         cmd_status ;;
-  tunnel-config)  cmd_tunnel_config ;;
+  tunnel-config)  cmd_tunnel_config "$@" ;;
   -h|--help|"")   usage ;;
   *)              die "Unknown command: ${command}. Run with --help for usage." ;;
 esac

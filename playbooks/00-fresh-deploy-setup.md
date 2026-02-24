@@ -11,7 +11,7 @@ This playbook validates the configuration needed to deploy OpenClaw on a fresh U
 - A fresh Ubuntu VPS (>= 24.04) with root/sudo access
 - An SSH key pair for VPS access
 - A Cloudflare account with a domain
-- Cloudflare Tunnel created with public hostname routes configured
+- Cloudflare Tunnel token (`CF_TUNNEL_TOKEN`, manual) OR Cloudflare API token (`CF_API_TOKEN`, automated)
 - Cloudflare Access application protecting the domain
 
 ---
@@ -39,7 +39,7 @@ Then ask the user to fill in the required values (see section 0.2).
 Validate all of these fields:
 
 1. **`VPS1_IP`** — Must be set and not a placeholder (not `x.x.x.x` or containing `<`).
-2. **`CF_TUNNEL_TOKEN`** — Must not be empty.
+2. **`CF_TUNNEL_TOKEN`** or **`CF_API_TOKEN`** — At least one must be non-empty. If both are empty, report: "Set `CF_TUNNEL_TOKEN` (manual — create tunnel in CF Dashboard) or `CF_API_TOKEN` (automated — Claude creates tunnel + routes + DNS). See [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md)."
 3. **`OPENCLAW_DOMAIN`** — Must not be a placeholder (no `<example>` or angle brackets).
 4. **`OPENCLAW_DASHBOARD_DOMAIN`** — Must not be a placeholder.
 5. **`OPENCLAW_DASHBOARD_DOMAIN_PATH`** — Validated (can be empty for separate subdomain, or a path like `/browser`).
@@ -54,8 +54,9 @@ Report **all** issues at once (don't stop at the first one). Present them as:
 > **Configuration issues found:**
 >
 > - `VPS1_IP` is still a placeholder (`x.x.x.x`) — set it to your VPS public IP
-> - `CF_TUNNEL_TOKEN` is empty — create a tunnel in Cloudflare Dashboard and paste
->   the token (see [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md))
+> - `CF_TUNNEL_TOKEN` and `CF_API_TOKEN` are both empty — set one:
+>   `CF_TUNNEL_TOKEN` (manual — create tunnel in CF Dashboard) or
+>   `CF_API_TOKEN` (automated — see [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md))
 > - `OPENCLAW_DOMAIN` is still a placeholder — set it to your actual domain
 >   (e.g., `openclaw.yourdomain.com`). You need to configure Cloudflare Tunnel
 >   public hostname routes first (see [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md))
@@ -67,6 +68,50 @@ Report **all** issues at once (don't stop at the first one). Present them as:
 > Update `openclaw-config.env` and let me know when ready.
 
 Wait for user to fix all issues before continuing. Re-validate after they confirm.
+
+---
+
+## 0.2b Automated Tunnel Setup (CF_API_TOKEN)
+
+**Skip this section entirely if `CF_API_TOKEN` is not set.** The manual flow (user already has `CF_TUNNEL_TOKEN`) is unchanged.
+
+When `CF_API_TOKEN` is set, automate tunnel creation, route configuration, and DNS setup:
+
+1. **Verify token permissions:**
+   ```bash
+   deploy/scripts/cf-tunnel-setup.sh verify
+   ```
+   If verification fails, report the missing permissions and link to the API token creation page.
+
+2. **List existing tunnels:**
+   ```bash
+   deploy/scripts/cf-tunnel-setup.sh list-tunnels
+   ```
+
+3. **Prompt user:** Use an existing tunnel or create a new one?
+   - If existing: user selects from the list, then fetch the tunnel token:
+     ```bash
+     deploy/scripts/cf-tunnel-setup.sh get-token <tunnel-id>
+     ```
+   - If new: ask for a tunnel name (default: `openclaw`), then create:
+     ```bash
+     deploy/scripts/cf-tunnel-setup.sh create-tunnel <name>
+     ```
+     This outputs `TUNNEL_ID=...` and `CF_TUNNEL_TOKEN=...`.
+
+4. **Write `CF_TUNNEL_TOKEN`** to `openclaw-config.env` (the value from step 3).
+
+5. **Configure routes + DNS:**
+   ```bash
+   deploy/scripts/cf-tunnel-setup.sh setup-routes
+   ```
+   This reads all instance configs, configures tunnel ingress rules, and creates DNS CNAME records.
+
+6. **Report** what was configured (routes, DNS records created). Remind the user that Cloudflare Access still needs manual setup (see § 0.5).
+
+> **Multi-instance note:** When using `CF_API_TOKEN` with multiple claws, a single Cloudflare Access
+> application with a wildcard domain (e.g., `openclaw*.example.com` or `*claw.example.com`) can
+> protect all instance subdomains. This must still be configured manually in the CF Dashboard.
 
 ---
 
@@ -199,6 +244,10 @@ Wait for user to confirm. Re-run the curl check to verify.
 > Let me know when you've completed these steps."
 
 Wait for user. Re-check.
+
+> **Multi-instance with CF_API_TOKEN:** When using automated tunnel setup with multiple claws,
+> a single Cloudflare Access application with a wildcard domain (e.g., `openclaw*.example.com`)
+> can protect all instance subdomains. This must still be configured manually in the CF Dashboard.
 
 ### Also verify the browser VNC domain
 

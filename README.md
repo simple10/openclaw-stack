@@ -51,6 +51,9 @@ Check out this guide on [OpenClaw hosting](https://proclaw.co/resources/openclaw
 
 1. Claude subscription - Pro/Max for Claude Code
 2. Cloudflare Account (free)
+3. A Cloudflare Tunnel token **or** API token:
+   - **`CF_TUNNEL_TOKEN`** — create a tunnel manually in the [CF Dashboard](https://one.dash.cloudflare.com/) and copy the token
+   - **`CF_API_TOKEN`** — create an [API token](https://dash.cloudflare.com/profile/api-tokens) with Tunnel Edit + DNS Edit permissions, and Claude automates the rest (tunnel creation, route config, DNS records)
 
 About 30 min for the first deploy. Claude does a LOT of work on your VPS to get OpenClaw securely deployed.
 
@@ -94,7 +97,7 @@ required config setup, git clone this repo, and automate the deploy.
 
 ### Manual Steps
 
-1. Create a **[new VPS](docs/VPS-SETUP-GUIDE.md)** and [Cloudflare Tunnel](docs/CLOUDFLARE-TUNNEL.md)
+1. Create a **[new VPS](docs/VPS-SETUP-GUIDE.md)** and set up a [Cloudflare Tunnel](docs/CLOUDFLARE-TUNNEL.md) (manual token or API token)
 2. Clone this repo
 3. Run `claude` in this repo dir, just say `start`
 
