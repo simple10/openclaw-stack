@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Interactive TUI for OpenClaw session debug & analytics.
- * Run: bun scripts/debug-sessions/main.ts
+ * Run: bun scripts/lib/logs-explorer/main.ts
  */
 
 import {

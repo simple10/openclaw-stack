@@ -1,6 +1,6 @@
 // data/logs.mjs — Session & LLM log parsing for the OpenClaw dashboard logs explorer.
 // Reads JSONL session transcripts and LLM log files directly from the filesystem.
-// Ported from scripts/debug-sessions/debug-sessions.py. Zero dependencies.
+// Ported from scripts/lib/log-explorer/debug-sessions.py. Zero dependencies.
 
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, basename } from 'node:path'
@@ -11,12 +11,12 @@ const LLM_LOG = join(OPENCLAW_PATH, 'logs/llm.log')
 
 // Per-million-token pricing (input, output, cache_read, cache_write)
 const MODEL_PRICING = {
-  'claude-opus-4': [15.0, 75.0, 1.50, 18.75],
-  'claude-sonnet-4': [3.0, 15.0, 0.30, 3.75],
-  'claude-haiku-4': [0.80, 4.0, 0.08, 1.00],
-  'claude-3-5-sonnet': [3.0, 15.0, 0.30, 3.75],
-  'claude-3-5-haiku': [0.80, 4.0, 0.08, 1.00],
-  'claude-3-opus': [15.0, 75.0, 1.50, 18.75],
+  'claude-opus-4': [15.0, 75.0, 1.5, 18.75],
+  'claude-sonnet-4': [3.0, 15.0, 0.3, 3.75],
+  'claude-haiku-4': [0.8, 4.0, 0.08, 1.0],
+  'claude-3-5-sonnet': [3.0, 15.0, 0.3, 3.75],
+  'claude-3-5-haiku': [0.8, 4.0, 0.08, 1.0],
+  'claude-3-opus': [15.0, 75.0, 1.5, 18.75],
 }
 
 // Sorted by key length descending for prefix matching
@@ -86,8 +86,8 @@ function extractText(content) {
   if (typeof content === 'string') return content
   if (Array.isArray(content)) {
     return content
-      .filter(b => typeof b === 'object' && b && b.type === 'text')
-      .map(b => b.text || '')
+      .filter((b) => typeof b === 'object' && b && b.type === 'text')
+      .map((b) => b.text || '')
       .join('\n')
   }
   return ''
@@ -96,13 +96,20 @@ function extractText(content) {
 function isErrorResult(msg) {
   if (msg.isError) return true
   const details = msg.details
-  if (details && typeof details === 'object' && (details.status === 'error' || details.status === 'forbidden')) return true
+  if (
+    details &&
+    typeof details === 'object' &&
+    (details.status === 'error' || details.status === 'forbidden')
+  )
+    return true
   const text = extractText(msg.content || '')
   if (!text) return false
   try {
     const parsed = JSON.parse(text)
     if (parsed && typeof parsed === 'object' && parsed.status === 'error') return true
-  } catch { /* not JSON */ }
+  } catch {
+    /* not JSON */
+  }
   if (text.includes("Can't reach") && text.toLowerCase().includes('browser')) return true
   return false
 }
@@ -111,23 +118,28 @@ function categorizeError(text) {
   const t = text.toLowerCase()
   if (t.includes('escapes sandbox') || t.includes('sandbox root')) return 'sandbox'
   if (t.includes("can't reach") && t.includes('browser')) return 'browser'
-  if (['network', 'dns', 'econnrefused', 'etimedout'].some(w => t.includes(w))) return 'network'
-  if (['permission', 'eacces', 'forbidden'].some(w => t.includes(w))) return 'permission'
-  if (['not found', 'enoent', 'no such file'].some(w => t.includes(w))) return 'filesystem'
-  if (['401', '403', 'unauthorized'].some(w => t.includes(w))) return 'auth'
-  if (['too long', 'overflow', 'context'].some(w => t.includes(w))) return 'context'
+  if (['network', 'dns', 'econnrefused', 'etimedout'].some((w) => t.includes(w))) return 'network'
+  if (['permission', 'eacces', 'forbidden'].some((w) => t.includes(w))) return 'permission'
+  if (['not found', 'enoent', 'no such file'].some((w) => t.includes(w))) return 'filesystem'
+  if (['401', '403', 'unauthorized'].some((w) => t.includes(w))) return 'auth'
+  if (['too long', 'overflow', 'context'].some((w) => t.includes(w))) return 'context'
   return 'other'
 }
 
 function toolCallSummary(name, args) {
   if (typeof args === 'string') {
-    try { args = JSON.parse(args) } catch { return args }
+    try {
+      args = JSON.parse(args)
+    } catch {
+      return args
+    }
   }
   if (!args || typeof args !== 'object') return String(args || '')
   if (name === 'exec') return args.command || args.cmd || ''
   if (name === 'read' || name === 'write') return args.path || args.file || ''
   if (name === 'browser') return `${args.action || ''} ${args.url || ''}`.trim()
-  if (name === 'sessions_spawn' || name === 'sessions_send') return `-> ${args.agent || args.agentId || ''}`
+  if (name === 'sessions_spawn' || name === 'sessions_send')
+    return `-> ${args.agent || args.agentId || ''}`
   if (name === 'gateway') return args.action || ''
   if (name === 'image') return 'screenshot'
   return JSON.stringify(args)
@@ -138,9 +150,11 @@ function toolCallSummary(name, args) {
 function agentDirs() {
   try {
     return readdirSync(AGENTS_BASE, { withFileTypes: true })
-      .filter(d => d.isDirectory())
-      .map(d => d.name)
-  } catch { return [] }
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name)
+  } catch {
+    return []
+  }
 }
 
 // ── Session discovery ───────────────────────────────────────────────
@@ -152,13 +166,22 @@ function discoverSessions(agentFilter) {
   for (const agentId of dirs) {
     const sessDir = join(AGENTS_BASE, agentId, 'sessions')
     let entries
-    try { entries = readdirSync(sessDir) } catch { continue }
+    try {
+      entries = readdirSync(sessDir)
+    } catch {
+      continue
+    }
 
     for (const fname of entries) {
       if (!fname.includes('.jsonl') || fname === 'sessions.json') continue
       const filepath = join(sessDir, fname)
       let stat
-      try { stat = statSync(filepath); if (!stat.isFile()) continue } catch { continue }
+      try {
+        stat = statSync(filepath)
+        if (!stat.isFile()) continue
+      } catch {
+        continue
+      }
 
       const parts = fname.split('.jsonl')
       const sessionId = parts[0]
@@ -188,10 +211,18 @@ function discoverSessions(agentFilter) {
 function parseSessionFile(filepath) {
   const records = []
   let content
-  try { content = readFileSync(filepath, 'utf8') } catch { return records }
+  try {
+    content = readFileSync(filepath, 'utf8')
+  } catch {
+    return records
+  }
   for (const line of content.split('\n')) {
     if (!line) continue
-    try { records.push(JSON.parse(line)) } catch { /* skip */ }
+    try {
+      records.push(JSON.parse(line))
+    } catch {
+      /* skip */
+    }
   }
   return records
 }
@@ -342,10 +373,10 @@ function analyzeSession(records) {
 function findSession(sessionId, agentFilter) {
   const all = discoverSessions(agentFilter)
   // Exact match
-  const exact = all.filter(s => s.sessionId === sessionId)
+  const exact = all.filter((s) => s.sessionId === sessionId)
   if (exact.length) return exact[exact.length - 1]
   // Prefix match
-  const prefix = all.filter(s => s.sessionId.startsWith(sessionId))
+  const prefix = all.filter((s) => s.sessionId.startsWith(sessionId))
   if (prefix.length === 1) return prefix[0]
   return null
 }
@@ -366,12 +397,21 @@ function estimateCost(model, inputTok, outputTok, cacheRead = 0, cacheWrite = 0)
   const pricing = matchModelPricing(model)
   if (!pricing) return null
   const [pIn, pOut, pCr, pCw] = pricing
-  return inputTok * pIn / 1e6 + outputTok * pOut / 1e6 + cacheRead * pCr / 1e6 + cacheWrite * pCw / 1e6
+  return (
+    (inputTok * pIn) / 1e6 +
+    (outputTok * pOut) / 1e6 +
+    (cacheRead * pCr) / 1e6 +
+    (cacheWrite * pCw) / 1e6
+  )
 }
 
 function parseLlmLog() {
   let content
-  try { content = readFileSync(LLM_LOG, 'utf8') } catch { return [] }
+  try {
+    content = readFileSync(LLM_LOG, 'utf8')
+  } catch {
+    return []
+  }
 
   const pendingInputs = {}
   const calls = []
@@ -379,7 +419,11 @@ function parseLlmLog() {
   for (const line of content.split('\n')) {
     if (!line) continue
     let entry
-    try { entry = JSON.parse(line) } catch { continue }
+    try {
+      entry = JSON.parse(line)
+    } catch {
+      continue
+    }
 
     const event = entry.event
     if (event !== 'llm_input' && event !== 'llm_output') continue
@@ -403,7 +447,9 @@ function parseLlmLog() {
       const cost = estimateCost(model, inputTok, outputTok, cacheRead, cacheWrite)
 
       const toolCalls = entry.toolCalls || []
-      const toolNames = toolCalls.filter(tc => tc && typeof tc === 'object').map(tc => tc.name || '?')
+      const toolNames = toolCalls
+        .filter((tc) => tc && typeof tc === 'object')
+        .map((tc) => tc.name || '?')
 
       calls.push({
         timestamp: entry.timestamp || inp.timestamp,
@@ -459,12 +505,8 @@ export async function getSessions(agentFilter) {
         stopReason: a.stopReason,
         firstMessage: truncate(a.firstUserMsg, 200),
         model: a.model || '',
-        durationSeconds: a.firstTs && a.lastTs
-          ? Math.round((a.lastTs - a.firstTs) / 1000)
-          : null,
-        durationDisplay: a.firstTs && a.lastTs
-          ? fmtDuration((a.lastTs - a.firstTs) / 1000)
-          : '',
+        durationSeconds: a.firstTs && a.lastTs ? Math.round((a.lastTs - a.firstTs) / 1000) : null,
+        durationDisplay: a.firstTs && a.lastTs ? fmtDuration((a.lastTs - a.firstTs) / 1000) : '',
         totalTokens: a.tokens.totalTokens || 0,
         totalTokensDisplay: humanTokens(a.tokens.totalTokens || 0),
       })
@@ -482,8 +524,14 @@ export async function getSessions(agentFilter) {
   if (agentFilter) return work()
 
   sessionsPending = work()
-    .then(d => { sessionsCache = d; sessionsCacheAt = Date.now(); return d })
-    .finally(() => { sessionsPending = null })
+    .then((d) => {
+      sessionsCache = d
+      sessionsCacheAt = Date.now()
+      return d
+    })
+    .finally(() => {
+      sessionsPending = null
+    })
   return sessionsPending
 }
 
@@ -505,14 +553,14 @@ export async function getLlmCalls(agentFilter, modelFilter, sessionFilter) {
     llmCacheAt = Date.now()
   }
 
-  if (agentFilter) calls = calls.filter(c => c.agentId === agentFilter)
+  if (agentFilter) calls = calls.filter((c) => c.agentId === agentFilter)
   if (modelFilter) {
     const mf = modelFilter.toLowerCase()
-    calls = calls.filter(c => (c.model || '').toLowerCase().includes(mf))
+    calls = calls.filter((c) => (c.model || '').toLowerCase().includes(mf))
   }
-  if (sessionFilter) calls = calls.filter(c => c.sessionId === sessionFilter)
+  if (sessionFilter) calls = calls.filter((c) => c.sessionId === sessionFilter)
 
-  return calls.map(c => ({
+  return calls.map((c) => ({
     ...c,
     costDisplay: c.cost != null ? fmtCost(c.cost) : '?',
     inputTokensDisplay: humanTokens(c.inputTokens),
@@ -556,10 +604,10 @@ export async function getSummary() {
   }
 
   // Unique agents list
-  const agents = [...new Set(sessions.map(s => s.agent))].sort()
+  const agents = [...new Set(sessions.map((s) => s.agent))].sort()
 
   // Unique models list
-  const models = [...new Set(llmCalls.map(c => c.model).filter(Boolean))].sort()
+  const models = [...new Set(llmCalls.map((c) => c.model).filter(Boolean))].sort()
 
   return {
     totalSessions,
@@ -619,7 +667,7 @@ export async function getSessionMetrics(sessionId, agent) {
     stopReason: a.stopReason,
     tools: a.tools,
     errors: a.errors,
-    turns: a.turns.map(t => ({
+    turns: a.turns.map((t) => ({
       ...t,
       inputTokensDisplay: humanTokens(t.inputTokens),
       outputTokensDisplay: humanTokens(t.outputTokens),
@@ -648,7 +696,10 @@ export async function getSessionTrace(sessionId, agent) {
       const ts = parseTimestamp(record.timestamp)
       if (ts) entries.push({ type: 'session_start', text: ts.toISOString() })
     } else if (rtype === 'model_change') {
-      entries.push({ type: 'model_change', text: `${record.provider || '?'}:${record.modelId || '?'}` })
+      entries.push({
+        type: 'model_change',
+        text: `${record.provider || '?'}:${record.modelId || '?'}`,
+      })
     } else if (rtype === 'message') {
       const msg = record.message || {}
       const role = msg.role
