@@ -5,18 +5,18 @@
 # With arguments: runs Python script directly via SSH
 #
 # Usage:
-#   scripts/debug-sessions.sh                              # Interactive TUI
-#   scripts/debug-sessions.sh --instance test-claw         # TUI for specific instance
-#   scripts/debug-sessions.sh list                         # Direct: list sessions
-#   scripts/debug-sessions.sh list --agent personal        # Direct: list filtered
-#   scripts/debug-sessions.sh trace 4e29832a               # Direct: trace session
-#   scripts/debug-sessions.sh metrics 4e29832a             # Direct: session metrics
-#   scripts/debug-sessions.sh errors 4e29832a              # Direct: session errors
-#   scripts/debug-sessions.sh summary                      # Direct: agent summary
-#   scripts/debug-sessions.sh llm-list                     # Direct: list LLM calls
-#   scripts/debug-sessions.sh llm-list --agent personal    # Direct: filtered LLM calls
-#   scripts/debug-sessions.sh llm-trace 4e29832a           # Direct: LLM trace for session
-#   scripts/debug-sessions.sh llm-summary                  # Direct: LLM stats
+#   scripts/logs-explorer.sh                              # Interactive TUI
+#   scripts/logs-explorer.sh --instance test-claw         # TUI for specific instance
+#   scripts/logs-explorer.sh list                         # Direct: list sessions
+#   scripts/logs-explorer.sh list --agent personal        # Direct: list filtered
+#   scripts/logs-explorer.sh trace 4e29832a               # Direct: trace session
+#   scripts/logs-explorer.sh metrics 4e29832a             # Direct: session metrics
+#   scripts/logs-explorer.sh errors 4e29832a              # Direct: session errors
+#   scripts/logs-explorer.sh summary                      # Direct: agent summary
+#   scripts/logs-explorer.sh llm-list                     # Direct: list LLM calls
+#   scripts/logs-explorer.sh llm-list --agent personal    # Direct: filtered LLM calls
+#   scripts/logs-explorer.sh llm-trace 4e29832a           # Direct: LLM trace for session
+#   scripts/logs-explorer.sh llm-summary                  # Direct: LLM stats
 #
 # All flags (--full, --json, --no-color, --agent) are passed through in direct mode.
 # --base-dir and --llm-log are set automatically to the VPS paths.
@@ -51,7 +51,7 @@ INSTANCE="${INSTANCE:-${OPENCLAW_INSTANCE:-}}"
 
 if [[ $# -eq 0 ]] || [[ "${1:-}" == "--tui" ]]; then
   if command -v bun &>/dev/null; then
-    OPENCLAW_INSTANCE="${INSTANCE}" exec bun "$SCRIPT_DIR/debug-sessions/main.ts"
+    OPENCLAW_INSTANCE="${INSTANCE}" exec bun "$SCRIPT_DIR/lib/logs-explorer/main.ts"
   else
     echo "Error: bun is required for the interactive TUI." >&2
     echo "Install: curl -fsSL https://bun.sh/install | bash" >&2
@@ -70,7 +70,7 @@ if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
   echo "  $0"
   echo ""
   echo "Direct mode:"
-  python3 "$SCRIPT_DIR/debug-sessions/debug-sessions.py" --help 2>&1 || true
+  python3 "$SCRIPT_DIR/lib/logs-explorer/debug-sessions.py" --help 2>&1 || true
   exit 0
 fi
 
@@ -114,10 +114,10 @@ if [[ -z "$INSTANCE" ]]; then
 fi
 
 INSTANCE_DIR="${INSTALL_DIR}/instances/${INSTANCE}/.openclaw"
-PYTHON_SCRIPT="$SCRIPT_DIR/debug-sessions/debug-sessions.py"
+PYTHON_SCRIPT="$SCRIPT_DIR/lib/logs-explorer/debug-sessions.py"
 REMOTE_SCRIPT="/tmp/debug-sessions.py"
 BASE_DIR="${INSTANCE_DIR}/agents"
-LLM_LOG="${INSTANCE_DIR}/logs/llm.log"
+LLM_LOG="${INSTANCE_DIR}/logs/telemetry.log"
 
 if [[ ! -f "$PYTHON_SCRIPT" ]]; then
   echo "Error: debug-sessions.py not found at $PYTHON_SCRIPT" >&2
