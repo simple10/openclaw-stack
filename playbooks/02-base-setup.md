@@ -10,9 +10,7 @@ This playbook configures:
 - Two-user security model (adminclaw + openclaw)
 - UFW firewall
 - SSH hardening (custom port, key-only)
-- Fail2ban intrusion prevention
-- Automatic security updates
-- Kernel hardening
+- System hardening (swap, fail2ban, unattended-upgrades, kernel sysctl)
 - Cloudflare Tunnel (cloudflared)
 
 ## Prerequisites
@@ -42,7 +40,7 @@ From `../openclaw-config.env`:
 
 ## Execution Order
 
-Complete sections 2.1-2.9 on VPS-1.
+Complete sections 2.1–2.6 on VPS-1.
 
 Connect initially as `<SSH_USER>`, then switch to `adminclaw` after section 2.4 (SSH hardening).
 
@@ -373,143 +371,31 @@ sudo ls -la /home/adminclaw/.ssh/
 
 ---
 
-## 2.5 Swap Configuration
+## 2.5 System Hardening (swap, fail2ban, unattended-upgrades, sysctl)
 
-> **Batch:** Steps 2.5 through 2.8 are independent system configurations. Execute all in a single SSH session after § 2.4 completes.
-
-Run on: **VPS-1**
-
-Create a swap file so Docker containers can use swap-backed memory (`memorySwap` limits).
-Without host swap, Docker's `--memory-swap` effectively equals `--memory` (no spill to disk).
-
-```bash
-#!/bin/bash
-# Create 8G swap file — sized to cover peak sandbox memory spill
-# (sandbox memorySwap limits total ~19G across all containers, but
-# concurrent peak is much lower; 8G provides comfortable headroom)
-sudo fallocate -l 8G /swapfile
-sudo chmod 600 /swapfile
-sudo mkswap /swapfile
-sudo swapon /swapfile
-
-# Persist across reboots
-echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
-
-# Low swappiness: prefer RAM, only swap under pressure
-sudo sysctl vm.swappiness=10
-echo 'vm.swappiness=10' | sudo tee /etc/sysctl.d/99-swap.conf
-
-# Verify
-swapon --show
-free -h
-```
-
----
-
-## 2.6 Fail2ban Configuration
+> **Batch:** Consolidates former steps 2.5–2.8 into a single script. Execute after § 2.4 completes.
 
 Run on: **VPS-1**
 
-```bash
-#!/bin/bash
-sudo tee /etc/fail2ban/jail.local << 'EOF'
-[DEFAULT]
-bantime = 1h
-findtime = 10m
-maxretry = 5
-backend = systemd
+Configures in one pass:
+- **Swap** — 8G swap file for Docker `memorySwap` limits (idempotent, skips if already active)
+- **Fail2ban** — SSH jail on port `<SSH_PORT>`, 3 retries, 24h ban
+- **Unattended-upgrades** — automatic security patches (no auto-reboot)
+- **Kernel sysctl** — anti-spoofing, SYN flood protection, ASLR, dmesg/kptr restriction
 
-[sshd]
-enabled = true
-port = <SSH_PORT>
-filter = sshd
-logpath = /var/log/auth.log
-maxretry = 3
-bantime = 24h
+```bash
+# SOURCE: deploy/system-hardening.sh
+sudo tee /tmp/system-hardening.sh << 'EOF'
+# <<< deploy/system-hardening.sh >>>
 EOF
 
-sudo systemctl enable fail2ban
-sudo systemctl restart fail2ban
+sudo SSH_PORT=<SSH_PORT> bash /tmp/system-hardening.sh
+rm -f /tmp/system-hardening.sh
 ```
 
 ---
 
-## 2.7 Automatic Security Updates
-
-Run on: **VPS-1**
-
-```bash
-#!/bin/bash
-sudo apt install -y unattended-upgrades
-
-sudo tee /etc/apt/apt.conf.d/50unattended-upgrades << 'EOF'
-Unattended-Upgrade::Allowed-Origins {
-    "${distro_id}:${distro_codename}";
-    "${distro_id}:${distro_codename}-security";
-    "${distro_id}ESMApps:${distro_codename}-apps-security";
-    "${distro_id}ESM:${distro_codename}-infra-security";
-};
-Unattended-Upgrade::AutoFixInterruptedDpkg "true";
-Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
-Unattended-Upgrade::Remove-Unused-Dependencies "true";
-Unattended-Upgrade::Automatic-Reboot "false";
-EOF
-
-sudo systemctl enable unattended-upgrades
-```
-
----
-
-## 2.8 Kernel Hardening
-
-Run on: **VPS-1**
-
-```bash
-#!/bin/bash
-sudo tee /etc/sysctl.d/99-security.conf << 'EOF'
-# IP Spoofing protection
-net.ipv4.conf.all.rp_filter = 1
-net.ipv4.conf.default.rp_filter = 1
-
-# Ignore ICMP broadcast requests
-net.ipv4.icmp_echo_ignore_broadcasts = 1
-
-# Disable source packet routing
-net.ipv4.conf.all.accept_source_route = 0
-net.ipv4.conf.default.accept_source_route = 0
-
-# Ignore send redirects
-net.ipv4.conf.all.send_redirects = 0
-net.ipv4.conf.default.send_redirects = 0
-
-# Block SYN attacks
-net.ipv4.tcp_syncookies = 1
-net.ipv4.tcp_max_syn_backlog = 2048
-net.ipv4.tcp_synack_retries = 2
-
-# Log Martians
-net.ipv4.conf.all.log_martians = 1
-
-# Ignore ICMP redirects
-net.ipv4.conf.all.accept_redirects = 0
-net.ipv4.conf.default.accept_redirects = 0
-
-# Enable ASLR
-kernel.randomize_va_space = 2
-
-# Restrict dmesg access
-kernel.dmesg_restrict = 1
-
-# Restrict kernel pointer access
-kernel.kptr_restrict = 2
-EOF
-
-sudo sysctl -p /etc/sysctl.d/99-security.conf
-```
-
----
-
-## 2.9 Cloudflare Tunnel Setup
+## 2.6 Cloudflare Tunnel Setup
 
 Run on: **VPS-1**
 
