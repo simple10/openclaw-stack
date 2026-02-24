@@ -3,14 +3,13 @@ set -euo pipefail
 
 # deploy-config.sh — OpenClaw configuration deployment (playbook 04, section 4.3)
 #
-# Copies files from staging, substitutes template variables, sets permissions,
-# creates host crons, deploys plugins.
+# Always-multi-claw architecture: deploys configuration for all discovered claws.
+# For each claw: copies _defaults, overlays claw-specific files, templates, deploys.
 #
-# Modes (backward compatible — all modes produce the same result for single-instance):
-#   Default:              Deploy everything (shared + single-instance config)
+# Modes:
+#   Default:              Deploy everything (shared files + all claw configs)
 #   SHARED_ONLY=true:     Deploy shared files only (compose, Vector, entrypoint, plugins, crons, scripts)
-#   INSTANCE_NAME=<name>: Deploy instance-specific config only (openclaw.json, models.json, CLI wrapper)
-#                         Uses instance config from deploy/openclaws/<name>/config.env
+#   INSTANCE_NAME=<name>: Deploy config for a single claw only (openclaw.json, models.json)
 #
 # Interface:
 #   Env vars in: OPENCLAW_DOMAIN_PATH, YOUR_TELEGRAM_ID, OPENCLAW_INSTANCE_ID,
@@ -20,7 +19,6 @@ set -euo pipefail
 #                CRON_MINUTE, CRON_HOUR, CRON_MAINTENANCE_MINUTE, CRON_MAINTENANCE_HOUR,
 #                HOSTALERT_TELEGRAM_BOT_TOKEN, HOSTALERT_TELEGRAM_CHAT_ID,
 #                INSTANCE_NAME, SHARED_ONLY
-#   Reads GATEWAY_TOKEN from /home/openclaw/openclaw/.env (not passed in) for single-instance mode
 #   Stdout: DEPLOY_CONFIG_OK on success (progress -> stderr)
 #   Exit: 0 success, 1 failure (e.g. unsubstituted {{VAR}} found)
 
@@ -33,12 +31,12 @@ DEPLOY_SHARED=true
 DEPLOY_INSTANCE=true
 if [ -n "$INSTANCE_NAME" ]; then
   DEPLOY_SHARED=false
-  echo "Mode: instance-specific (${INSTANCE_NAME})" >&2
+  echo "Mode: single claw (${INSTANCE_NAME})" >&2
 elif [ "$SHARED_ONLY" = "true" ]; then
   DEPLOY_INSTANCE=false
   echo "Mode: shared files only" >&2
 else
-  echo "Mode: single-instance (default)" >&2
+  echo "Mode: full deployment (shared + all claws)" >&2
 fi
 
 # ---- Defaults for optional vars ----
@@ -54,31 +52,124 @@ ENABLE_VECTOR_LOG_SHIPPING="${ENABLE_VECTOR_LOG_SHIPPING:-false}"
 HOSTALERT_TELEGRAM_BOT_TOKEN="${HOSTALERT_TELEGRAM_BOT_TOKEN:-}"
 HOSTALERT_TELEGRAM_CHAT_ID="${HOSTALERT_TELEGRAM_CHAT_ID:-}"
 
-# Derived URLs
-LLEMTRY_URL="${LOG_WORKER_URL/\/logs/\/llemtry}"
-EVENTS_URL="${LOG_WORKER_URL/\/logs/\/events}"
-
-# Instance-specific config directory (multi-instance mode)
-if [ -n "$INSTANCE_NAME" ]; then
-  INSTANCE_CONFIG_DIR="/home/openclaw/.openclaw/instances/${INSTANCE_NAME}"
-  # In instance mode, generate a new token if not provided
-  GATEWAY_TOKEN="${GATEWAY_TOKEN:-$(openssl rand -hex 32)}"
-  echo "  Instance config dir: ${INSTANCE_CONFIG_DIR}" >&2
-  echo "  Gateway token: ${GATEWAY_TOKEN}" >&2
-else
-  # Read the gateway token generated in section 4.2
-  GATEWAY_TOKEN=$(sudo grep OPENCLAW_GATEWAY_TOKEN /home/openclaw/openclaw/.env | cut -d= -f2)
-fi
-
 STAGING="/tmp/deploy-staging"
+DEFAULTS_DIR="${STAGING}/openclaws/_defaults"
+INSTANCES_DIR="${STAGING}/openclaws"
+
+# ── Helper: deploy config for a single claw ──────────────────────────
+deploy_claw_config() {
+  local name="$1"
+  local instance_config="${INSTANCES_DIR}/${name}/config.env"
+
+  # Instance config dir on VPS
+  local config_target="/home/openclaw/instances/${name}/.openclaw"
+
+  echo "Deploying config for claw: ${name}" >&2
+
+  # Layer config: load shared defaults, then claw overrides
+  # Save/restore outer env vars that might be modified
+  local saved_domain_path="$OPENCLAW_DOMAIN_PATH"
+  local saved_instance_id="$OPENCLAW_INSTANCE_ID"
+
+  if [ -f "$instance_config" ]; then
+    # Source claw-specific config on top of shared config
+    set -a
+    # shellcheck disable=SC1090
+    source "$instance_config"
+    set +a
+  fi
+
+  # Resolve GATEWAY_TOKEN: config.env > existing deployed openclaw.json > generate new
+  local token="${GATEWAY_TOKEN:-}"
+  if [ -z "$token" ] && [ -f "${config_target}/openclaw.json" ]; then
+    # Preserve existing token from previous deploy (avoid rotating on redeploy)
+    token=$(sudo grep -o '"token": "[^"]*"' "${config_target}/openclaw.json" 2>/dev/null | head -1 | cut -d'"' -f4 || true)
+    [ -n "$token" ] && echo "  Reusing existing GATEWAY_TOKEN for ${name}" >&2
+  fi
+  if [ -z "$token" ]; then
+    token=$(openssl rand -hex 32)
+    echo "  Generated GATEWAY_TOKEN for ${name}: ${token}" >&2
+  fi
+
+  # Re-derive URLs with potentially updated LOG_WORKER_URL
+  local llemtry_url="${LOG_WORKER_URL/\/logs/\/llemtry}"
+  local events_url="${LOG_WORKER_URL/\/logs/\/events}"
+
+  # Determine openclaw.json source — claw-specific overrides _defaults
+  local json_source="${INSTANCES_DIR}/${name}/openclaw.json"
+  if [ ! -f "$json_source" ]; then
+    json_source="${DEFAULTS_DIR}/openclaw.json"
+  fi
+  [ -f "$json_source" ] || { echo "ERROR: openclaw.json not found for ${name}" >&2; exit 1; }
+
+  # Copy and template openclaw.json
+  sudo cp "$json_source" "${config_target}/openclaw.json"
+
+  # Substitute all template variables — use | as sed delimiter (URLs contain /)
+  sudo sed -i \
+    -e "s|{{GATEWAY_TOKEN}}|${token}|g" \
+    -e "s|{{OPENCLAW_DOMAIN_PATH}}|${OPENCLAW_DOMAIN_PATH:-}|g" \
+    -e "s|{{YOUR_TELEGRAM_ID}}|${YOUR_TELEGRAM_ID}|g" \
+    -e "s|{{OPENCLAW_INSTANCE_ID}}|${OPENCLAW_INSTANCE_ID:-${name}}|g" \
+    -e "s|{{VPS_HOSTNAME}}|${VPS_HOSTNAME}|g" \
+    -e "s|{{ENABLE_EVENTS_LOGGING}}|${ENABLE_EVENTS_LOGGING}|g" \
+    -e "s|{{ENABLE_LLEMTRY_LOGGING}}|${ENABLE_LLEMTRY_LOGGING}|g" \
+    -e "s|{{EVENTS_URL}}|${events_url}|g" \
+    -e "s|{{LLEMTRY_URL}}|${llemtry_url}|g" \
+    -e "s|{{LOG_WORKER_TOKEN}}|${LOG_WORKER_TOKEN}|g" \
+    "${config_target}/openclaw.json"
+
+  # Verify no unsubstituted {{VAR}} placeholders remain (exclude comments)
+  if sudo grep -v '^\s*//' "${config_target}/openclaw.json" | grep -q '{{'; then
+    echo "ERROR: Unsubstituted template placeholders found in ${name}:" >&2
+    sudo grep -n '{{' "${config_target}/openclaw.json" | grep -v '^\s*//' >&2
+    exit 1
+  fi
+
+  # Ensure container (uid 1000) can read/write, and not world-readable
+  sudo chown 1000:1000 "${config_target}/openclaw.json"
+  sudo chmod 600 "${config_target}/openclaw.json"
+  echo "  Deployed openclaw.json" >&2
+
+  # Deploy per-agent models.json
+  # Determine models.json source — claw-specific overrides _defaults
+  local models_source="${INSTANCES_DIR}/${name}/models.json"
+  if [ ! -f "$models_source" ]; then
+    models_source="${DEFAULTS_DIR}/models.json"
+  fi
+
+  for agent in main code skills; do
+    sudo mkdir -p "${config_target}/agents/${agent}/agent"
+    sudo cp "${models_source}" "${config_target}/agents/${agent}/agent/models.json"
+
+    # Substitute template variable
+    sudo sed -i "s|{{AI_GATEWAY_WORKER_URL}}|${AI_GATEWAY_WORKER_URL}|g" \
+      "${config_target}/agents/${agent}/agent/models.json"
+
+    # Pre-create session store — the gateway lazily creates this dir only when the
+    # first session is saved, but `openclaw doctor` reports CRITICAL if it's missing.
+    sudo mkdir -p "${config_target}/agents/${agent}/sessions"
+    [ -f "${config_target}/agents/${agent}/sessions/sessions.json" ] || \
+      echo '{}' | sudo tee "${config_target}/agents/${agent}/sessions/sessions.json" > /dev/null
+    sudo chown -R 1000:1000 "${config_target}/agents/${agent}"
+    sudo chmod 600 "${config_target}/agents/${agent}/agent/models.json"
+    sudo chmod 600 "${config_target}/agents/${agent}/sessions/sessions.json"
+  done
+  echo "  Deployed per-agent models.json" >&2
+
+  # Restore env vars for next claw
+  OPENCLAW_DOMAIN_PATH="$saved_domain_path"
+  OPENCLAW_INSTANCE_ID="$saved_instance_id"
+  # Reset GATEWAY_TOKEN so next claw generates its own
+  GATEWAY_TOKEN=""
+}
 
 # ── Shared files (compose, Vector, scripts, crons, plugins) ──────────
 if [ "$DEPLOY_SHARED" = "true" ]; then
 
-# 1. Docker Compose override (static)
-# Building happens separately via the build script (section 4.4), not via docker compose build.
-sudo -u openclaw cp "${STAGING}/docker-compose.override.yml" /home/openclaw/openclaw/docker-compose.override.yml
-echo "Deployed docker-compose.override.yml" >&2
+# 1. Docker Compose override is GENERATED by openclaw-multi.sh, not deployed from staging.
+# Skip deploying a static override file — run openclaw-multi.sh generate instead.
+echo "Note: docker-compose.override.yml is generated by openclaw-multi.sh (not deployed from staging)" >&2
 
 # 2. Vector log shipper (static, conditional)
 if [ "${ENABLE_VECTOR_LOG_SHIPPING}" = "true" ]; then
@@ -103,101 +194,24 @@ fi
 
 fi  # DEPLOY_SHARED
 
-# ── Instance-specific config (openclaw.json, models.json) ────────────
+# ── Per-claw config (openclaw.json, models.json) ─────────────────────
 if [ "$DEPLOY_INSTANCE" = "true" ]; then
 
-# Determine config target path and openclaw.json source
 if [ -n "$INSTANCE_NAME" ]; then
-  CONFIG_TARGET="${INSTANCE_CONFIG_DIR}"
-  # Check for instance-specific openclaw.json, fall back to default
-  if [ -f "${STAGING}/openclaws/${INSTANCE_NAME}/openclaw.json" ]; then
-    JSON_SOURCE="${STAGING}/openclaws/${INSTANCE_NAME}/openclaw.json"
-    echo "  Using instance-specific openclaw.json" >&2
-  else
-    JSON_SOURCE="${STAGING}/openclaw.json"
-  fi
+  # Deploy config for a single claw
+  deploy_claw_config "$INSTANCE_NAME"
 else
-  CONFIG_TARGET="/home/openclaw/.openclaw"
-  JSON_SOURCE="${STAGING}/openclaw.json"
+  # Deploy config for all discovered claws
+  for claw_dir in "${INSTANCES_DIR}"/*/; do
+    [ -d "$claw_dir" ] || continue
+    claw_name=$(basename "$claw_dir")
+    # Skip disabled/special directories
+    [[ "$claw_name" == _* ]] && continue
+    # Must have config.env
+    [ -f "$claw_dir/config.env" ] || continue
+    deploy_claw_config "$claw_name"
+  done
 fi
-
-# 3. OpenClaw configuration (template)
-# IMPORTANT: OpenClaw rejects unknown config keys — only use documented keys.
-# bind: "lan" required (Docker bridge traffic, not loopback). openclaw doctor warning is expected.
-# trustedProxies: exact IPs only, CIDR ranges NOT supported.
-# Device pairing: tunnel users need CLI approval — see 08-post-deploy.md.
-# gateway.auth.token + gateway.remote.token: must match OPENCLAW_GATEWAY_TOKEN from .env (section 4.2).
-#   - auth.token: the gateway uses this for WebSocket auth (CLI flag --token overrides if set)
-#   - remote.token: the CLI reads this to authenticate when connecting to the gateway
-#   - Without remote.token, `openclaw doctor`, `openclaw devices list`, and `openclaw security audit --deep`
-#     all fail with "gateway token mismatch".
-# See REQUIREMENTS.md § 3.2 for sandbox config rationale.
-#
-# Tiered sandbox architecture (config-driven via deploy/sandbox-toolkit.yaml):
-#   defaults → base sandbox (openclaw-sandbox:bookworm-slim), no network — used for non-operator sessions (group chats, spawned sessions)
-#   "skills" agent → toolkit sandbox (openclaw-sandbox-toolkit:bookworm-slim), bridge network — runs skill binaries
-#   "code" agent → toolkit sandbox (openclaw-sandbox-toolkit:bookworm-slim), bridge network, Claude Code CLI
-#   All tools (gifgrep, claude-code, ffmpeg, etc.) are installed in sandbox-toolkit via sandbox-toolkit.yaml.
-#   Main agent delegates to skills agent for skills needing network (gifgrep, weather, etc.)
-#   Main agent delegates to code agent via sessions_spawn for coding tasks.
-#   /opt/skill-bins is auto-shimmed from sandbox-toolkit.yaml (see entrypoint §1g).
-
-sudo cp "${JSON_SOURCE}" "${CONFIG_TARGET}/openclaw.json"
-
-# Substitute all template variables — use | as sed delimiter (URLs contain /)
-sudo sed -i \
-  -e "s|{{GATEWAY_TOKEN}}|${GATEWAY_TOKEN}|g" \
-  -e "s|{{OPENCLAW_DOMAIN_PATH}}|${OPENCLAW_DOMAIN_PATH}|g" \
-  -e "s|{{YOUR_TELEGRAM_ID}}|${YOUR_TELEGRAM_ID}|g" \
-  -e "s|{{OPENCLAW_INSTANCE_ID}}|${OPENCLAW_INSTANCE_ID:-${INSTANCE_NAME}}|g" \
-  -e "s|{{VPS_HOSTNAME}}|${VPS_HOSTNAME}|g" \
-  -e "s|{{ENABLE_EVENTS_LOGGING}}|${ENABLE_EVENTS_LOGGING}|g" \
-  -e "s|{{ENABLE_LLEMTRY_LOGGING}}|${ENABLE_LLEMTRY_LOGGING}|g" \
-  -e "s|{{EVENTS_URL}}|${EVENTS_URL}|g" \
-  -e "s|{{LLEMTRY_URL}}|${LLEMTRY_URL}|g" \
-  -e "s|{{LOG_WORKER_TOKEN}}|${LOG_WORKER_TOKEN}|g" \
-  "${CONFIG_TARGET}/openclaw.json"
-
-# Verify no unsubstituted {{VAR}} placeholders remain (exclude comments)
-if sudo grep -v '^\s*//' "${CONFIG_TARGET}/openclaw.json" | grep -q '{{'; then
-  echo "ERROR: Unsubstituted template placeholders found:" >&2
-  sudo grep -n '{{' "${CONFIG_TARGET}/openclaw.json" | grep -v '^\s*//' >&2
-  exit 1
-fi
-
-# Ensure container (uid 1000) can read/write, and not world-readable
-sudo chown 1000:1000 "${CONFIG_TARGET}/openclaw.json"
-sudo chmod 600 "${CONFIG_TARGET}/openclaw.json"
-echo "Deployed openclaw.json with template substitution." >&2
-
-# 4. Agent model configuration (template)
-# IMPORTANT: The embedded agent reads models.json from the agent directory,
-# NOT from openclaw.json. The built-in "anthropic" provider ignores the
-# ANTHROPIC_BASE_URL env var — this file is the only way to override the base URL.
-#
-# The format must be "override-only" (baseUrl without a models array).
-# If you include a "models" array, the registry creates new model entries
-# instead of overriding the built-in anthropic models, and the built-in
-# entries (with hardcoded api.anthropic.com) take precedence.
-
-for agent in main code skills; do
-  sudo mkdir -p "${CONFIG_TARGET}/agents/${agent}/agent"
-  sudo cp "${STAGING}/models.json" "${CONFIG_TARGET}/agents/${agent}/agent/models.json"
-
-  # Substitute template variable
-  sudo sed -i "s|{{AI_GATEWAY_WORKER_URL}}|${AI_GATEWAY_WORKER_URL}|g" \
-    "${CONFIG_TARGET}/agents/${agent}/agent/models.json"
-
-  # Pre-create session store — the gateway lazily creates this dir only when the
-  # first session is saved, but `openclaw doctor` reports CRITICAL if it's missing.
-  sudo mkdir -p "${CONFIG_TARGET}/agents/${agent}/sessions"
-  [ -f "${CONFIG_TARGET}/agents/${agent}/sessions/sessions.json" ] || \
-    echo '{}' | sudo tee "${CONFIG_TARGET}/agents/${agent}/sessions/sessions.json" > /dev/null
-  sudo chown -R 1000:1000 "${CONFIG_TARGET}/agents/${agent}"
-  sudo chmod 600 "${CONFIG_TARGET}/agents/${agent}/agent/models.json"
-  sudo chmod 600 "${CONFIG_TARGET}/agents/${agent}/sessions/sessions.json"
-done
-echo "Deployed per-agent models.json." >&2
 
 fi  # DEPLOY_INSTANCE
 
@@ -261,7 +275,7 @@ echo "Deployed host cron jobs." >&2
 # Multi-instance aware: auto-detects running containers, supports --instance flag
 sudo tee /usr/local/bin/openclaw > /dev/null << 'WRAPEOF'
 #!/bin/bash
-# OpenClaw CLI wrapper — multi-instance aware
+# OpenClaw CLI wrapper — multi-claw aware
 # Resolves target container via:
 #   1. --instance <name> flag (explicit, stripped before passing to openclaw)
 #   2. Auto-detect: single running container = use it, multiple = interactive picker

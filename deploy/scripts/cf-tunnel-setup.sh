@@ -3,6 +3,9 @@ set -euo pipefail
 
 # cf-tunnel-setup.sh — Automated Cloudflare Tunnel configuration via API
 #
+# Always-multi-claw: discovers all claws from deploy/openclaws/*/ and configures
+# tunnel ingress + DNS for each. No single-instance fallback.
+#
 # Uses CF_API_TOKEN to create/manage tunnels, configure ingress routes,
 # and create DNS CNAME records. Runs locally (not on VPS).
 #
@@ -13,8 +16,8 @@ set -euo pipefail
 #   list-tunnels              List active tunnels in the account
 #   create-tunnel <name>      Create a new tunnel, output tunnel ID + token
 #   get-token <tunnel-id>     Get the connector install token for a tunnel
-#   setup-routes              Configure tunnel ingress + DNS for all instances
-#     --instance <name>       Configure routes for a single instance only
+#   setup-routes              Configure tunnel ingress + DNS for all claws
+#     --instance <name>       Configure routes for a single claw only
 #     --tunnel-id <id>        Override tunnel ID (otherwise extracted from CF_TUNNEL_TOKEN)
 #
 # Environment:
@@ -95,7 +98,7 @@ extract_tunnel_id_from_token() {
   echo "$decoded" | jq -r '.t // empty'
 }
 
-# Discover active instances (same logic as openclaw-multi.sh)
+# Discover active claws (same logic as openclaw-multi.sh)
 discover_instances() {
   [ -d "$INSTANCES_DIR" ] || return
   for dir in "$INSTANCES_DIR"/*/; do
@@ -301,8 +304,20 @@ cmd_setup_routes() {
   header "Configuring Tunnel Routes"
   info "Tunnel ID: ${tunnel_id}"
 
-  # Collect instances and their configs
-  local -a instance_names=()
+  # Discover claws to configure
+  local -a claw_names=()
+  if [ -n "$target_instance" ]; then
+    claw_names+=("$target_instance")
+  else
+    local discovered
+    discovered=$(discover_instances)
+    [ -n "$discovered" ] || die "No active claws found in deploy/openclaws/"
+    while IFS= read -r name; do
+      claw_names+=("$name")
+    done <<< "$discovered"
+  fi
+
+  # Collect configs for all claws
   local -A instance_domains=()
   local -A instance_dash_domains=()
   local -A instance_dash_paths=()
@@ -310,93 +325,47 @@ cmd_setup_routes() {
   local -A instance_dash_ports=()
   local -A instance_tunnel_ids=()
 
-  # Check for multi-instance setup
-  local instances
-  instances=$(discover_instances)
+  local idx=0
+  for name in "${claw_names[@]}"; do
+    local inst_config="${INSTANCES_DIR}/${name}/config.env"
+    [ -f "$inst_config" ] || die "Claw config not found: ${inst_config}"
 
-  if [ -n "$instances" ] && [ -z "$target_instance" ]; then
-    # Multi-instance mode
-    local idx=0
-    while IFS= read -r name; do
-      local inst_config="${INSTANCES_DIR}/${name}/config.env"
-
-      # Load instance config on top of shared config
-      set -a
-      source "$config_env"
-      source "$inst_config"
-      set +a
-
-      instance_names+=("$name")
-      instance_domains[$name]="${OPENCLAW_DOMAIN:-}"
-      instance_dash_domains[$name]="${OPENCLAW_DASHBOARD_DOMAIN:-}"
-      instance_dash_paths[$name]="${OPENCLAW_DASHBOARD_DOMAIN_PATH:-}"
-
-      # Check for explicit port assignments
-      local gw_port dash_port
-      gw_port=$(get_config_val "$inst_config" "INSTANCE_GATEWAY_PORT")
-      dash_port=$(get_config_val "$inst_config" "INSTANCE_DASHBOARD_PORT")
-      [ -z "$gw_port" ] && gw_port=$((18789 + idx))
-      [ -z "$dash_port" ] && dash_port=$((6090 + idx))
-      instance_gw_ports[$name]="$gw_port"
-      instance_dash_ports[$name]="$dash_port"
-
-      # Per-instance tunnel override
-      local inst_tunnel_token
-      inst_tunnel_token=$(get_config_val "$inst_config" "CF_TUNNEL_TOKEN")
-      if [ -n "$inst_tunnel_token" ]; then
-        instance_tunnel_ids[$name]=$(extract_tunnel_id_from_token "$inst_tunnel_token")
-      else
-        instance_tunnel_ids[$name]="$tunnel_id"
-      fi
-
-      idx=$((idx + 1))
-    done <<< "$instances"
-  elif [ -n "$target_instance" ]; then
-    # Single instance specified
-    local inst_config="${INSTANCES_DIR}/${target_instance}/config.env"
-    [ -f "$inst_config" ] || die "Instance config not found: ${inst_config}"
-
+    # Load layered config (shared + claw-specific)
     set -a
     source "$config_env"
     source "$inst_config"
     set +a
 
-    instance_names+=("$target_instance")
-    instance_domains[$target_instance]="${OPENCLAW_DOMAIN:-}"
-    instance_dash_domains[$target_instance]="${OPENCLAW_DASHBOARD_DOMAIN:-}"
-    instance_dash_paths[$target_instance]="${OPENCLAW_DASHBOARD_DOMAIN_PATH:-}"
+    instance_domains[$name]="${OPENCLAW_DOMAIN:-}"
+    instance_dash_domains[$name]="${OPENCLAW_DASHBOARD_DOMAIN:-}"
+    instance_dash_paths[$name]="${OPENCLAW_DASHBOARD_DOMAIN_PATH:-}"
 
+    # Check for explicit port assignments
     local gw_port dash_port
     gw_port=$(get_config_val "$inst_config" "INSTANCE_GATEWAY_PORT")
     dash_port=$(get_config_val "$inst_config" "INSTANCE_DASHBOARD_PORT")
-    [ -z "$gw_port" ] && gw_port=18789
-    [ -z "$dash_port" ] && dash_port=6090
-    instance_gw_ports[$target_instance]="$gw_port"
-    instance_dash_ports[$target_instance]="$dash_port"
+    [ -z "$gw_port" ] && gw_port=$((18789 + idx))
+    [ -z "$dash_port" ] && dash_port=$((6090 + idx))
+    instance_gw_ports[$name]="$gw_port"
+    instance_dash_ports[$name]="$dash_port"
 
+    # Per-claw tunnel override
     local inst_tunnel_token
     inst_tunnel_token=$(get_config_val "$inst_config" "CF_TUNNEL_TOKEN")
     if [ -n "$inst_tunnel_token" ]; then
-      instance_tunnel_ids[$target_instance]=$(extract_tunnel_id_from_token "$inst_tunnel_token")
+      instance_tunnel_ids[$name]=$(extract_tunnel_id_from_token "$inst_tunnel_token")
     else
-      instance_tunnel_ids[$target_instance]="$tunnel_id"
+      instance_tunnel_ids[$name]="$tunnel_id"
     fi
-  else
-    # Single-instance mode (no instance directories)
-    instance_names+=("default")
-    instance_domains[default]="${OPENCLAW_DOMAIN:-}"
-    instance_dash_domains[default]="${OPENCLAW_DASHBOARD_DOMAIN:-}"
-    instance_dash_paths[default]="${OPENCLAW_DASHBOARD_DOMAIN_PATH:-}"
-    instance_gw_ports[default]=18789
-    instance_dash_ports[default]=6090
-    instance_tunnel_ids[default]="$tunnel_id"
-  fi
+
+    idx=$((idx + 1))
+  done
 
   # Validate domains and warn about SSL depth
   local ssl_warnings=0
-  for name in "${instance_names[@]}"; do
+  for name in "${claw_names[@]}"; do
     local domain="${instance_domains[$name]}"
-    [ -n "$domain" ] || die "Instance '${name}' has no OPENCLAW_DOMAIN configured"
+    [ -n "$domain" ] || die "Claw '${name}' has no OPENCLAW_DOMAIN configured"
     check_subdomain_depth "$domain" "${name}" || ssl_warnings=$((ssl_warnings + 1))
   done
   if [ "$ssl_warnings" -gt 0 ]; then
@@ -406,9 +375,9 @@ cmd_setup_routes() {
     exit 1
   fi
 
-  # Group instances by tunnel ID for batch configuration
+  # Group claws by tunnel ID for batch configuration
   local -A tunnel_groups=()
-  for name in "${instance_names[@]}"; do
+  for name in "${claw_names[@]}"; do
     local tid="${instance_tunnel_ids[$name]}"
     if [ -n "${tunnel_groups[$tid]:-}" ]; then
       tunnel_groups[$tid]+=" ${name}"
@@ -419,13 +388,14 @@ cmd_setup_routes() {
 
   # Configure each tunnel
   for tid in "${!tunnel_groups[@]}"; do
+    # shellcheck disable=SC2086  # Intentional word-splitting: space-separated claw names as separate args
     configure_tunnel_routes "$account_id" "$tid" ${tunnel_groups[$tid]}
   done
 
   # Create DNS CNAME records
   header "Creating DNS Records"
   local -A processed_domains=()
-  for name in "${instance_names[@]}"; do
+  for name in "${claw_names[@]}"; do
     local domain="${instance_domains[$name]}"
     local dash_domain="${instance_dash_domains[$name]}"
     local tid="${instance_tunnel_ids[$name]}"
@@ -448,15 +418,15 @@ cmd_setup_routes() {
   header "Setup Complete"
   echo "" >&2
   echo "Configured routes:" >&2
-  for name in "${instance_names[@]}"; do
+  for name in "${claw_names[@]}"; do
     local domain="${instance_domains[$name]}"
     local dash_path="${instance_dash_paths[$name]}"
     local gw_port="${instance_gw_ports[$name]}"
     local dash_port="${instance_dash_ports[$name]}"
     if [ -n "$dash_path" ]; then
-      echo "  ${domain}${dash_path}/* -> localhost:${dash_port} (dashboard)" >&2
+      echo "  ${name}: ${domain}${dash_path}/* -> localhost:${dash_port} (dashboard)" >&2
     fi
-    echo "  ${domain} -> localhost:${gw_port} (gateway)" >&2
+    echo "  ${name}: ${domain} -> localhost:${gw_port} (gateway)" >&2
   done
 }
 
@@ -489,7 +459,7 @@ configure_tunnel_routes() {
     )" '[.result.config.ingress[]? | select(.hostname != null) | select(.hostname as $h | $managed | index($h) | not)]')
   fi
 
-  # Build new ingress rules for our instances
+  # Build new ingress rules for our claws
   # Dashboard paths MUST come before catch-all gateway rules (CF evaluates top-to-bottom)
   local new_rules="[]"
 
@@ -541,10 +511,6 @@ create_dns_cname() {
   local zone_id
   zone_id=$(get_zone_id "$root_domain")
 
-  # Extract the subdomain part (everything before the root domain)
-  local subdomain
-  subdomain=$(echo "$domain" | sed "s/\.${root_domain}$//")
-
   # Check if CNAME already exists
   local existing
   existing=$(cf_api GET "/zones/${zone_id}/dns_records?type=CNAME&name=${domain}" 2>/dev/null) || true
@@ -579,8 +545,8 @@ Commands:
   list-tunnels              List active tunnels in the account
   create-tunnel <name>      Create a new tunnel, output tunnel ID + token
   get-token <tunnel-id>     Get the connector install token for a tunnel
-  setup-routes [flags]      Configure tunnel ingress + DNS for all instances
-    --instance <name>         Configure routes for a single instance only
+  setup-routes [flags]      Configure tunnel ingress + DNS for all claws
+    --instance <name>         Configure routes for a single claw only
     --tunnel-id <id>          Override tunnel ID (default: extracted from CF_TUNNEL_TOKEN)
 
 Environment:

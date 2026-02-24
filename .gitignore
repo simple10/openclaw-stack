@@ -1,13 +1,16 @@
 .DS_Store
 certs/
 *.env
+!deploy/openclaws/main-claw/config.env
+!deploy/openclaws/_example/config.env
 *.key
 
-# Multi-instance configs: only track the example, ignore real instances
-# Copy _example-claw/ to create your own (e.g., deploy/openclaws/personal-claw/)
+# Multi-claw configs: track _defaults/, _example/, and main-claw/; ignore user-created claws
+# Copy _example/ to create your own (e.g., deploy/openclaws/my-claw/)
 deploy/openclaws/*
+!deploy/openclaws/_defaults/
 !deploy/openclaws/_example/
-!deploy/openclaws/_example/config.env
+!deploy/openclaws/main-claw/
 
 tmp/
 _bak/

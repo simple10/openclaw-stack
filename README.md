@@ -7,7 +7,7 @@ This project primarily solves the hard bits of deploying fully containerized Ope
 
 It's also packed full of useful debugging tools to assist you or `claude code` in modifying your OpenClaw setup.
 
-You'll likely want to customize the agents in `deploy/openclaw.json` before deploying.
+You'll likely want to customize the agents in `deploy/openclaws/_defaults/openclaw.json` before deploying.
 The default agent is configured as a coordinator to hand off tasks to sub-agents.
 
 ---
@@ -502,9 +502,10 @@ openclaw-vps/
 ├── openclaw-config.env.example       # Template with all fields documented
 │
 ├── deploy/                           # Files deployed to the VPS
-│   ├── docker-compose.override.yml   # Container config (Sysbox, resource limits, ports)
-│   ├── openclaw.json                 # Gateway config (agents, plugins, security)
-│   ├── models.json                   # AI provider routing (baseUrl overrides)
+│   ├── openclaws/                    # Per-claw configuration
+│   │   ├── _defaults/                # Shared templates (openclaw.json, models.json)
+│   │   ├── main-claw/               # Default claw (inherits from openclaw-config.env)
+│   │   └── _example/                # Template for creating new claws
 │   ├── sandbox-toolkit.yaml          # Sandbox tool definitions
 │   ├── vector/                        # Vector log shipper (standalone compose project)
 │   │   ├── docker-compose.yml        # Independent of gateway — start/stop separately

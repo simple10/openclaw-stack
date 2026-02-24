@@ -20,6 +20,6 @@
     "websockify"
   ],
   "files.associations": {
-    "deploy/openclaw.json": "jsonc"
+    "deploy/openclaws/_defaults/openclaw.json": "jsonc"
   }
 }

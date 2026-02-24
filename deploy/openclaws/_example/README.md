@@ -1,10 +1,9 @@
-# Example Multi OpenClaw
+# Example OpenClaw Claw
 
-This dir provides an example template for creating multiple OpenClaw instances
+This dir provides an example template for creating additional OpenClaw claws
 to run on the same VPS.
 
-Simply copy this dir and rename: e.g. personal-claw
+Simply copy this dir and rename: e.g. `cp -r _example my-claw`
 
-Then modify the config.env and openclaw.json files.
-
-Remove openclaw.json for the dir to use the default deploy/openclaw.json template.
+Then modify the config.env file. Optionally add an openclaw.json to override
+the shared template from `_defaults/openclaw.json`.

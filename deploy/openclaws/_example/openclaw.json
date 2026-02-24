@@ -1,6 +1,6 @@
-// Example OpenClaw Config
-// This completely replaces (not merges) the deploy/openclaw.json default config
-// Remove this file if you want to use the default config instead.
+// Example OpenClaw Config — per-claw override
+// This completely replaces (not merges) the _defaults/openclaw.json shared template.
+// Remove this file to use the shared template from _defaults/ instead.
 {
   "commands": {
     "restart": true
