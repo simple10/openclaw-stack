@@ -133,7 +133,9 @@ done
 log ""
 log "Checking OpenClaw gateway health..."
 
-HEALTH_OUTPUT=$($SSH_CMD "openclaw health 2>&1" 2>/dev/null) && HEALTH_EXIT=0 || HEALTH_EXIT=$?
+# Pass --instance to avoid interactive picker when multiple claws are running
+INSTANCE_NAME="${GATEWAY#openclaw-}"
+HEALTH_OUTPUT=$($SSH_CMD "openclaw --instance $INSTANCE_NAME health 2>&1" 2>/dev/null) && HEALTH_EXIT=0 || HEALTH_EXIT=$?
 
 if [ "$HEALTH_EXIT" -eq 0 ]; then
   pass "openclaw health: OK"
