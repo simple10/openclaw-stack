@@ -21,7 +21,7 @@ All secrets should be rotated on a regular cadence. If a token is suspected comp
 
 #### Gateway Token
 
-> **Multi-claw:** Each claw has its own `GATEWAY_TOKEN` baked into its `openclaw.json` by `deploy-config.sh`. Rotate each claw's token independently.
+Each claw has its own `GATEWAY_TOKEN` baked into its `openclaw.json` by `deploy-config.sh`. Rotate each claw's token independently.
 
 ```bash
 # 1. Generate new token
@@ -30,13 +30,15 @@ NEW_TOKEN=$(openssl rand -hex 32)
 # 2. Update .env on VPS
 # Edit /home/openclaw/openclaw/.env — change OPENCLAW_GATEWAY_TOKEN value
 
-# 3. Update openclaw.json on VPS
-# Edit /home/openclaw/.openclaw/openclaw.json — update gateway.auth.token and gateway.remote.token
+# 3. Update the claw's openclaw.json on VPS
+# Edit /home/openclaw/instances/<CLAW_NAME>/.openclaw/openclaw.json
+#   — update gateway.auth.token and gateway.remote.token
 
-# 4. Recreate gateway to pick up new .env values (see CLAUDE.md: restart vs up -d)
-sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d openclaw-main-claw'
+# 4. Recreate the claw to pick up new .env values (see CLAUDE.md: restart vs up -d)
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d openclaw-<CLAW_NAME>'
 
 # 5. Update all paired devices with new token (existing browser URLs will need the new token parameter)
+# Repeat steps 3-5 for each claw being rotated
 ```
 
 #### AI Gateway Auth Token
@@ -51,8 +53,8 @@ echo "$NEW_TOKEN" | npx wrangler secret put AUTH_TOKEN
 
 # 3. Update VPS .env — change AI_GATEWAY_AUTH_TOKEN value
 
-# 4. Recreate gateway to pick up new .env values (no rebuild needed — token is an env var)
-sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d openclaw-main-claw'
+# 4. Recreate all claws to pick up new .env values (no rebuild needed — token is an env var)
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'
 ```
 
 #### Log Worker Token
@@ -120,7 +122,7 @@ See [docs/CLOUDFLARE-TUNNEL.md](../docs/CLOUDFLARE-TUNNEL.md#rotating-tunnel-tok
 
 ### Sandbox Images
 
-Sandbox images (base, toolkit, browser) persist across gateway restarts in `./data/docker`. The entrypoint auto-rebuilds when:
+Sandbox images (base, toolkit, browser) persist across container restarts in per-instance Docker storage. The entrypoint auto-rebuilds when:
 
 - An image is **missing** (first boot or after manual removal)
 - **`sandbox-toolkit.yaml` changes** — config is embedded as a Docker label; entrypoint compares current config against the label and rebuilds on mismatch
@@ -138,17 +140,17 @@ scripts/update-sandboxes.sh --all
 scripts/update-sandboxes.sh --dry-run
 ```
 
-No gateway restart needed — builds happen inside the running container's nested Docker. New sandbox containers launched by agents automatically use the rebuilt images.
+No container restart needed — builds happen inside the running container's nested Docker. New sandbox containers launched by agents automatically use the rebuilt images.
 
 **When to run:**
 
 - Monthly, for security patches (apt package updates)
 - When entrypoint logs a staleness warning (images > 30 days old)
-- After editing `sandbox-toolkit.yaml` — auto-detected on next gateway restart, but `update-sandboxes.sh` applies immediately without restart
+- After editing `sandbox-toolkit.yaml` — auto-detected on next container restart, but `update-sandboxes.sh` applies immediately without restart
 
 ### Bind-Mounted Deploy Files
 
-Several deploy files are bind-mounted read-only into the gateway container. These can be updated without a full image rebuild — just SCP the file and restart the gateway.
+Several deploy files are bind-mounted read-only into claw containers. These can be updated without a full image rebuild — just SCP the file and restart the claws.
 
 **Bind-mounted files:** `dashboard/`, `entrypoint-gateway.sh`, `rebuild-sandboxes.sh`, `parse-toolkit.mjs`, `sandbox-toolkit.yaml`, `plugins/`
 
@@ -156,28 +158,30 @@ Several deploy files are bind-mounted read-only into the gateway container. Thes
 # From local machine — copy to VPS (use -r for directories like dashboard/ or plugins/)
 scp -i <SSH_KEY_PATH> -P <SSH_PORT> [-r] deploy/<path> adminclaw@<VPS1_IP>:/tmp/deploy-update
 
-# Move into place, fix ownership, and restart gateway (single SSH session)
+# Move into place, fix ownership, and restart all claws (single SSH session)
 ssh -i <SSH_KEY_PATH> -p <SSH_PORT> adminclaw@<VPS1_IP> "
   sudo rm -rf /home/openclaw/openclaw/deploy/<path>
   sudo cp -r /tmp/deploy-update /home/openclaw/openclaw/deploy/<path>
   sudo chown -R 1000:1000 /home/openclaw/openclaw/deploy/<path>
   rm -rf /tmp/deploy-update
-  sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart openclaw-main-claw'
+  sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart'
 "
 ```
 
-> **Note:** `sandbox-toolkit.yaml` changes are also auto-detected on gateway restart via Docker label comparison, triggering a sandbox image rebuild if needed.
+> To restart only a specific claw: `docker compose restart openclaw-<CLAW_NAME>`
 
-### OpenClaw Gateway
+> **Note:** `sandbox-toolkit.yaml` changes are also auto-detected on container restart via Docker label comparison, triggering a sandbox image rebuild if needed.
 
-Update the gateway to the latest upstream version:
+### OpenClaw Image
+
+Update OpenClaw to the latest upstream version:
 
 ```bash
-# From local machine — pulls upstream, rebuilds image, recreates container
+# From local machine — pulls upstream, rebuilds image, recreates all claws
 scripts/update-openclaw.sh
 ```
 
-Brief downtime (~5-10s) during container swap. The script waits for the health check to pass before reporting success.
+Brief downtime (~5-10s) per claw during container swap. The script waits for health checks to pass before reporting success.
 
 ---
 
