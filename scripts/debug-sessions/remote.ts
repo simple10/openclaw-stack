@@ -104,7 +104,7 @@ export async function listInstances(cfg: Config): Promise<string[]> {
 /** Return a new config with instance paths set for the given claw name. */
 export function withInstance(cfg: Config, instance: string): Config {
   const dir = `${cfg.installDir}/instances/${instance}/.openclaw`
-  return { ...cfg, instance, baseDir: `${dir}/agents`, llmLogPath: `${dir}/logs/llm.log` }
+  return { ...cfg, instance, baseDir: `${dir}/agents`, llmLogPath: `${dir}/logs/telemetry.log` }
 }
 
 export async function resolveInstance(cfg: Config): Promise<Config> {
