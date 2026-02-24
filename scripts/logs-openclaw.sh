@@ -30,7 +30,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-CONTAINER=$(resolve_gateway "${INSTANCE_ARGS[@]}" ) || exit 1
+CONTAINER=$(resolve_gateway ${INSTANCE_ARGS[@]+"${INSTANCE_ARGS[@]}"}) || exit 1
 DOCKER_ARGS=("logs")
 
 if [[ "${POSITIONAL_ARGS[0]:-}" == "--no-follow" ]]; then

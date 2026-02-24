@@ -58,7 +58,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-GATEWAY=$(resolve_gateway "${INSTANCE_ARGS[@]}" ) || exit 1
+GATEWAY=$(resolve_gateway ${INSTANCE_ARGS[@]+"${INSTANCE_ARGS[@]}"}) || exit 1
 
 # Check gateway container is running
 if ! ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \

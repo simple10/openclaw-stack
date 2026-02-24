@@ -11,7 +11,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "${SCRIPT_DIR}/../openclaw-config.env"
 
-SSH_CMD="TERM=xterm-256color ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP}"
+export TERM=xterm-256color
+SSH_CMD="ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP}"
 
 AGENT="main"
 SESSION_ID=""

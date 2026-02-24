@@ -66,7 +66,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-GATEWAY=$(resolve_gateway "${INSTANCE_ARGS[@]}" ) || exit 1
+GATEWAY=$(resolve_gateway ${INSTANCE_ARGS[@]+"${INSTANCE_ARGS[@]}"}) || exit 1
 OPENCLAW_DIR="/home/openclaw/openclaw"
 
 # Files to sync: local path -> VPS host path

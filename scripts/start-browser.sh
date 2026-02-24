@@ -36,7 +36,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-GATEWAY=$(resolve_gateway "${INSTANCE_ARGS[@]}" ) || exit 1
+GATEWAY=$(resolve_gateway ${INSTANCE_ARGS[@]+"${INSTANCE_ARGS[@]}"}) || exit 1
 AGENT_ARG="${POSITIONAL_ARGS[0]:-}"
 MAX_WAIT=90  # seconds to wait for browser container
 

@@ -47,7 +47,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-SSH_CMD="TERM=xterm-256color ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP}"
+export TERM=xterm-256color
+SSH_CMD="ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP}"
 FAILURES=0
 
 log() {
@@ -84,7 +85,7 @@ pass "SSH connection OK"
 log ""
 log "Checking Docker containers..."
 
-GATEWAY=$(resolve_gateway "${INSTANCE_ARGS[@]}" ) || exit 1
+GATEWAY=$(resolve_gateway ${INSTANCE_ARGS[@]+"${INSTANCE_ARGS[@]}"}) || exit 1
 CONTAINERS="$GATEWAY"
 if [ "${ENABLE_VECTOR_LOG_SHIPPING:-true}" = "true" ]; then
   CONTAINERS="$CONTAINERS vector"

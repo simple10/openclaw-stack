@@ -48,7 +48,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-GATEWAY=$(resolve_gateway "${INSTANCE_ARGS[@]}" ) || exit 1
+GATEWAY=$(resolve_gateway ${INSTANCE_ARGS[@]+"${INSTANCE_ARGS[@]}"}) || exit 1
 
 printf '\033[32mRebuilding sandbox images on %s...\033[0m\n' "$VPS1_IP"
 
