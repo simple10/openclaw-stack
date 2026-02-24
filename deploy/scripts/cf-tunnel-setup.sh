@@ -317,13 +317,8 @@ cmd_setup_routes() {
     done <<< "$discovered"
   fi
 
-  # Collect configs for all claws
-  local -A instance_domains=()
-  local -A instance_dash_domains=()
-  local -A instance_dash_paths=()
-  local -A instance_gw_ports=()
-  local -A instance_dash_ports=()
-  local -A instance_tunnel_ids=()
+  # Collect configs for all claws using parallel indexed arrays (Bash 3.2 compatible)
+  local _domains="" _dash_domains="" _dash_paths="" _gw_ports="" _dash_ports="" _tunnel_ids=""
 
   local idx=0
   for name in "${claw_names[@]}"; do
@@ -336,9 +331,9 @@ cmd_setup_routes() {
     source "$inst_config"
     set +a
 
-    instance_domains[$name]="${OPENCLAW_DOMAIN:-}"
-    instance_dash_domains[$name]="${OPENCLAW_DASHBOARD_DOMAIN:-}"
-    instance_dash_paths[$name]="${OPENCLAW_DASHBOARD_DOMAIN_PATH:-}"
+    _domains="${_domains}${_domains:+$'\n'}${OPENCLAW_DOMAIN:-}"
+    _dash_domains="${_dash_domains}${_dash_domains:+$'\n'}${OPENCLAW_DASHBOARD_DOMAIN:-}"
+    _dash_paths="${_dash_paths}${_dash_paths:+$'\n'}${OPENCLAW_DASHBOARD_DOMAIN_PATH:- }"
 
     # Check for explicit port assignments
     local gw_port dash_port
@@ -346,27 +341,33 @@ cmd_setup_routes() {
     dash_port=$(get_config_val "$inst_config" "INSTANCE_DASHBOARD_PORT")
     [ -z "$gw_port" ] && gw_port=$((18789 + idx))
     [ -z "$dash_port" ] && dash_port=$((6090 + idx))
-    instance_gw_ports[$name]="$gw_port"
-    instance_dash_ports[$name]="$dash_port"
+    _gw_ports="${_gw_ports}${_gw_ports:+$'\n'}${gw_port}"
+    _dash_ports="${_dash_ports}${_dash_ports:+$'\n'}${dash_port}"
 
     # Per-claw tunnel override
     local inst_tunnel_token
     inst_tunnel_token=$(get_config_val "$inst_config" "CF_TUNNEL_TOKEN")
     if [ -n "$inst_tunnel_token" ]; then
-      instance_tunnel_ids[$name]=$(extract_tunnel_id_from_token "$inst_tunnel_token")
+      _tunnel_ids="${_tunnel_ids}${_tunnel_ids:+$'\n'}$(extract_tunnel_id_from_token "$inst_tunnel_token")"
     else
-      instance_tunnel_ids[$name]="$tunnel_id"
+      _tunnel_ids="${_tunnel_ids}${_tunnel_ids:+$'\n'}${tunnel_id}"
     fi
 
     idx=$((idx + 1))
   done
 
+  # Helper to get nth line (0-indexed) from a newline-separated string
+  _nth() { echo "$1" | sed -n "$((${2} + 1))p"; }
+
   # Validate domains and warn about SSL depth
   local ssl_warnings=0
+  idx=0
   for name in "${claw_names[@]}"; do
-    local domain="${instance_domains[$name]}"
+    local domain
+    domain=$(_nth "$_domains" $idx)
     [ -n "$domain" ] || die "Claw '${name}' has no OPENCLAW_DOMAIN configured"
     check_subdomain_depth "$domain" "${name}" || ssl_warnings=$((ssl_warnings + 1))
+    idx=$((idx + 1))
   done
   if [ "$ssl_warnings" -gt 0 ]; then
     echo "" >&2
@@ -376,57 +377,73 @@ cmd_setup_routes() {
   fi
 
   # Group claws by tunnel ID for batch configuration
-  local -A tunnel_groups=()
+  # Build unique tunnel IDs list and their associated claw names
+  local unique_tids="" tunnel_groups=""
+  idx=0
   for name in "${claw_names[@]}"; do
-    local tid="${instance_tunnel_ids[$name]}"
-    if [ -n "${tunnel_groups[$tid]:-}" ]; then
-      tunnel_groups[$tid]+=" ${name}"
+    local tid
+    tid=$(_nth "$_tunnel_ids" $idx)
+    if ! echo "$unique_tids" | grep -qF "$tid"; then
+      unique_tids="${unique_tids}${unique_tids:+$'\n'}${tid}"
+      tunnel_groups="${tunnel_groups}${tunnel_groups:+$'\n'}${tid}=${name}"
     else
-      tunnel_groups[$tid]="$name"
+      # Append name to existing tunnel group
+      tunnel_groups=$(echo "$tunnel_groups" | sed "s|^${tid}=\(.*\)$|${tid}=\1 ${name}|")
     fi
+    idx=$((idx + 1))
   done
 
   # Configure each tunnel
-  for tid in "${!tunnel_groups[@]}"; do
-    # shellcheck disable=SC2086  # Intentional word-splitting: space-separated claw names as separate args
-    configure_tunnel_routes "$account_id" "$tid" ${tunnel_groups[$tid]}
-  done
+  while IFS='=' read -r tid names_str; do
+    [ -n "$tid" ] || continue
+    # shellcheck disable=SC2086  # Intentional word-splitting
+    configure_tunnel_routes "$account_id" "$tid" $names_str
+  done <<< "$tunnel_groups"
 
   # Create DNS CNAME records
   header "Creating DNS Records"
-  local -A processed_domains=()
+  local processed_domains=""
+  idx=0
   for name in "${claw_names[@]}"; do
-    local domain="${instance_domains[$name]}"
-    local dash_domain="${instance_dash_domains[$name]}"
-    local tid="${instance_tunnel_ids[$name]}"
+    local domain dash_domain tid
+    domain=$(_nth "$_domains" $idx)
+    dash_domain=$(_nth "$_dash_domains" $idx)
+    tid=$(_nth "$_tunnel_ids" $idx)
 
-    # Create CNAME for gateway domain
-    if [ -z "${processed_domains[$domain]:-}" ]; then
+    # Create CNAME for gateway domain (skip if already processed)
+    if ! echo "$processed_domains" | grep -qF "$domain"; then
       create_dns_cname "$domain" "$tid"
-      processed_domains[$domain]=1
+      processed_domains="${processed_domains}${processed_domains:+$'\n'}${domain}"
     fi
 
     # Create CNAME for dashboard domain if different
     if [ -n "$dash_domain" ] && [ "$dash_domain" != "$domain" ]; then
-      if [ -z "${processed_domains[$dash_domain]:-}" ]; then
+      if ! echo "$processed_domains" | grep -qF "$dash_domain"; then
         create_dns_cname "$dash_domain" "$tid"
-        processed_domains[$dash_domain]=1
+        processed_domains="${processed_domains}${processed_domains:+$'\n'}${dash_domain}"
       fi
     fi
+
+    idx=$((idx + 1))
   done
 
   header "Setup Complete"
   echo "" >&2
   echo "Configured routes:" >&2
+  idx=0
   for name in "${claw_names[@]}"; do
-    local domain="${instance_domains[$name]}"
-    local dash_path="${instance_dash_paths[$name]}"
-    local gw_port="${instance_gw_ports[$name]}"
-    local dash_port="${instance_dash_ports[$name]}"
+    local domain dash_path gw_port dash_port
+    domain=$(_nth "$_domains" $idx)
+    dash_path=$(_nth "$_dash_paths" $idx)
+    gw_port=$(_nth "$_gw_ports" $idx)
+    dash_port=$(_nth "$_dash_ports" $idx)
+    # Trim placeholder space for empty dash_path
+    dash_path=$(echo "$dash_path" | sed 's/^ $//')
     if [ -n "$dash_path" ]; then
       echo "  ${name}: ${domain}${dash_path}/* -> localhost:${dash_port} (dashboard)" >&2
     fi
     echo "  ${name}: ${domain} -> localhost:${gw_port} (gateway)" >&2
+    idx=$((idx + 1))
   done
 }
 
@@ -441,56 +458,59 @@ configure_tunnel_routes() {
   local existing_config
   existing_config=$(cf_api GET "/accounts/${account_id}/cfd_tunnel/${tid}/configurations" 2>/dev/null) || true
 
-  # Build the set of domains we're managing (to identify which existing rules to keep)
-  local -A managed_domains=()
+  # Build the set of domains we're managing and collect per-claw config
+  # by looking up each claw name's index in the claw_names array
+  local managed_domains_list=""
+  local ingress_json="[]"
+
   for name in "${names[@]}"; do
-    managed_domains[${instance_domains[$name]}]=1
-    local dash_domain="${instance_dash_domains[$name]}"
-    if [ -n "$dash_domain" ]; then
-      managed_domains[$dash_domain]=1
+    # Find this claw's index in the claw_names array
+    local ci=0
+    for cn in "${claw_names[@]}"; do
+      [ "$cn" = "$name" ] && break
+      ci=$((ci + 1))
+    done
+
+    local domain dash_domain dash_path gw_port dash_port
+    domain=$(_nth "$_domains" $ci)
+    dash_domain=$(_nth "$_dash_domains" $ci)
+    dash_path=$(_nth "$_dash_paths" $ci)
+    gw_port=$(_nth "$_gw_ports" $ci)
+    dash_port=$(_nth "$_dash_ports" $ci)
+    # Trim placeholder space for empty dash_path
+    dash_path=$(echo "$dash_path" | sed 's/^ $//')
+
+    managed_domains_list="${managed_domains_list}${managed_domains_list:+$'\n'}${domain}"
+    [ -n "$dash_domain" ] && managed_domains_list="${managed_domains_list}${managed_domains_list:+$'\n'}${dash_domain}"
+
+    # Dashboard rule (path-based, must come first — CF evaluates top-to-bottom)
+    if [ -n "$dash_path" ]; then
+      local cf_path="${dash_path#/}"
+      local dash_hostname="${dash_domain:-$domain}"
+      ingress_json=$(echo "$ingress_json" | jq -c --arg hostname "$dash_hostname" --arg path "${cf_path}*" --arg service "http://localhost:${dash_port}" \
+        '. + [{"hostname": $hostname, "path": $path, "service": $service}]')
+    elif [ -n "$dash_domain" ] && [ "$dash_domain" != "$domain" ]; then
+      ingress_json=$(echo "$ingress_json" | jq -c --arg hostname "$dash_domain" --arg service "http://localhost:${dash_port}" \
+        '. + [{"hostname": $hostname, "service": $service}]')
     fi
+
+    # Gateway rule (catch-all for the domain)
+    ingress_json=$(echo "$ingress_json" | jq -c --arg hostname "$domain" --arg service "http://localhost:${gw_port}" \
+      '. + [{"hostname": $hostname, "service": $service}]')
   done
 
   # Collect existing non-openclaw ingress rules (preserve user's other routes)
   local preserved_rules="[]"
   if [ -n "$existing_config" ]; then
-    preserved_rules=$(echo "$existing_config" | jq -c --argjson managed "$(
-      printf '%s\n' "${!managed_domains[@]}" | jq -R . | jq -s .
-    )" '[.result.config.ingress[]? | select(.hostname != null) | select(.hostname as $h | $managed | index($h) | not)]')
+    local managed_json
+    managed_json=$(echo "$managed_domains_list" | sort -u | jq -R . | jq -s .)
+    preserved_rules=$(echo "$existing_config" | jq -c --argjson managed "$managed_json" \
+      '[.result.config.ingress[]? | select(.hostname != null) | select(.hostname as $h | $managed | index($h) | not)]')
   fi
-
-  # Build new ingress rules for our claws
-  # Dashboard paths MUST come before catch-all gateway rules (CF evaluates top-to-bottom)
-  local new_rules="[]"
-
-  for name in "${names[@]}"; do
-    local domain="${instance_domains[$name]}"
-    local dash_domain="${instance_dash_domains[$name]}"
-    local dash_path="${instance_dash_paths[$name]}"
-    local gw_port="${instance_gw_ports[$name]}"
-    local dash_port="${instance_dash_ports[$name]}"
-
-    # Dashboard rule (path-based, must come first)
-    if [ -n "$dash_path" ]; then
-      # Strip leading slash for CF path matching
-      local cf_path="${dash_path#/}"
-      local dash_hostname="${dash_domain:-$domain}"
-      new_rules=$(echo "$new_rules" | jq -c --arg hostname "$dash_hostname" --arg path "${cf_path}*" --arg service "http://localhost:${dash_port}" \
-        '. + [{"hostname": $hostname, "path": $path, "service": $service}]')
-    elif [ -n "$dash_domain" ] && [ "$dash_domain" != "$domain" ]; then
-      # Separate subdomain for dashboard (no path needed)
-      new_rules=$(echo "$new_rules" | jq -c --arg hostname "$dash_domain" --arg service "http://localhost:${dash_port}" \
-        '. + [{"hostname": $hostname, "service": $service}]')
-    fi
-
-    # Gateway rule (catch-all for the domain)
-    new_rules=$(echo "$new_rules" | jq -c --arg hostname "$domain" --arg service "http://localhost:${gw_port}" \
-      '. + [{"hostname": $hostname, "service": $service}]')
-  done
 
   # Combine: preserved rules + new rules + catch-all 404
   local all_ingress
-  all_ingress=$(jq -n --argjson preserved "$preserved_rules" --argjson new "$new_rules" \
+  all_ingress=$(jq -n --argjson preserved "$preserved_rules" --argjson new "$ingress_json" \
     '$preserved + $new + [{"service": "http_status:404"}]')
 
   # PUT the full tunnel configuration
@@ -500,7 +520,7 @@ configure_tunnel_routes() {
   cf_api PUT "/accounts/${account_id}/cfd_tunnel/${tid}/configurations" "$config_payload" > /dev/null \
     || die "Failed to update tunnel configuration for ${tid}"
 
-  info "Ingress rules updated for tunnel ${tid} ($(echo "$new_rules" | jq length) rules)"
+  info "Ingress rules updated for tunnel ${tid} ($(echo "$ingress_json" | jq length) rules)"
 }
 
 create_dns_cname() {
@@ -554,6 +574,7 @@ Environment:
   CF_TUNNEL_TOKEN           Optional — used to extract tunnel ID
 
 Required API token permissions:
+  Account > Account Settings > Read (needed for /accounts API discovery)
   Account > Cloudflare Tunnel > Edit
   Zone > DNS > Edit (scoped to your domain's zone)
 EOF

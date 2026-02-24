@@ -26,6 +26,7 @@ Create an API token at [dash.cloudflare.com/profile/api-tokens](https://dash.clo
 
 | Scope | Permission | Level |
 |-------|-----------|-------|
+| Account | Account Settings | Read |
 | Account | Cloudflare Tunnel | Edit |
 | Zone | DNS | Edit (scoped to your domain's zone) |
 
