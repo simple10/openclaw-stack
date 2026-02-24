@@ -109,8 +109,8 @@ https://<OPENCLAW_DOMAIN><OPENCLAW_DOMAIN_PATH>/chat?token=<TOKEN>
 
 1. Check the tunnel is running:
    - `ssh ... "sudo systemctl status cloudflared"`
-2. Check the gateway is running: `ssh ... "sudo docker ps | grep openclaw-gateway"`
-3. Check gateway logs: `ssh ... "sudo docker logs --tail 20 openclaw-gateway"`
+2. Check the gateway is running: `ssh ... "sudo docker ps | grep openclaw-main-claw"`
+3. Check gateway logs: `ssh ... "sudo docker logs --tail 20 openclaw-main-claw"`
 4. Verify DNS is resolving to the correct destination
 
 Ask the user to confirm they can see the page (even with the pairing error) before proceeding.
@@ -151,7 +151,7 @@ If `openclaw devices list` fails with "pairing required", the CLI identity was l
 GATEWAY_TOKEN=$(ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
   "sudo grep OPENCLAW_GATEWAY_TOKEN /home/openclaw/openclaw/.env | cut -d= -f2")
 ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
-  "sudo docker exec --user node openclaw-gateway \
+  "sudo docker exec --user node openclaw-main-claw \
     openclaw devices list --url ws://localhost:18789 --token $GATEWAY_TOKEN"
 ```
 
@@ -164,11 +164,11 @@ If the CLI pairing keeps failing, bypass WebSocket pairing entirely via file man
 ```bash
 # 1. Fix .openclaw ownership (gateway creates dirs as root before gosu drops to node)
 ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
-  "sudo docker exec openclaw-gateway chown -R 1000:1000 /home/node/.openclaw"
+  "sudo docker exec openclaw-main-claw chown -R 1000:1000 /home/node/.openclaw"
 
 # 2. Trigger a pending CLI pairing request (expected to fail, but registers the device)
 ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
-  "sudo docker exec --user node openclaw-gateway openclaw devices list 2>&1 || true"
+  "sudo docker exec --user node openclaw-main-claw openclaw devices list 2>&1 || true"
 
 # 3. Approve the CLI device via file manipulation — moves CLI entry from pending.json to paired.json
 ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> "sudo python3 -c \"
@@ -213,7 +213,7 @@ As a last resort, restart the gateway and try again:
 
 ```bash
 ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
-  "sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart openclaw-gateway'"
+  "sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart openclaw-main-claw'"
 ```
 
 Wait 30-60 seconds for full startup (sandbox images are cached, so restarts are faster
@@ -245,7 +245,7 @@ Ask the user to confirm:
 ```bash
 # Check gateway logs for auth/pairing errors
 ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
-  "sudo docker logs --tail 30 openclaw-gateway"
+  "sudo docker logs --tail 30 openclaw-main-claw"
 
 # Re-list devices to confirm approval went through
 ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
@@ -443,7 +443,7 @@ Check `HOSTALERT_TELEGRAM_BOT_TOKEN` and `HOSTALERT_TELEGRAM_CHAT_ID` in `opencl
 
 - Hard-refresh the browser page.
 - Check gateway logs for errors after the approval.
-- Verify the gateway container hasn't restarted: `sudo docker ps | grep openclaw-gateway`
+- Verify the gateway container hasn't restarted: `sudo docker ps | grep openclaw-main-claw`
 
 ### Control UI shows "unauthorized" or "disconnected" (was working before)
 

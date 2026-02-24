@@ -189,7 +189,7 @@ ssh -p 222 adminclaw@<VPS1_IP> "sudo -u openclaw bash -c 'cd /home/openclaw/open
 
 ### Gateway Not Healthy
 
-1. Check container logs: `sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose logs --tail 50 openclaw-gateway'`
+1. Check container logs: `sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose logs --tail 50 openclaw-main-claw'`
 2. Check container is running: `sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose ps'`
 3. Verify localhost access: `curl -s http://localhost:18789<OPENCLAW_DOMAIN_PATH>/ | head -5`
 

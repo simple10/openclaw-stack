@@ -53,7 +53,7 @@ ssh -i <SSH_KEY_PATH> -p <SSH_PORT> -o ConnectTimeout=10 adminclaw@<VPS1_IP> "ec
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose ps'
 
 # Check gateway logs for errors
-sudo docker logs --tail 50 openclaw-gateway
+sudo docker logs --tail 50 openclaw-main-claw
 
 # Test internal endpoint (must include basePath if controlUi.basePath is set)
 curl -s http://localhost:18789<OPENCLAW_DOMAIN_PATH>/ | head -5
@@ -69,7 +69,7 @@ curl -s http://localhost:18789<OPENCLAW_DOMAIN_PATH>/ | head -5
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'
 ```
 
-> If they fail to start, check `sudo docker logs openclaw-gateway` for errors.
+> If they fail to start, check `sudo docker logs openclaw-main-claw` for errors.
 
 ---
 
@@ -81,27 +81,27 @@ Verify all tool binaries from `deploy/sandbox-toolkit.yaml` are installed and op
 
 ```bash
 # Get the list of all tool binaries from sandbox-toolkit.yaml
-BINS=$(sudo docker exec --user node openclaw-gateway \
+BINS=$(sudo docker exec --user node openclaw-main-claw \
   node /app/deploy/parse-toolkit.mjs /app/deploy/sandbox-toolkit.yaml \
   | jq -r '.allBins[]')
 echo "Bins to test: $BINS"
 
 # Find a running sandbox-toolkit container (code or skills agent)
-SANDBOX=$(sudo docker exec --user node openclaw-gateway \
+SANDBOX=$(sudo docker exec --user node openclaw-main-claw \
   docker ps --filter "ancestor=openclaw-sandbox-toolkit:bookworm-slim" --format '{{.Names}}' | head -1)
 
 # If no sandbox is running, trigger one via the openclaw CLI.
 # This creates the container with correct env (PATH, etc.) from openclaw.json.
 if [ -z "$SANDBOX" ]; then
   echo "No sandbox running — triggering skills agent sandbox..."
-  sudo docker exec --user node openclaw-gateway \
+  sudo docker exec --user node openclaw-main-claw \
     openclaw agent --agent skills --message ping --timeout 60 >/dev/null 2>&1 &
   AGENT_PID=$!
 
   # Wait for the sandbox container to appear
   for i in $(seq 1 20); do
     sleep 3
-    SANDBOX=$(sudo docker exec --user node openclaw-gateway \
+    SANDBOX=$(sudo docker exec --user node openclaw-main-claw \
       docker ps --filter "ancestor=openclaw-sandbox-toolkit:bookworm-slim" --format '{{.Names}}' | head -1)
     [ -n "$SANDBOX" ] && break
     echo "  waiting... ($((i*3))s)"
@@ -120,7 +120,7 @@ echo "Testing sandbox: $SANDBOX"
 PASS=0; FAIL=0; TOTAL=0
 for bin in $BINS; do
   TOTAL=$((TOTAL+1))
-  if sudo docker exec --user node openclaw-gateway \
+  if sudo docker exec --user node openclaw-main-claw \
     docker exec "$SANDBOX" which "$bin" > /dev/null 2>&1; then
     echo "  ✓ $bin"
     PASS=$((PASS+1))
@@ -139,8 +139,8 @@ echo "Results: $PASS passed, $FAIL failed, $TOTAL total"
 
 **If tools are missing:**
 
-- Rebuild the sandbox image: `sudo docker exec --user node openclaw-gateway /app/deploy/rebuild-sandboxes.sh --force`
-- Then recreate containers: `sudo docker exec --user node openclaw-gateway openclaw sandbox recreate --all --force`
+- Rebuild the sandbox image: `sudo docker exec --user node openclaw-main-claw /app/deploy/rebuild-sandboxes.sh --force`
+- Then recreate containers: `sudo docker exec --user node openclaw-main-claw openclaw sandbox recreate --all --force`
 
 ---
 
@@ -350,7 +350,7 @@ Re-run the CLI pairing step from `08-post-deploy.md` § 8.3:
 
 ```bash
 GATEWAY_TOKEN=$(sudo grep OPENCLAW_GATEWAY_TOKEN /home/openclaw/openclaw/.env | cut -d= -f2)
-sudo docker exec --user node openclaw-gateway \
+sudo docker exec --user node openclaw-main-claw \
   openclaw devices list --url ws://localhost:18789 --token "$GATEWAY_TOKEN"
 ```
 
@@ -363,7 +363,7 @@ Verify deployed gateway resource limits match VPS hardware. Resource limits are 
 ```bash
 # On VPS: query hardware and deployed limits in one command
 nproc && free -b | awk '/^Mem:/{print $2}' && \
-sudo docker inspect openclaw-gateway --format '{{.HostConfig.NanoCpus}} {{.HostConfig.Memory}}'
+sudo docker inspect openclaw-main-claw --format '{{.HostConfig.NanoCpus}} {{.HostConfig.Memory}}'
 ```
 
 Compare: CPUs should equal `nproc`, memory should be total minus 500M–1GB. NanoCpus = CPUs × 1e9.
@@ -425,7 +425,7 @@ sudo ss -tlnp | grep -E '187(89|90)'
 sudo ss -tlnp
 
 # Verify pids_limit set (prevents fork bombs)
-sudo docker inspect openclaw-gateway --format '{{.HostConfig.PidsLimit}}'
+sudo docker inspect openclaw-main-claw --format '{{.HostConfig.PidsLimit}}'
 # Expected: 1024
 ```
 
@@ -501,7 +501,7 @@ curl -s -X POST "$LLEMTRY_URL" \
 **3. Plugin startup validation** (on VPS):
 
 ```bash
-sudo docker logs openclaw-gateway 2>&1 | grep -i '\[telemetry\]'
+sudo docker logs openclaw-main-claw 2>&1 | grep -i '\[telemetry\]'
 # Expected: "[telemetry] Plugin registered — outputs: [file:telemetry.log, events:/events, llemtry]"
 # If misconfigured: "[telemetry] events.enabled is true but events.url or events.authToken is missing..."
 ```

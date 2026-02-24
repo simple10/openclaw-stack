@@ -203,7 +203,7 @@ ssh -p 222 adminclaw@<VPS_IP> "openclaw exec which codex"
 
 # Check real binary in sandbox
 ssh -p 222 adminclaw@<VPS_IP> \
-  "sudo docker exec openclaw-gateway docker run --rm openclaw-sandbox-toolkit:bookworm-slim codex --version"
+  "sudo docker exec openclaw-main-claw docker run --rm openclaw-sandbox-toolkit:bookworm-slim codex --version"
 ```
 
 ## Architecture Notes

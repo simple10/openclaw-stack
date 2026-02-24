@@ -166,7 +166,7 @@ function makeSendSpan(url, token, instanceId, hostname) {
   return async function sendSpan(span) {
     const batch = {
       resource: {
-        serviceName: 'openclaw-gateway',
+        serviceName: hostname || 'openclaw',
         instanceId,
         hostname,
       },

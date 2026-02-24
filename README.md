@@ -200,7 +200,7 @@ Each agent runs tools inside an isolated Docker container (via Sysbox for secure
   +-------------------------------------+-------+
   |  VPS                                         |
   |                                              |
-  |  +-- openclaw-gateway (Sysbox) ----------+   |
+  |  +-- openclaw-main-claw (Sysbox) --------+   |
   |  |  Gateway process (Node.js)            |   |
   |  |  Nested Docker daemon                 |   |
   |  |    -> sandbox containers (per agent)  |   |
@@ -336,7 +336,7 @@ ssh -i ~/.ssh/your_key -p 222 adminclaw@YOUR_VPS_IP
 # Gateway commands (run as openclaw user)
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose ps'          # Status
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose logs -f'      # Logs
-sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart openclaw-gateway'  # Restart
+sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose restart openclaw-main-claw'  # Restart
 ```
 
 **Or use the helper scripts:**

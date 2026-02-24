@@ -84,7 +84,7 @@ To update after changes: SCP to VPS, restart the gateway.
 
 After changing skill filters, clear session caches to force a skill snapshot rebuild:
 ```bash
-docker exec openclaw-gateway sh -c 'find /home/node/.openclaw/agents -name "sessions.json" -exec sh -c '"'"'echo "{}" > "$1"'"'"' _ {} \;'
+docker exec openclaw-main-claw sh -c 'find /home/node/.openclaw/agents -name "sessions.json" -exec sh -c '"'"'echo "{}" > "$1"'"'"' _ {} \;'
 ```
 
 ## Technical Notes

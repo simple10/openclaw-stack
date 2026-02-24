@@ -306,7 +306,7 @@ fi
 
 # Check status
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose ps'
-sudo docker logs --tail 20 openclaw-gateway
+sudo docker logs --tail 20 openclaw-main-claw
 ```
 
 **If build fails:**
@@ -322,7 +322,7 @@ sudo docker logs --tail 20 openclaw-gateway
 
 > "Container failed to start. Check the error with:"
 >
-> `sudo docker logs openclaw-gateway`
+> `sudo docker logs openclaw-main-claw`
 >
 > Common issues:
 >
@@ -345,7 +345,7 @@ Use a background task + polling pattern to give the user visual feedback without
 ```bash
 #!/bin/bash
 # Wait for entrypoint to finish sandbox builds — looks for privilege drop message
-timeout 900 bash -c 'until sudo docker logs openclaw-gateway 2>&1 | grep -q "Executing as node"; do sleep 10; done'
+timeout 900 bash -c 'until sudo docker logs openclaw-main-claw 2>&1 | grep -q "Executing as node"; do sleep 10; done'
 # Then wait for gateway health endpoint
 timeout 120 bash -c 'until curl -sf http://localhost:18789<OPENCLAW_DOMAIN_PATH>/ > /dev/null 2>&1; do sleep 3; done'
 echo "READY"
@@ -355,7 +355,7 @@ echo "READY"
 
 ```bash
 ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
-  "sudo docker logs openclaw-gateway 2>&1 | grep '\[entrypoint\]' | tail -1"
+  "sudo docker logs openclaw-main-claw 2>&1 | grep '\[entrypoint\]' | tail -1"
 ```
 
 Print the result as a status update to the user (e.g., `[entrypoint] Building toolkit sandbox image...`). Continue polling until the background task completes.
@@ -370,7 +370,7 @@ The gateway creates subdirectories (`identity/`, `devices/`) during startup as r
 (before gosu drops to node). Fix ownership so the container can write to them:
 
 ```bash
-sudo docker exec openclaw-gateway chown -R 1000:1000 /home/node/.openclaw
+sudo docker exec openclaw-main-claw chown -R 1000:1000 /home/node/.openclaw
 ```
 
 ### Verify CLI access
@@ -393,7 +393,7 @@ Run after gateway startup to verify all sandbox images were built correctly. Wit
 #!/bin/bash
 # Wait for entrypoint to finish sandbox builds (look for privilege drop message)
 echo "Waiting for entrypoint to finish..."
-timeout 600 bash -c 'until sudo docker logs openclaw-gateway 2>&1 | grep -q "Executing as node"; do sleep 5; done'
+timeout 600 bash -c 'until sudo docker logs openclaw-main-claw 2>&1 | grep -q "Executing as node"; do sleep 5; done'
 
 echo "=== Checking sandbox images ==="
 FAILED=0
@@ -401,7 +401,7 @@ FAILED=0
 # 1. Check all 3 images exist (tools are in toolkit image via sandbox-toolkit.yaml)
 for img in openclaw-sandbox:bookworm-slim openclaw-sandbox-toolkit:bookworm-slim \
            openclaw-sandbox-browser:bookworm-slim; do
-  if sudo docker exec openclaw-gateway docker image inspect "$img" > /dev/null 2>&1; then
+  if sudo docker exec openclaw-main-claw docker image inspect "$img" > /dev/null 2>&1; then
     echo "  $img: EXISTS"
   else
     echo "  $img: MISSING"
@@ -411,7 +411,7 @@ done
 
 # 2. Security check: verify USER is 1000 (not root) on toolkit image
 for img in openclaw-sandbox-toolkit:bookworm-slim; do
-  USER=$(sudo docker exec openclaw-gateway docker image inspect "$img" 2>/dev/null \
+  USER=$(sudo docker exec openclaw-main-claw docker image inspect "$img" 2>/dev/null \
     | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['Config']['User'])" 2>/dev/null)
   if [ "$USER" = "1000" ]; then
     echo "  $img USER: 1000 (OK)"
@@ -423,7 +423,7 @@ done
 
 # 3. Test key binaries in toolkit sandbox (all tools from sandbox-toolkit.yaml)
 for bin in go rustc bun brew node npm pnpm git curl wget jq ffmpeg convert claude gifgrep; do
-  if sudo docker exec openclaw-gateway docker run --rm openclaw-sandbox-toolkit:bookworm-slim which "$bin" > /dev/null 2>&1; then
+  if sudo docker exec openclaw-main-claw docker run --rm openclaw-sandbox-toolkit:bookworm-slim which "$bin" > /dev/null 2>&1; then
     echo "  toolkit/$bin: OK"
   else
     echo "  toolkit/$bin: MISSING"
@@ -432,7 +432,7 @@ for bin in go rustc bun brew node npm pnpm git curl wget jq ffmpeg convert claud
 done
 
 # 5. Check no intermediate images left
-if sudo docker exec openclaw-gateway docker images | grep -q base-root; then
+if sudo docker exec openclaw-main-claw docker images | grep -q base-root; then
   echo "  WARNING: intermediate base-root image not cleaned up"
 fi
 
@@ -440,7 +440,7 @@ fi
 echo ""
 echo "=== Image age ==="
 for img in openclaw-sandbox-toolkit:bookworm-slim openclaw-sandbox-browser:bookworm-slim; do
-  BUILD_DATE=$(sudo docker exec openclaw-gateway docker image inspect "$img" \
+  BUILD_DATE=$(sudo docker exec openclaw-main-claw docker image inspect "$img" \
     --format '{{index .Config.Labels "openclaw.build-date"}}' 2>/dev/null)
   if [ -n "$BUILD_DATE" ] && [ "$BUILD_DATE" != "<no value>" ]; then
     AGE_DAYS=$(( ( $(date +%s) - $(date -d "$BUILD_DATE" +%s 2>/dev/null || echo 0) ) / 86400 ))
@@ -457,7 +457,7 @@ done
 if [ "$FAILED" -eq 1 ]; then
   echo ""
   echo "SANDBOX VERIFICATION FAILED — check entrypoint logs:"
-  echo "  sudo docker logs openclaw-gateway 2>&1 | grep '\\[entrypoint\\]'"
+  echo "  sudo docker logs openclaw-main-claw 2>&1 | grep '\\[entrypoint\\]'"
 fi
 ```
 
@@ -564,7 +564,7 @@ openclaw cron list
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose ps'
 
 # Check gateway logs
-sudo docker logs --tail 50 openclaw-gateway
+sudo docker logs --tail 50 openclaw-main-claw
 
 # Test internal endpoint (must include basePath if controlUi.basePath is set)
 curl -s http://localhost:18789<OPENCLAW_DOMAIN_PATH>/ | head -5
@@ -594,7 +594,7 @@ sudo dpkg -i sysbox-ce_*.deb
 
 ```bash
 # Check logs for config errors
-sudo docker logs openclaw-gateway
+sudo docker logs openclaw-main-claw
 
 # Common issue: Invalid config keys in openclaw.json
 # Solution: Keep config minimal, only use documented keys
@@ -616,7 +616,7 @@ these dirs exist, so they end up root-owned.
 sudo chown -R 1000:1000 /home/openclaw/.openclaw
 
 # Or fix inside the container
-sudo docker exec openclaw-gateway chown -R 1000:1000 /home/node/.openclaw
+sudo docker exec openclaw-main-claw chown -R 1000:1000 /home/node/.openclaw
 ```
 
 ### Vector Not Shipping Logs
@@ -640,8 +640,8 @@ sudo -u openclaw bash -c 'cd /home/openclaw/vector && docker compose restart'
 The `openclaw` host wrapper uses `docker exec`, which bypasses WebSocket device pairing.
 If CLI commands fail, check:
 
-1. The gateway container is running: `sudo docker ps | grep openclaw-gateway`
-2. The `.openclaw` directory has correct ownership: `sudo docker exec openclaw-gateway chown -R 1000:1000 /home/node/.openclaw`
+1. The gateway container is running: `sudo docker ps | grep openclaw-main-claw`
+2. The `.openclaw` directory has correct ownership: `sudo docker exec openclaw-main-claw chown -R 1000:1000 /home/node/.openclaw`
 
 ### Network Issues
 
