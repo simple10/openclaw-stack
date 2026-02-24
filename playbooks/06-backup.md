@@ -46,14 +46,14 @@ sudo chmod +x /home/openclaw/scripts/backup.sh
 # This avoids permission issues with uid 1000 owned directories
 sudo tee /etc/cron.d/openclaw-backup << 'EOF'
 # OpenClaw daily backup - runs as root to access uid 1000 owned directories
-0 3 * * * root /home/openclaw/scripts/backup.sh >> /home/openclaw/.openclaw/logs/backup.log 2>&1
+0 3 * * * root /home/openclaw/scripts/backup.sh >> /home/openclaw/logs/backup.log 2>&1
 EOF
 
 sudo chmod 644 /etc/cron.d/openclaw-backup
 
-# Ensure log directory exists
-sudo mkdir -p /home/openclaw/.openclaw/logs
-sudo chown 1000:1000 /home/openclaw/.openclaw/logs
+# Ensure shared log directory exists (host-level, not per-instance)
+sudo mkdir -p /home/openclaw/logs
+sudo chown openclaw:openclaw /home/openclaw/logs
 ```
 
 ---
@@ -64,33 +64,37 @@ sudo chown 1000:1000 /home/openclaw/.openclaw/logs
 # Run backup manually
 sudo /home/openclaw/scripts/backup.sh
 
-# Verify backup was created
-sudo ls -la /home/openclaw/.openclaw/backups/
+# Verify backup was created (per-instance)
+for inst_dir in /home/openclaw/instances/*/; do
+  echo "=== $(basename "$inst_dir") ==="
+  sudo ls -la "${inst_dir}.openclaw/backups/" 2>/dev/null || echo "  (no backups yet)"
+done
 
-# Verify backup contents
-sudo tar -tzf /home/openclaw/.openclaw/backups/openclaw_backup_*.tar.gz
+# Verify backup contents (latest from first instance)
+FIRST_INST=$(ls -d /home/openclaw/instances/*/ | head -1)
+sudo tar -tzf "${FIRST_INST}.openclaw/backups"/openclaw_backup_*.tar.gz | head -20
 ```
 
 **If backup script fails with "No such file or directory":**
 
 > "Some backup paths don't exist yet. This is normal on first boot before
-> the gateway has created all directories. The `2>/dev/null || true` in the
+> OpenClaw has created all directories. The `2>/dev/null || true` in the
 > script allows partial backups. Verify the script completed and check which
 > files were included with `tar -tzf`."
 
 **If backup is empty or very small (< 1KB):**
 
 > "The backup archive is too small — it may not contain any files. Check that
-> the gateway has been started at least once (directories are created on first
+> OpenClaw has been started at least once (directories are created on first
 > boot). Verify paths exist:"
 >
-> `sudo ls -la /home/openclaw/.openclaw/openclaw.json /home/openclaw/openclaw/.env`
+> `sudo ls -la /home/openclaw/instances/*/.openclaw/openclaw.json /home/openclaw/openclaw/.env`
 
 ---
 
 ## 6.4 Session & Log Pruning
 
-Session transcripts (`~/.openclaw/agents/<agentId>/sessions/*.jsonl`) accumulate indefinitely. This cron job deletes session files and stale log files older than 30 days.
+Session transcripts (`instances/<name>/.openclaw/agents/<agentId>/sessions/*.jsonl`) accumulate indefinitely. This cron job deletes session files and stale log files older than 30 days.
 
 ### Install Prune Script
 
@@ -108,7 +112,7 @@ sudo chmod +x /home/openclaw/scripts/session-prune.sh
 ```bash
 sudo tee /etc/cron.d/openclaw-session-prune << 'EOF'
 # OpenClaw session & log pruning — runs as root (uid 1000 owned directories)
-30 3 * * * root /home/openclaw/scripts/session-prune.sh >> /home/openclaw/.openclaw/logs/session-prune.log 2>&1
+30 3 * * * root /home/openclaw/scripts/session-prune.sh >> /home/openclaw/logs/session-prune.log 2>&1
 EOF
 
 sudo chmod 644 /etc/cron.d/openclaw-session-prune
@@ -133,14 +137,17 @@ sudo /home/openclaw/scripts/session-prune.sh
 cat /etc/cron.d/openclaw-backup
 cat /etc/cron.d/openclaw-session-prune
 
-# Check backup directory exists (sudo required — .openclaw is owned by uid 1000)
-sudo ls -la /home/openclaw/.openclaw/backups/
+# Check backup directories exist (per-instance)
+for inst_dir in /home/openclaw/instances/*/; do
+  echo "=== $(basename "$inst_dir") ==="
+  sudo ls -la "${inst_dir}.openclaw/backups/" 2>/dev/null || echo "  (no backups yet)"
+done
 
 # Check backup log (after first run)
-sudo cat /home/openclaw/.openclaw/logs/backup.log
+cat /home/openclaw/logs/backup.log
 
 # Check prune log (after first run)
-sudo cat /home/openclaw/.openclaw/logs/session-prune.log
+cat /home/openclaw/logs/session-prune.log
 ```
 
 ---
@@ -151,31 +158,35 @@ sudo cat /home/openclaw/.openclaw/logs/session-prune.log
 
 | Path | Description |
 |------|-------------|
-| `.openclaw/openclaw.json` | OpenClaw configuration |
-| `.openclaw/credentials/` | API keys and tokens |
-| `.openclaw/workspace/` | User workspaces and data |
-| `openclaw/.env` | Environment variables |
-| `sandboxes-home/` | Persistent sandbox home directories (credentials, dotfiles, SSH keys) |
+| `instances/<name>/.openclaw/openclaw.json` | OpenClaw configuration (per-claw) |
+| `instances/<name>/.openclaw/credentials/` | API keys and tokens (per-claw) |
+| `instances/<name>/.openclaw/workspace/` | User workspaces and data (per-claw) |
+| `openclaw/.env` | Shared environment variables |
+| `instances/<name>/sandboxes-home/` | Persistent sandbox home directories (per-claw) |
 
 ---
 
 ## Restore Procedure
 
 ```bash
-# List available backups (sudo required — .openclaw is owned by uid 1000)
-sudo ls -la /home/openclaw/.openclaw/backups/
+# List available backups per instance
+for inst_dir in /home/openclaw/instances/*/; do
+  echo "=== $(basename "$inst_dir") ==="
+  sudo ls -la "${inst_dir}.openclaw/backups/" 2>/dev/null || echo "  (no backups)"
+done
 
-# Stop OpenClaw
+# Stop all claws (or just the one being restored)
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose down'
 
-# Restore from backup
-BACKUP_FILE="/home/openclaw/.openclaw/backups/openclaw_backup_YYYYMMDD_HHMMSS.tar.gz"
-sudo tar -xzf "${BACKUP_FILE}" -C /home/openclaw
+# Restore a specific claw from backup
+INSTANCE="main-claw"  # ← change to the claw being restored
+BACKUP_FILE="/home/openclaw/instances/${INSTANCE}/.openclaw/backups/openclaw_backup_YYYYMMDD_HHMMSS.tar.gz"
+sudo tar -xzf "${BACKUP_FILE}" -C "/home/openclaw/instances/${INSTANCE}"
 
-# Fix permissions
-sudo chown -R 1000:1000 /home/openclaw/.openclaw
+# Fix permissions for the restored instance
+sudo chown -R 1000:1000 "/home/openclaw/instances/${INSTANCE}/.openclaw"
 
-# Restart OpenClaw
+# Restart
 sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'
 ```
 
@@ -190,7 +201,7 @@ sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose up -d'
 # Cause: .openclaw owned by uid 1000, but openclaw user is uid 1002
 
 # Check ownership (sudo required — .openclaw is owned by uid 1000)
-sudo ls -la /home/openclaw/.openclaw/
+sudo ls -la /home/openclaw/instances/*/.openclaw/
 # Shows: drwx------ 1000 1000 ... (container's node user, NOT host's openclaw)
 
 # Solution: Backup runs as root via /etc/cron.d (not user crontab)
@@ -217,18 +228,23 @@ sudo /home/openclaw/scripts/backup.sh
 # Check disk space
 df -h
 
-# Check backup contents
-tar -tzf /home/openclaw/.openclaw/backups/openclaw_backup_*.tar.gz
+# Check backup contents (pick an instance)
+sudo tar -tzf /home/openclaw/instances/main-claw/.openclaw/backups/openclaw_backup_*.tar.gz
 
 # Check for errors in log
-cat /home/openclaw/.openclaw/logs/backup.log
+cat /home/openclaw/logs/backup.log
 ```
 
 ---
 
 ## Off-Site Backup (Optional)
 
-Sync backups to external storage via `rclone sync /home/openclaw/.openclaw/backups remote:openclaw-backups` or `rsync -avz /home/openclaw/.openclaw/ user@backup-server:/path/to/backups/`.
+Sync the entire `instances/` directory to capture all per-claw backups and data:
+
+```bash
+rclone sync /home/openclaw/instances/ remote:openclaw-backups
+rsync -avz /home/openclaw/instances/ user@backup-server:/path/to/backups/
+```
 
 ---
 
