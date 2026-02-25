@@ -28,9 +28,20 @@ for inst_dir in "${INSTANCES_DIR}"/*/; do
   chown 1000:1000 "${BACKUP_DIR}"
 
   # Create backup of this claw's config and data
+  # Exclude ephemeral/re-downloadable dirs from sandboxes-home
   # || true: continue to other instances if one fails (error still printed)
   tar -czf "${BACKUP_FILE}" \
       -C "${inst_dir}" \
+      --exclude='.cache' \
+      --exclude='tmp' \
+      --exclude='.tmp' \
+      --exclude='node_modules' \
+      --exclude='.npm' \
+      --exclude='.yarn/cache' \
+      --exclude='.pnpm-store' \
+      --exclude='.local/share/pnpm' \
+      --exclude='__pycache__' \
+      --exclude='.venv' \
       .openclaw/openclaw.json \
       .openclaw/credentials \
       .openclaw/workspace \
