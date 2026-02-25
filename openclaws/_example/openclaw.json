@@ -10,15 +10,11 @@
     "mode": "local",
     "auth": {
       "mode": "token",
-      "token": "{{GATEWAY_TOKEN}}", // TEMPLATE: replace with 64-char hex token from VPS .env
       "rateLimit": {
         "maxAttempts": 10,
         "windowMs": 60000,
         "lockoutMs": 300000
       }
-    },
-    "remote": {
-      "token": "{{GATEWAY_TOKEN}}" // TEMPLATE: same token as auth.token above
     },
     "trustedProxies": [
       "172.30.0.1"

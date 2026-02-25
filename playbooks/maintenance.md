@@ -27,16 +27,17 @@ Each claw has its own `GATEWAY_TOKEN` baked into its `openclaw.json` by `deploy-
 # 1. Generate new token
 NEW_TOKEN=$(openssl rand -hex 32)
 
-# 2. Update the claw's openclaw.json on VPS
-# Edit <INSTALL_DIR>/instances/<CLAW_NAME>/.openclaw/openclaw.json
-#   — update gateway.auth.token and gateway.remote.token
-# Note: The gateway rewrites openclaw.json on startup, so use sed or jq, not manual edit.
+# 2. Write new token to per-claw .gateway-token file
+echo "$NEW_TOKEN" | sudo tee <INSTALL_DIR>/instances/<CLAW_NAME>/.openclaw/.gateway-token > /dev/null
 
-# 3. Restart the claw to pick up the new token (restart is fine — token is read from disk)
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose restart openclaw-<CLAW_NAME>'
+# 3. Regenerate .env so PREFIX_GATEWAY_TOKEN gets the new value
+<INSTALL_DIR>/scripts/openclaw-multi.sh generate
 
-# 4. Update all paired devices with new token (existing browser URLs will need the new token parameter)
-# Repeat steps 2-4 for each claw being rotated
+# 4. Recreate the claw container (up -d, NOT restart — restart doesn't reload .env)
+sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose up -d openclaw-<CLAW_NAME>'
+
+# 5. Update all paired devices with new token (existing browser URLs will need the new token parameter)
+# Repeat steps 2-5 for each claw being rotated
 ```
 
 > **Note:** The shared `.env` contains `OPENCLAW_GATEWAY_TOKEN` from initial setup, but this is not used by multi-claw containers. Each claw reads its token from its own `openclaw.json`. You do not need to update `.env` when rotating a claw's token.

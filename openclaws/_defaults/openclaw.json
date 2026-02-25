@@ -24,16 +24,12 @@
     "bind": "lan", // Required for cloudflared (tunnel) to connect to gateway in the docker container
     "mode": "local",
     "auth": {
-      "mode": "token",
-      "token": "{{GATEWAY_TOKEN}}", // TEMPLATE: replace with 64-char hex token from VPS .env
+      "mode": "token", // OpenClaw uses OPENCLAW_GATEWAY_TOKEN env var
       "rateLimit": {
         "maxAttempts": 10,
         "windowMs": 60000,
         "lockoutMs": 300000
       }
-    },
-    "remote": {
-      "token": "{{GATEWAY_TOKEN}}" // TEMPLATE: same token as auth.token above
     },
     // cloudflared connects via Docker bridge gateway IP. Must be exact IPs — CIDR ranges NOT supported.
     "trustedProxies": [
@@ -89,6 +85,7 @@
         // Main agent overrides to "non-main" so operator DMs run on host.
         "mode": "all",
         "scope": "agent",
+        "workspaceAccess": "rw", // Enable writes to agent sandbox - remove this here and customize per agent for tighter security controls
         "docker": {
           "image": "openclaw-sandbox:bookworm-slim",
           "containerPrefix": "openclaw-sbx-",
@@ -221,7 +218,6 @@
           "tmux"
         ],
         "sandbox": {
-          "workspaceAccess": "rw", // Code agent needs persistent read/write access to workspace
           "docker": {
             "image": "openclaw-sandbox-toolkit:bookworm-slim", // sandbox-toolkit has the full toolkit bins
             "network": "bridge", // enable network access for claude code, codex, etc. to work

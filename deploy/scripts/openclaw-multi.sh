@@ -356,11 +356,12 @@ generate_env() {
 
     instance_section+=$'\n'"# Claw: ${name}"$'\n'
 
-    # Extract gateway token from deployed openclaw.json (set by deploy-config.sh)
-    local config_json="${OPENCLAW_HOME}/instances/${name}/.openclaw/openclaw.json"
-    if sudo test -f "$config_json"; then
+    # Read gateway token from per-claw .gateway-token file (written by deploy-config.sh)
+    # Token is NOT in openclaw.json — env var is the single source of truth.
+    local token_file="${OPENCLAW_HOME}/instances/${name}/.openclaw/.gateway-token"
+    if sudo test -f "$token_file"; then
       local gw_token
-      gw_token=$(sudo grep -o '"token": *"[^"]*"' "$config_json" 2>/dev/null | head -1 | cut -d'"' -f4 || true)
+      gw_token=$(sudo cat "$token_file" 2>/dev/null | tr -d '[:space:]' || true)
       [ -n "$gw_token" ] && instance_section+="${prefix}_GATEWAY_TOKEN=${gw_token}"$'\n'
     fi
 

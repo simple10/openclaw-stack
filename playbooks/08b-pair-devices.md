@@ -15,11 +15,10 @@ Pair browser and Telegram devices with each claw's gateway.
 Discover running claws and read each claw's gateway token:
 
 ```bash
-# On VPS: list claws and their gateway tokens
+# On VPS: list claws and their gateway tokens (from env var, not openclaw.json)
 CLAWS=$(sudo docker ps --format '{{.Names}}' --filter 'name=^openclaw-' | grep -v '^openclaw-cli$' | grep -v '^openclaw-sbx-' | sort)
 for CLAW in $CLAWS; do
-  TOKEN=$(sudo docker exec --user node "$CLAW" \
-    node -e "console.log(require('/home/node/.openclaw/openclaw.json').gateway.auth.token)" 2>/dev/null || echo "UNKNOWN")
+  TOKEN=$(sudo docker exec --user node "$CLAW" printenv OPENCLAW_GATEWAY_TOKEN 2>/dev/null || echo "UNKNOWN")
   echo "$CLAW: token=$TOKEN"
 done
 ```
@@ -92,10 +91,9 @@ PORT=$(ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
   "sudo docker port openclaw-<CLAW_NAME> | grep -oP '0\.0\.0\.0:\K\d+' | head -1")
 echo "Claw port: $PORT"
 
-# Read token from the claw's openclaw.json
+# Read token from the claw's env var
 TOKEN=$(ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
-  "sudo docker exec --user node openclaw-<CLAW_NAME> \
-    node -e \"console.log(require('/home/node/.openclaw/openclaw.json').gateway.auth.token)\"")
+  "sudo docker exec --user node openclaw-<CLAW_NAME> printenv OPENCLAW_GATEWAY_TOKEN")
 
 # Re-pair CLI with explicit token and port (loopback triggers auto-approval)
 ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
@@ -166,7 +164,7 @@ If the bot token is empty, skip this step — Telegram was not configured.
 
 ### Token is rejected (401/403)
 
-- The token in the URL may not match the claw's gateway token in its `openclaw.json`.
+- The token in the URL may not match the claw's OPENCLAW_GATEWAY_TOKEN env var.
 - Re-read the per-claw token from VPS-1 and try again (see Open the Claw URLs above).
 
 ### No pending devices after opening URL
@@ -198,8 +196,7 @@ Read the token from VPS if needed:
 
 ```bash
 ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
-  "sudo docker exec --user node openclaw-<CLAW_NAME> \
-    node -e \"console.log(require('/home/node/.openclaw/openclaw.json').gateway.auth.token)\""
+  "sudo docker exec --user node openclaw-<CLAW_NAME> printenv OPENCLAW_GATEWAY_TOKEN"
 ```
 
 After the user clicks the URL:

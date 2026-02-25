@@ -473,9 +473,8 @@ Re-run the CLI pairing step from `08b-pair-devices.md`:
 
 ```bash
 FIRST_CLAW=$(echo "$CLAWS" | head -1)
-# Read token from the claw's own openclaw.json (not shared .env)
-GATEWAY_TOKEN=$(sudo docker exec --user node "$FIRST_CLAW" \
-  node -e "console.log(require('/home/node/.openclaw/openclaw.json').gateway.auth.token)")
+# Read token from the claw's env var (single source of truth)
+GATEWAY_TOKEN=$(sudo docker exec --user node "$FIRST_CLAW" printenv OPENCLAW_GATEWAY_TOKEN)
 # Discover the claw's gateway port
 PORT=$(sudo docker port "$FIRST_CLAW" | grep -oP '0\.0\.0\.0:\K\d+' | head -1)
 sudo docker exec --user node "$FIRST_CLAW" \

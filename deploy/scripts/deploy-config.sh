@@ -85,17 +85,23 @@ deploy_claw_config() {
     set +a
   fi
 
-  # Resolve GATEWAY_TOKEN: config.env > existing deployed openclaw.json > generate new
+  # Resolve GATEWAY_TOKEN: config.env > existing .gateway-token file > generate new
+  # Token is NOT stored in openclaw.json — it's passed via OPENCLAW_GATEWAY_TOKEN env var
+  # to avoid drift between config file and env var (which caused auth failures).
   local token="${GATEWAY_TOKEN:-}"
-  if [ -z "$token" ] && [ -f "${config_target}/openclaw.json" ]; then
-    # Preserve existing token from previous deploy (avoid rotating on redeploy)
-    token=$(sudo grep -o '"token": "[^"]*"' "${config_target}/openclaw.json" 2>/dev/null | head -1 | cut -d'"' -f4 || true)
+  local token_file="${config_target}/.gateway-token"
+  if [ -z "$token" ] && sudo test -f "$token_file"; then
+    token=$(sudo cat "$token_file" 2>/dev/null | tr -d '[:space:]' || true)
     [ -n "$token" ] && echo "  Reusing existing GATEWAY_TOKEN for ${name}" >&2
   fi
   if [ -z "$token" ]; then
     token=$(openssl rand -hex 32)
     echo "  Generated GATEWAY_TOKEN for ${name}: ${token}" >&2
   fi
+  # Persist token for reuse across redeploys
+  echo "$token" | sudo tee "$token_file" > /dev/null
+  sudo chown 1000:1000 "$token_file"
+  sudo chmod 600 "$token_file"
 
   # Construct allowed origin for controlUi (required for non-loopback binds)
   local allowed_origin="https://${OPENCLAW_DOMAIN}"
@@ -116,7 +122,6 @@ deploy_claw_config() {
 
   # Substitute all template variables — use | as sed delimiter (URLs contain /)
   sudo sed -i \
-    -e "s|{{GATEWAY_TOKEN}}|${token}|g" \
     -e "s|{{OPENCLAW_DOMAIN_PATH}}|${OPENCLAW_DOMAIN_PATH:-}|g" \
     -e "s|{{YOUR_TELEGRAM_ID}}|${YOUR_TELEGRAM_ID}|g" \
     -e "s|{{OPENCLAW_INSTANCE_ID}}|${OPENCLAW_INSTANCE_ID:-${name}}|g" \

@@ -19,14 +19,14 @@ Collect the following values and present them in a single, neatly formatted repo
 
 1. **User passwords** — these were generated and displayed during `02-base-setup.md` section 2.2. If you no longer have them in context (e.g., context was compressed), check the `# DEPLOYED:` lines in `openclaw-config.env` first (`grep 'DEPLOYED.*PASSWORD' openclaw-config.env`). If those are also empty, inform the user the passwords were displayed during base setup and can be reset via VNC/console access.
 
-2. **Per-claw gateway tokens** — read from VPS:
+2. **Per-claw gateway tokens** — read from container env var (NOT openclaw.json):
 
    ```bash
    CLAWS=$(ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
      "sudo docker ps --format '{{.Names}}' --filter 'name=^openclaw-' | grep -v '^openclaw-cli$' | grep -v '^openclaw-sbx-' | sort")
    for CLAW in $CLAWS; do
      TOKEN=$(ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
-       "sudo docker exec --user node $CLAW node -e \"console.log(require('/home/node/.openclaw/openclaw.json').gateway.auth.token)\"")
+       "sudo docker exec --user node $CLAW printenv OPENCLAW_GATEWAY_TOKEN")
      echo "$CLAW: $TOKEN"
    done
    ```
