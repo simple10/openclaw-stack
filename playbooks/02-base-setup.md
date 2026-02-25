@@ -132,7 +132,12 @@ sudo chmod 600 /home/adminclaw/.ssh/authorized_keys
 # ============================================
 # 2. Create openclaw (app user, NO sudo, NO SSH)
 # ============================================
-sudo useradd -m -s /bin/bash openclaw
+# Pin uid to 1000 — matches the 'node' user (uid 1000) inside the Docker
+# container so bind-mounted files show correct ownership under Sysbox's
+# user namespace remapping. If uid 1000 is taken (e.g., 'ubuntu' on some
+# providers), remove or reassign it first:
+#   sudo userdel ubuntu  # or: sudo usermod -u 1099 ubuntu
+sudo useradd -m -s /bin/bash -u 1000 openclaw
 
 # Generate and set random password (save this for console/emergency access)
 OPENCLAW_PASS=$(openssl rand -base64 18)

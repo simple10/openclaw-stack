@@ -55,7 +55,7 @@ if [ ! -L /usr/local/bin/openclaw ]; then
   echo "[entrypoint] Created /usr/local/bin/openclaw symlink"
 fi
 
-# ── 1f. Configure npm global prefix for skill installs ────────────
+# ── 1f. Configure npm global prefix for skill installs ─────────────
 # Gateway runs as node (uid 1000) after gosu drops privileges.
 # npm install -g (used by skills.install) needs a writable global prefix.
 # Default /usr/local/lib/node_modules is owned by root — redirect to user dir.
@@ -67,7 +67,7 @@ echo "prefix=$npm_global" >> /home/node/.npmrc
 export PATH="$npm_global/bin:$PATH"
 echo "[entrypoint] npm global prefix set to $npm_global"
 
-# ── 1g. Auto-generate gateway shims from sandbox-toolkit.yaml ─────
+# ── 1g. Auto-generate gateway shims from sandbox-toolkit.yaml ──────
 # Skills check bins on the gateway (load-time) AND inside the sandbox (runtime).
 # /opt/skill-bins is bind-mounted read-only into all sandboxes, making
 # gateway-installed binaries available without network or image rebuilds.
@@ -178,7 +178,7 @@ if command -v dockerd > /dev/null 2>&1; then
     (
       set +e
       /app/deploy/rebuild-sandboxes.sh
-    )
+    ) || true
   fi
 else
   echo "[entrypoint] Docker not installed, skipping sandbox bootstrap"

@@ -56,6 +56,12 @@ docker network create \
 
 # Part 2: Create Directory Structure (instance-based layout)
 # Each claw gets full isolation under ${INSTALL_DIR}/instances/<name>/
+# Ensure INSTALL_DIR exists and is owned by openclaw.
+# Default /home/openclaw is already correct (created by useradd -m), but custom
+# INSTALL_DIR values (e.g. /opt/openclaw) may be root-owned from the staging mkdir.
+sudo mkdir -p "$INSTALL_DIR"
+sudo chown openclaw:openclaw "$INSTALL_DIR"
+
 sudo -u openclaw bash -s "$INSTALL_DIR" << 'DIREOF'
 set -euo pipefail
 OPENCLAW_HOME="$1"

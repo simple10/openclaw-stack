@@ -110,6 +110,41 @@ fi
 
 ---
 
+## 3b.4 Disable Broken Overlayfs ID-Mapped Mounts
+
+Sysbox 0.6.7 detects kernel support for ID-mapped mounts on overlayfs but fails to apply them, causing Docker image files inside containers to appear as `nobody:nogroup`. This breaks any file with restrictive permissions (e.g., `.env` at mode 0600).
+
+The fix is to disable overlayfs-on-idmapped-mount, forcing Sysbox to use rootfs cloning (chown) instead. This adds a few seconds to container start/stop but ensures correct uid mapping.
+
+See: https://github.com/nestybox/sysbox/issues/968
+
+```bash
+#!/bin/bash
+# Create sysbox-mgr override to force rootfs cloning
+sudo mkdir -p /etc/systemd/system/sysbox-mgr.service.d
+sudo tee /etc/systemd/system/sysbox-mgr.service.d/override.conf << 'EOF'
+[Service]
+# Force rootfs cloning (chown) instead of broken ID-mapped mount on overlayfs.
+# Sysbox 0.6.7 detects kernel ID-mapped mount support but fails to apply it,
+# causing image files to appear as nobody:nogroup inside containers.
+# This slows container start/stop by a few seconds but ensures correct uid mapping.
+# See: https://github.com/nestybox/sysbox/issues/968
+ExecStart=
+ExecStart=/usr/bin/sysbox-mgr --disable-ovfs-on-idmapped-mount --log-level info
+EOF
+sudo systemctl daemon-reload
+sudo systemctl restart sysbox
+
+# Verify the override is active
+sudo systemctl show sysbox-mgr --property=ExecStart | grep -q 'disable-ovfs-on-idmapped-mount' \
+  && echo "sysbox-mgr override active" \
+  || echo "ERROR: override not applied"
+```
+
+> **When to remove:** Once Sysbox fixes the overlayfs ID-mapped mount bug (check future releases), remove the override with `sudo rm /etc/systemd/system/sysbox-mgr.service.d/override.conf && sudo systemctl daemon-reload && sudo systemctl restart sysbox`.
+
+---
+
 ## Verification
 
 ```bash
@@ -118,6 +153,9 @@ sudo systemctl status sysbox
 
 # Verify runtime registered with Docker
 sudo docker info | grep -i "sysbox"
+
+# Verify rootfs cloning is active (should show "Use of overlayfs on ID-mapped mounts disabled")
+sudo journalctl -u sysbox-mgr --no-pager -n 20 | grep -i "idmap\|overlayfs"
 ```
 
 ---
