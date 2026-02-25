@@ -363,7 +363,7 @@ openclaw doctor --deep
 
 # SSH
 ./scripts/ssh-vps.sh # SSH into VPS host
-./scripts/ssh-gateway.sh # SSH into VPS -> exec bash into gateway container
+./scripts/ssh-openclaw.sh # SSH into VPS -> exec bash into OpenClaw gateway container
 ./scripts/ssh-agent.sh # SSH into an agent sandbox - auto starts if not currently running
 
 # Restart

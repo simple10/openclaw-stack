@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Opens an interactive bash shell inside an OpenClaw gateway container on VPS-1.
+# Opens an interactive bash shell inside an OpenClaw gateway container on VPS.
 #
 # Usage:
-#   scripts/ssh-gateway.sh                      # auto-detect instance
-#   scripts/ssh-gateway.sh --instance test-claw # target specific instance
+#   scripts/ssh-openclaw.sh                      # auto-detect instance
+#   scripts/ssh-openclaw.sh --instance main-claw # target specific instance
 
 set -euo pipefail
+
+printf '\033[32mSSH into OpenClaw container \033[0m\n'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../deploy/scripts/source-config.sh"

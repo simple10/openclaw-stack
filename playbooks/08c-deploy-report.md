@@ -134,7 +134,7 @@ Read `source-config.sh HOSTALERT_TELEGRAM_BOT_TOKEN` and `source-config.sh HOSTA
 | Task | Command |
 |------|---------|
 | SSH to VPS | `./scripts/ssh-vps.sh` |
-| SSH to claw | `./scripts/ssh-gateway.sh` |
+| SSH to claw container | `./scripts/ssh-openclaw.sh` |
 | Claw logs | `./scripts/logs-openclaw.sh` |
 | Health Checks | `./scripts/health-check.sh` |
 | OpenClaw CLI | `./scripts/openclaw.sh [command]` or SSH to claw `openclaw` |

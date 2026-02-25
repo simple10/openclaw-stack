@@ -58,7 +58,7 @@ resolve_gateway() {
     echo "  Start with: openclaw-multi.sh start" >&2
     return 1
   else
-    echo "Error: Multiple gateway containers running. Specify which one:" >&2
+    echo "Error: Multiple OpenClaw gateway containers running. Specify which one:" >&2
     while IFS= read -r c; do
       echo "  --instance ${c#openclaw-}" >&2
     done <<< "$containers"
