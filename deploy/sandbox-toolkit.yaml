@@ -96,6 +96,11 @@ tools:
   amp:
     install: npm install -g @sourcegraph/amp
 
+  # On-device search engine for markdown notes and docs
+  # https://github.com/tobi/qmd
+  qmd:
+    install: npm install -g @tobilu/qmd
+
   # URL summarizer
   # https://github.com/steipete/summarize
   summarize:
