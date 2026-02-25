@@ -126,11 +126,10 @@ sudo ls -la <INSTALL_DIR>/vector/data/
 
 ```bash
 # Health check (no auth required)
-# NOTE: LOG_WORKER_URL contains /logs suffix — strip it for the base URL health check
-curl -s https://<LOG_WORKER_BASE_URL>/health
+curl -s https://<LOG_WORKER_URL>/health
 
-# Test log ingestion (use the full LOG_WORKER_URL which includes /logs)
-curl -X POST https://<LOG_WORKER_URL> \
+# Test log ingestion
+curl -X POST https://<LOG_WORKER_URL>/logs \
   -H "Authorization: Bearer <LOG_WORKER_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{"container_name":"test","message":"verification test","stream":"stdout","timestamp":"2026-01-01T00:00:00Z"}'
@@ -530,8 +529,7 @@ ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
 **1. Events endpoint (D1 storage):**
 
 ```bash
-# Derive events URL from LOG_WORKER_URL
-EVENTS_URL="${LOG_WORKER_URL/\/logs/\/openclaw\/events}"
+EVENTS_URL="${LOG_WORKER_URL}/openclaw/events"
 curl -s -X POST "$EVENTS_URL" \
   -H "Authorization: Bearer $LOG_WORKER_TOKEN" \
   -H "Content-Type: application/json" \
@@ -542,7 +540,7 @@ curl -s -X POST "$EVENTS_URL" \
 **2. Llemtry endpoint (Langfuse):**
 
 ```bash
-LLEMTRY_URL="${LOG_WORKER_URL/\/logs/\/llemtry}"
+LLEMTRY_URL="${LOG_WORKER_URL}/llemtry"
 curl -s -X POST "$LLEMTRY_URL" \
   -H "Authorization: Bearer $LOG_WORKER_TOKEN" \
   -H "Content-Type: application/json" \
@@ -613,8 +611,8 @@ sudo docker logs --tail 50 vector
 # Restart Vector (use `up -d` instead if .env values changed)
 sudo -u openclaw bash -c 'cd <INSTALL_DIR>/vector && docker compose restart'
 
-# Check if Worker endpoint is reachable (strip /logs suffix for base URL)
-curl -s https://<LOG_WORKER_BASE_URL>/health
+# Check if Worker endpoint is reachable
+curl -s https://<LOG_WORKER_URL>/health
 ```
 
 ### Networking Issues

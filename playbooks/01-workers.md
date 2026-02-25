@@ -126,8 +126,7 @@ The D1 `database_id` placeholder will be updated after creating the database (se
 Before deploying, check if the worker is already live. If `source-config.sh LOG_WORKER_URL` is not a placeholder (no angle brackets), curl its health endpoint:
 
 ```bash
-# Strip the /logs path suffix to get the base URL for health check
-curl -s https://<LOG_WORKER_BASE_URL>/health
+curl -s https://<LOG_WORKER_URL>/health
 ```
 
 - **If healthy (`{"status":"ok"}`):** The worker is already deployed. During a **fresh deploy**, proceed without pausing. Outside of a fresh deploy, warn the user that re-deploying will overwrite secrets and ask to confirm.
@@ -191,7 +190,7 @@ Note the Worker URL from the output (e.g., `https://log-receiver.<account>.worke
 
 ### Update VPS Configuration
 
-Capture the Worker URL from the deploy output and update `LOG_WORKER_URL` in `openclaw-config.env` (include the `/logs` path suffix). `LOG_WORKER_TOKEN` should already be set from the secret configuration step above.
+Capture the Worker URL from the deploy output and update `LOG_WORKER_URL` in `openclaw-config.env` (base URL only, no path suffix). `LOG_WORKER_TOKEN` should already be set from the secret configuration step above.
 
 > **Fresh deploy:** During initial deployment, skip the VPS update below — Vector
 > isn't running yet. The correct values will be used when `04-vps1-openclaw.md`
@@ -256,11 +255,11 @@ npx wrangler deploy --dry-run
 # Check Vector logs on VPS-1
 sudo docker logs --tail 50 vector
 
-# Verify Worker URL is correct (must include /logs path)
+# Verify Worker URL is correct
 echo $LOG_WORKER_URL
 
 # Test Worker directly
-curl -X POST <LOG_WORKER_URL> \
+curl -X POST <LOG_WORKER_URL>/logs \
   -H "Authorization: Bearer <token>" \
   -d '{"message":"test"}'
 ```

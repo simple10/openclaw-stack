@@ -106,9 +106,9 @@ deploy_claw_config() {
   # Construct allowed origin for controlUi (required for non-loopback binds)
   local allowed_origin="https://${OPENCLAW_DOMAIN}"
 
-  # Re-derive URLs with potentially updated LOG_WORKER_URL
-  local llemtry_url="${LOG_WORKER_URL/\/logs/\/llemtry}"
-  local events_url="${LOG_WORKER_URL/\/logs/\/openclaw\/events}"
+  # Derive endpoint URLs from base LOG_WORKER_URL
+  local llemtry_url="${LOG_WORKER_URL}/llemtry"
+  local events_url="${LOG_WORKER_URL}/openclaw/events"
 
   # Determine openclaw.json source — claw-specific overrides _defaults
   local json_source="${INSTANCES_DIR}/${name}/openclaw.json"

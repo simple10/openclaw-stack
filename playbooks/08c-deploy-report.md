@@ -100,7 +100,7 @@ All URLs are protected by Cloudflare Access.
 | Worker | URL |
 |--------|-----|
 | AI Gateway Proxy | `<AI_GATEWAY_WORKER_URL>` |
-| Log Receiver | `<LOG_WORKER_URL without /logs suffix>` |
+| Log Receiver | `<LOG_WORKER_URL>` |
 
 ---
 

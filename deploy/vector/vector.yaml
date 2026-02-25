@@ -43,7 +43,7 @@ sinks:
     type: http
     inputs:
       - tag_level
-    uri: "${LOG_WORKER_URL}"
+    uri: "${LOG_WORKER_URL}/logs"
     encoding:
       codec: json
     auth:

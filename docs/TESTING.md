@@ -20,7 +20,7 @@ Extract these values for use in all tests below:
 - `OPENCLAW_DOMAIN` - Domain for browser tests
 - `OPENCLAW_DOMAIN_PATH` - URL subpath (may be empty)
 - `AI_GATEWAY_WORKER_URL` - AI Gateway Worker URL
-- `LOG_WORKER_URL` - Log Receiver Worker URL (includes `/logs` path)
+- `LOG_WORKER_URL` - Log Receiver Worker URL (base URL, no path suffix)
 
 ---
 
@@ -196,8 +196,8 @@ ssh -p 222 adminclaw@<VPS1_IP> "sudo -u openclaw bash -c 'cd /home/openclaw/open
 ### No Logs in Cloudflare
 
 1. Check Vector logs: `sudo -u openclaw bash -c 'cd /home/openclaw/vector && docker compose logs'`
-2. Verify LOG_WORKER_URL includes `/logs` path
-3. Check Log Receiver Worker health (strip `/logs` suffix): `curl -s https://<LOG_WORKER_BASE_URL>/health`
+2. Verify LOG_WORKER_URL is set (base URL, no path suffix)
+3. Check Log Receiver Worker health: `curl -s https://<LOG_WORKER_URL>/health`
 
 ### Container Permission Errors
 

@@ -150,8 +150,8 @@ These are substituted server-side via `sed` after copying from staging. All conf
 | `VPS_HOSTNAME` | Config | `openclaw.json` |
 | `ENABLE_EVENTS_LOGGING` | Config | `openclaw.json` |
 | `ENABLE_LLEMTRY_LOGGING` | Config | `openclaw.json` |
-| `EVENTS_URL` | Derived: `LOG_WORKER_URL` with `/logs` → `/openclaw/events` | `openclaw.json` |
-| `LLEMTRY_URL` | Derived: `LOG_WORKER_URL` with `/logs` → `/llemtry` | `openclaw.json` |
+| `EVENTS_URL` | Derived: `${LOG_WORKER_URL}/openclaw/events` | `openclaw.json` |
+| `LLEMTRY_URL` | Derived: `${LOG_WORKER_URL}/llemtry` | `openclaw.json` |
 | `LOG_WORKER_TOKEN` | Config | `openclaw.json` |
 | `OPENCLAW_DOMAIN` | Config (or per-claw `config.env`) | Used to derive `ALLOWED_ORIGIN` |
 | `ALLOWED_ORIGIN` | Derived: `https://${OPENCLAW_DOMAIN}` | `openclaw.json` |
@@ -533,7 +533,7 @@ sudo docker logs vector 2>&1 | head -20
 sudo docker exec vector ls -la /etc/vector/
 
 # Test the Worker endpoint is reachable from within the container
-sudo docker exec vector wget -q -O- <LOG_WORKER_URL_WITHOUT_PATH>/health
+sudo docker exec vector wget -q -O- <LOG_WORKER_URL>/health
 
 # Restart Vector after fixing (use `up -d` instead if .env values changed)
 sudo -u openclaw bash -c 'cd <INSTALL_DIR>/vector && docker compose restart'
