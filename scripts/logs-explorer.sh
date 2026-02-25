@@ -25,12 +25,6 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="$SCRIPT_DIR/../openclaw-config.env"
-
-if [[ ! -f "$CONFIG_FILE" ]]; then
-  echo "Error: openclaw-config.env not found at $CONFIG_FILE" >&2
-  exit 1
-fi
 
 # ─── Extract --instance flag early (before TUI/direct mode split) ────────────
 
@@ -64,7 +58,7 @@ fi
 # ─── Help ─────────────────────────────────────────────────────────────────────
 
 if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
-  source "$CONFIG_FILE"
+  source "$SCRIPT_DIR/../deploy/scripts/source-config.sh"
   printf '\033[36mOpenClaw Session Debug Tool\033[0m (VPS: %s)\n\n' "$VPS1_IP"
   echo "Interactive TUI (no args):"
   echo "  $0"
@@ -76,9 +70,7 @@ fi
 
 # ─── Direct mode: SCP + SSH ──────────────────────────────────────────────────
 
-source "$CONFIG_FILE"
-
-INSTALL_DIR="${INSTALL_DIR:-/home/openclaw}"
+source "$SCRIPT_DIR/../deploy/scripts/source-config.sh"
 
 # Common SSH/SCP options (scp uses -P for port, ssh uses -p)
 SSH_COMMON=(-i "${SSH_KEY_PATH}" -o ConnectTimeout=10)

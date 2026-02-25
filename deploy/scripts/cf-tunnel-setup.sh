@@ -3,7 +3,7 @@ set -euo pipefail
 
 # cf-tunnel-setup.sh — Automated Cloudflare Tunnel configuration via API
 #
-# Always-multi-claw: discovers all claws from deploy/openclaws/*/ and configures
+# Always-multi-claw: discovers all claws from openclaws/*/ and configures
 # tunnel ingress + DNS for each. No single-instance fallback.
 #
 # Uses CF_API_TOKEN to create/manage tunnels, configure ingress routes,
@@ -27,7 +27,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DEPLOY_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$DEPLOY_DIR/.." && pwd)"
-INSTANCES_DIR="${DEPLOY_DIR}/openclaws"
+# Dual-context: VPS staging has openclaws/ inside deploy dir; local repo has it at root
+if [ -d "${DEPLOY_DIR}/openclaws" ]; then
+  INSTANCES_DIR="${DEPLOY_DIR}/openclaws"
+else
+  INSTANCES_DIR="${REPO_ROOT}/openclaws"
+fi
 
 CF_API_BASE="https://api.cloudflare.com/client/v4"
 
@@ -311,7 +316,7 @@ cmd_setup_routes() {
   else
     local discovered
     discovered=$(discover_instances)
-    [ -n "$discovered" ] || die "No active claws found in deploy/openclaws/"
+    [ -n "$discovered" ] || die "No active claws found in ${INSTANCES_DIR}/"
     while IFS= read -r name; do
       claw_names+=("$name")
     done <<< "$discovered"

@@ -3,7 +3,7 @@
 # Runs via cron every 15 minutes: /etc/cron.d/openclaw-alerts
 #
 # Requires: HOSTALERT_TELEGRAM_BOT_TOKEN and HOSTALERT_TELEGRAM_CHAT_ID in ${INSTALL_DIR}/openclaw/.env
-# Only alerts on state *change* to avoid spam (tracks state in /tmp/host-alert-state).
+# Only alerts on state *change* to avoid spam (tracks state in $INSTALL_DIR/.host-alert-state).
 #
 # Writes health.json to the agent workspace directory, readable by both
 # host scripts (--report mode) and OpenClaw agents (via read tool at host-status/health.json).
@@ -20,7 +20,7 @@ fi
 
 INSTALL_DIR="${INSTALL_DIR:-/home/openclaw}"
 
-STATE_FILE="/tmp/host-alert-state"
+STATE_FILE="${INSTALL_DIR}/.host-alert-state"
 CONFIG_FILE="${INSTALL_DIR}/openclaw/.env"
 INSTANCES_DIR="${INSTALL_DIR}/instances"
 

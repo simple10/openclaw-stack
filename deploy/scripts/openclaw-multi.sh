@@ -4,7 +4,7 @@ set -euo pipefail
 # openclaw-multi.sh — Multi-claw OpenClaw management (always-multi architecture)
 #
 # Every deployment is multi-claw — even if running just one instance (main-claw).
-# Discovers claws from deploy/openclaws/*/, generates docker-compose.override.yml,
+# Discovers claws from openclaws/*/, generates docker-compose.override.yml,
 # manages per-instance .env vars, and handles lifecycle operations.
 #
 # Usage: openclaw-multi.sh <command> [args]
@@ -25,7 +25,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DEPLOY_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$DEPLOY_DIR/.." && pwd)"
-INSTANCES_DIR="${DEPLOY_DIR}/openclaws"
+# Dual-context: VPS staging has openclaws/ inside deploy dir; local repo has it at root
+if [ -d "${DEPLOY_DIR}/openclaws" ]; then
+  INSTANCES_DIR="${DEPLOY_DIR}/openclaws"
+else
+  INSTANCES_DIR="${REPO_ROOT}/openclaws"
+fi
 OPENCLAW_HOME="${INSTALL_DIR:-/home/openclaw}"
 
 # Port bases for auto-assignment
@@ -133,7 +138,7 @@ cmd_list() {
   mapfile -t instances < <(discover_instances)
 
   if [ ${#instances[@]} -eq 0 ]; then
-    echo "  (none — create dirs in deploy/openclaws/)"
+    echo "  (none — create dirs in openclaws/)"
     echo ""
     echo "=== Disabled Claws ==="
     local disabled
@@ -599,7 +604,7 @@ Commands:
                             --force          Overwrite even if target has images
   tunnel-config [--apply] Print Cloudflare tunnel rules (--apply to configure via CF API)
 
-Claw directories: deploy/openclaws/<name>/
+Claw directories: openclaws/<name>/
   - Active: any name without _ prefix + has config.env
   - Disabled: _ prefix (e.g., _experimental/)
   - Templates: _defaults/ (shared config), _example/ (copy template)

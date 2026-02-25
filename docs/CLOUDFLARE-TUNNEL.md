@@ -361,7 +361,7 @@ Each subdomain needs its own Cloudflare Access application (or extend a single a
 
 ### Adding a New Instance
 
-1. Create `deploy/openclaws/<name>/config.env` with at least `OPENCLAW_DOMAIN` set
+1. Create `openclaws/<name>/config.env` with at least `OPENCLAW_DOMAIN` set
 2. Run `openclaw-multi.sh generate` to update compose and `.env` files
 3. Configure tunnel routes:
    - **With `CF_API_TOKEN`:** Run `openclaw-multi.sh tunnel-config --apply` to auto-configure routes + DNS

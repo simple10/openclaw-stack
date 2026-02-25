@@ -30,7 +30,7 @@ func main() {
 	}
 
 	if len(claws) == 0 {
-		// Fallback: if deploy/openclaws/ doesn't exist yet, assume main-claw
+		// Fallback: if openclaws/ doesn't exist yet, assume main-claw
 		claws = []string{"main-claw"}
 	}
 

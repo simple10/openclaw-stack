@@ -85,10 +85,10 @@ func LoadConfig(projectRoot string) (Config, error) {
 	return cfg, nil
 }
 
-// DiscoverClaws returns sorted claw names from deploy/openclaws/.
+// DiscoverClaws returns sorted claw names from openclaws/.
 // Directories prefixed with _ are skipped (e.g., _defaults, _example).
 func DiscoverClaws(projectRoot string) ([]string, error) {
-	clawsDir := filepath.Join(projectRoot, "deploy", "openclaws")
+	clawsDir := filepath.Join(projectRoot, "openclaws")
 	entries, err := os.ReadDir(clawsDir)
 	if err != nil {
 		if os.IsNotExist(err) {

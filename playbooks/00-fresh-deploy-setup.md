@@ -120,7 +120,7 @@ When `CF_API_TOKEN` is set, automate tunnel creation, route configuration, and D
 Check for additional claws beyond the default `main-claw`:
 
 ```bash
-ls -d deploy/openclaws/*/ 2>/dev/null | xargs -I{} basename {} | grep -v '^_'
+ls -d openclaws/*/ 2>/dev/null | xargs -I{} basename {} | grep -v '^_'
 ```
 
 If only `main-claw` is found (or no directories exist), this is a single-claw deployment — proceed normally. The deployment process is the same regardless of claw count.
@@ -194,7 +194,7 @@ Read current gateway resource limits from `GATEWAY_CPUS` and `GATEWAY_MEMORY` in
 
 `GATEWAY_CPUS` and `GATEWAY_MEMORY` are **per-container** limits — each claw gets these resources. With multiple claws, divide the available VPS resources by the number of active claws.
 
-1. Count active claws from § 0.2c (directories in `deploy/openclaws/` excluding `_`-prefixed).
+1. Count active claws from § 0.2c (directories in `openclaws/` excluding `_`-prefixed).
 2. Calculate system overhead: Vector (~128M) + system/kernel (~500M) = ~750M total.
 3. Compute per-claw resources:
    - **CPUs per claw:** `floor(nproc / claw_count)`
@@ -228,7 +228,7 @@ Ask the user if they want to adjust the limits. They may choose:
 - Enter custom values
 - Keep the current values (skip)
 
-If the user confirms changes, update `GATEWAY_CPUS` and `GATEWAY_MEMORY` in `openclaw-config.env`. Per-claw overrides can also be set in each claw's `config.env` (e.g., `deploy/openclaws/main-claw/config.env`) using `GATEWAY_CPUS` and `GATEWAY_MEMORY` — these override the global defaults for that specific claw.
+If the user confirms changes, update `GATEWAY_CPUS` and `GATEWAY_MEMORY` in `openclaw-config.env`. Per-claw overrides can also be set in each claw's `config.env` (e.g., `openclaws/main-claw/config.env`) using `GATEWAY_CPUS` and `GATEWAY_MEMORY` — these override the global defaults for that specific claw.
 
 ---
 
@@ -371,7 +371,7 @@ Log: Write detailed execution log (all commands, full output, errors, recovery s
 Return: pass/fail, OPENCLAW_GENERATED_TOKEN from stdout.
 ```
 
-**Template substitution in subagents:** Sections 4.2 and 4.3 now use standalone scripts (`deploy/scripts/setup-infra.sh` and `deploy/scripts/deploy-config.sh`) that are bulk-copied to `/tmp/deploy-staging/` as part of the `deploy/` directory copy in § 4.2 Step 1, then run remotely. Config values are passed as env vars — the subagent just needs the variable values, not the script contents.
+**Template substitution in subagents:** Sections 4.2 and 4.3 now use standalone scripts (`deploy/scripts/setup-infra.sh` and `deploy/scripts/deploy-config.sh`) that are bulk-copied to `${INSTALL_DIR}/.deploy-staging/` as part of the `deploy/` directory copy in § 4.2 Step 1, then run remotely. Config values are passed as env vars — the subagent just needs the variable values, not the script contents.
 
 **Deploy logs:** At the start of deployment (before launching subagents), create `.deploy-logs/YYYYMMDD-HHMMSS/`. The `.deploy-logs/` directory is gitignored. At the end of deployment, tell the user where the logs are.
 

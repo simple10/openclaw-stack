@@ -209,8 +209,10 @@ To update just one claw's `openclaw.json` or `models.json` without affecting oth
 
 ```bash
 # From local machine
-# 1. SCP updated deploy files to VPS
-scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r deploy/* ${SSH_USER}@${VPS1_IP}:/tmp/deploy-staging/
+# 1. SCP updated deploy files + claw configs to VPS
+ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP} "sudo mkdir -p ${INSTALL_DIR}/.deploy-staging && sudo chown ${SSH_USER}:${SSH_USER} ${INSTALL_DIR}/.deploy-staging"
+scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r deploy/* ${SSH_USER}@${VPS1_IP}:${INSTALL_DIR}/.deploy-staging/
+scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r openclaws ${SSH_USER}@${VPS1_IP}:${INSTALL_DIR}/.deploy-staging/openclaws
 
 # 2. Deploy config for one claw only
 ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP} \
@@ -226,7 +228,7 @@ ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP} \
     LOG_WORKER_URL='${LOG_WORKER_URL}' \
     AI_GATEWAY_WORKER_URL='${AI_GATEWAY_WORKER_URL}' \
     ENABLE_VECTOR_LOG_SHIPPING='${ENABLE_VECTOR_LOG_SHIPPING}' \
-  bash /tmp/deploy-staging/scripts/deploy-config.sh"
+  bash ${INSTALL_DIR}/.deploy-staging/scripts/deploy-config.sh"
 
 # 3. Restart that claw to pick up new config
 sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose restart openclaw-personal-claw'
@@ -236,24 +238,26 @@ sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose restart op
 
 ## Adding a New Claw
 
-1. Create `deploy/openclaws/<name>/config.env` (copy from `_example/config.env`)
+1. Create `openclaws/<name>/config.env` (copy from `_example/config.env`)
 2. Set per-claw overrides (domain, resources, etc.) in the new `config.env`
-3. SCP deploy files to VPS:
+3. SCP deploy files + claw configs to VPS:
    ```bash
-   scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r deploy/* ${SSH_USER}@${VPS1_IP}:/tmp/deploy-staging/
+   ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP} "sudo mkdir -p ${INSTALL_DIR}/.deploy-staging && sudo chown ${SSH_USER}:${SSH_USER} ${INSTALL_DIR}/.deploy-staging"
+   scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r deploy/* ${SSH_USER}@${VPS1_IP}:${INSTALL_DIR}/.deploy-staging/
+   scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r openclaws ${SSH_USER}@${VPS1_IP}:${INSTALL_DIR}/.deploy-staging/openclaws
    scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} openclaw-config.env ${SSH_USER}@${VPS1_IP}:/tmp/openclaw-config.env
    ```
 4. Run `openclaw-multi.sh generate` to update `docker-compose.override.yml`:
    ```bash
-   ssh ... "bash /tmp/deploy-staging/scripts/openclaw-multi.sh generate"
+   ssh ... "bash ${INSTALL_DIR}/.deploy-staging/scripts/openclaw-multi.sh generate"
    ```
 5. Run `deploy-config.sh` for the new claw:
    ```bash
-   ssh ... "env INSTANCE_NAME=<name> ... bash /tmp/deploy-staging/scripts/deploy-config.sh"
+   ssh ... "env INSTANCE_NAME=<name> ... bash ${INSTALL_DIR}/.deploy-staging/scripts/deploy-config.sh"
    ```
 6. If using `CF_API_TOKEN`, configure tunnel routes and DNS:
    ```bash
-   ssh ... "bash /tmp/deploy-staging/scripts/openclaw-multi.sh tunnel-config --apply"
+   ssh ... "bash ${INSTALL_DIR}/.deploy-staging/scripts/openclaw-multi.sh tunnel-config --apply"
    ```
 7. Start the new claw:
    ```bash
