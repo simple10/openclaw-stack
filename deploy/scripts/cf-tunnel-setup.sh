@@ -24,15 +24,10 @@ set -euo pipefail
 #   CF_API_TOKEN              Required — Cloudflare API token with Tunnel Edit + DNS Edit
 #   CF_TUNNEL_TOKEN           Optional — used to extract tunnel ID if --tunnel-id not given
 
+# Resolve paths via canonical config helper
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-DEPLOY_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-REPO_ROOT="$(cd "$DEPLOY_DIR/.." && pwd)"
-# Dual-context: VPS staging has openclaws/ inside deploy dir; local repo has it at root
-if [ -d "${DEPLOY_DIR}/openclaws" ]; then
-  INSTANCES_DIR="${DEPLOY_DIR}/openclaws"
-else
-  INSTANCES_DIR="${REPO_ROOT}/openclaws"
-fi
+source "$SCRIPT_DIR/source-config.sh"
+INSTANCES_DIR="$OPENCLAWS_DIR"
 
 CF_API_BASE="https://api.cloudflare.com/client/v4"
 
@@ -169,7 +164,7 @@ cmd_verify() {
   fi
 
   # Test DNS permissions (need a zone to check — use OPENCLAW_DOMAIN if available)
-  local config_env="${REPO_ROOT}/openclaw-config.env"
+  local config_env="${CONFIG_ENV_PATH}"
   if [ -f "$config_env" ]; then
     local domain
     domain=$(get_config_val "$config_env" "OPENCLAW_DOMAIN")
@@ -286,7 +281,7 @@ cmd_setup_routes() {
     esac
   done
 
-  local config_env="${REPO_ROOT}/openclaw-config.env"
+  local config_env="${CONFIG_ENV_PATH}"
   [ -f "$config_env" ] || die "openclaw-config.env not found"
 
   # Load shared config

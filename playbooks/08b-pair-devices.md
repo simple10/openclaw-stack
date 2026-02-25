@@ -24,7 +24,7 @@ for CLAW in $CLAWS; do
 done
 ```
 
-> **Note:** If `OPENCLAW_DOMAIN_PATH` is empty in `openclaw-config.env`, the URL is simply `https://<CLAW_DOMAIN>/chat?token=<TOKEN>`.
+> **Note:** If `OPENCLAW_DOMAIN_PATH` is empty (read via `source-config.sh`), the URL is simply `https://<CLAW_DOMAIN>/chat?token=<TOKEN>`.
 
 Construct the URL for each claw using its domain (from the Cloudflare Tunnel route or per-claw `config.env`) and token:
 
@@ -149,7 +149,7 @@ If the device shows as approved but the browser still can't connect, ask the use
 
 ## Telegram Pairing
 
-If `OPENCLAW_TELEGRAM_BOT_TOKEN` is set in `openclaw-config.env`, the claws are already connected to Telegram. Tell the user:
+If `OPENCLAW_TELEGRAM_BOT_TOKEN` is set (read via `source-config.sh`), the claws are already connected to Telegram. Tell the user:
 
 > **Telegram:** Your bot is live. Open Telegram and send a message to your bot. If the claw prompts for device approval, run `openclaw --instance <CLAW_NAME> devices approve <requestId>` the same way you approved the browser. Repeat for each claw if needed.
 

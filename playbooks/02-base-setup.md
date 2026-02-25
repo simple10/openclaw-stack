@@ -29,7 +29,7 @@ This playbook configures:
 
 ## Variables
 
-From `../openclaw-config.env`:
+Config variables (read via `source-config.sh`):
 
 - `VPS1_IP` - Public IP of VPS-1
 - `SSH_KEY_PATH` - Path to SSH private key
@@ -79,7 +79,7 @@ sudo apt install -y \
 
 ## 2.1a Set Hostname
 
-If `VPS_HOSTNAME` is set in `openclaw-config.env`, replace the provider's default hostname (e.g., `vps-54a00e96`) with a friendly name. Skip if empty.
+If `VPS_HOSTNAME` is set (read via `source-config.sh`), replace the provider's default hostname (e.g., `vps-54a00e96`) with a friendly name. Skip if empty.
 
 ```bash
 #!/bin/bash
@@ -399,7 +399,7 @@ rm -f /tmp/system-hardening.sh
 
 Run on: **VPS-1**
 
-Install cloudflared and register the tunnel as a systemd service. The tunnel token must already be set in `openclaw-config.env`.
+Install cloudflared and register the tunnel as a systemd service. The tunnel token must already be set — read `CF_TUNNEL_TOKEN` via `source-config.sh`.
 
 ```bash
 # Download and install cloudflared

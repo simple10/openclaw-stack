@@ -13,10 +13,11 @@ set -euo pipefail
 #   Stderr: progress
 #   Exit: 0 success, 1 failure
 
-OPENCLAW_HOME="${INSTALL_DIR:-/home/openclaw}"
+# Resolve paths via canonical config helper
+source "$(cd "$(dirname "$0")" && pwd)/source-config.sh"
+OPENCLAW_HOME="$INSTALL_DIR"
 
 # Discover configured instances from staging dir
-STAGING_DIR="${STAGING_DIR:-${INSTALL_DIR}/.deploy-staging}"
 if [ -d "${STAGING_DIR}/openclaws" ]; then
   INSTANCE_NAMES=$(ls -d "${STAGING_DIR}"/openclaws/*/ 2>/dev/null \
     | xargs -I{} basename {} | grep -v '^_' | tr '\n' ' ')

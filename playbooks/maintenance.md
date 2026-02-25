@@ -245,7 +245,7 @@ sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose restart op
    ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP} "sudo mkdir -p ${INSTALL_DIR}/.deploy-staging && sudo chown ${SSH_USER}:${SSH_USER} ${INSTALL_DIR}/.deploy-staging"
    scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r deploy/* ${SSH_USER}@${VPS1_IP}:${INSTALL_DIR}/.deploy-staging/
    scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r openclaws ${SSH_USER}@${VPS1_IP}:${INSTALL_DIR}/.deploy-staging/openclaws
-   scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} openclaw-config.env ${SSH_USER}@${VPS1_IP}:/tmp/openclaw-config.env
+   scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} openclaw-config.env ${SSH_USER}@${VPS1_IP}:${INSTALL_DIR}/.deploy-staging/openclaw-config.env
    ```
 4. Run `openclaw-multi.sh generate` to update `docker-compose.override.yml`:
    ```bash
@@ -263,4 +263,4 @@ sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose restart op
    ```bash
    sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose up -d openclaw-<name>'
    ```
-8. Clean up secrets: `ssh ... "rm -f /tmp/openclaw-config.env"`
+8. Clean up staging: `ssh ... "rm -rf ${INSTALL_DIR}/.deploy-staging"`

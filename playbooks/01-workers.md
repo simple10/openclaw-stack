@@ -17,7 +17,7 @@ This playbook deploys:
 
 ## Variables
 
-From `../openclaw-config.env`:
+Config variables (read via `source-config.sh`):
 
 - `AI_GATEWAY_WORKER_URL` — Set after deploying AI Gateway Worker
 - `AI_GATEWAY_AUTH_TOKEN` — Auth token for AI Gateway Worker
@@ -51,7 +51,7 @@ No values need to be changed for a standard deployment. If using multiple Cloudf
 
 ### Check for Existing AI Gateway Worker Deployment
 
-Before deploying, check if the worker is already live. If `AI_GATEWAY_WORKER_URL` in `openclaw-config.env` is not a placeholder (no angle brackets), curl its health endpoint:
+Before deploying, check if the worker is already live. If `AI_GATEWAY_WORKER_URL` (read via `source-config.sh`) is not a placeholder (no angle brackets), curl its health endpoint:
 
 ```bash
 curl -s https://<AI_GATEWAY_WORKER_URL>/health
@@ -64,7 +64,7 @@ curl -s https://<AI_GATEWAY_WORKER_URL>/health
 
 #### 1. AUTH_TOKEN
 
-If `AI_GATEWAY_AUTH_TOKEN` in `openclaw-config.env` still contains a placeholder (angle brackets), auto-generate a random token:
+If `AI_GATEWAY_AUTH_TOKEN` (read via `source-config.sh`) still contains a placeholder (angle brackets), auto-generate a random token:
 
 ```bash
 openssl rand -hex 32
@@ -123,7 +123,7 @@ The D1 `database_id` placeholder will be updated after creating the database (se
 
 ### Check for Existing Log Receiver Deployment
 
-Before deploying, check if the worker is already live. If `LOG_WORKER_URL` in `openclaw-config.env` is not a placeholder (no angle brackets), curl its health endpoint:
+Before deploying, check if the worker is already live. If `LOG_WORKER_URL` (read via `source-config.sh`) is not a placeholder (no angle brackets), curl its health endpoint:
 
 ```bash
 # Strip the /logs path suffix to get the base URL for health check
@@ -135,7 +135,7 @@ curl -s https://<LOG_WORKER_BASE_URL>/health
 
 ### Configure Log Worker Secrets
 
-If `LOG_WORKER_TOKEN` in `openclaw-config.env` still contains a placeholder (angle brackets), auto-generate a random token:
+If `LOG_WORKER_TOKEN` (read via `source-config.sh`) still contains a placeholder (angle brackets), auto-generate a random token:
 
 ```bash
 openssl rand -hex 32

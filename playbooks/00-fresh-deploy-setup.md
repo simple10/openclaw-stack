@@ -188,7 +188,7 @@ This returns two lines: CPU count (e.g., `6`) and total memory in bytes (e.g., `
 
 ### Compare Against Config
 
-Read current gateway resource limits from `GATEWAY_CPUS` and `GATEWAY_MEMORY` in `openclaw-config.env`. If not set, the compose file defaults apply (6 CPUs, 10.5G).
+Read `GATEWAY_CPUS` and `GATEWAY_MEMORY` via `source-config.sh`. If not set, the compose file defaults apply (6 CPUs, 10.5G).
 
 ### Expected Values
 
@@ -212,7 +212,7 @@ VPS Resources:
   Memory: <total from free, human-readable>
   Active claws: <count> (<names>)
 
-Current per-claw limits (openclaw-config.env):
+Current per-claw limits (via source-config.sh):
   GATEWAY_CPUS:   <current value or "(default: 6)">
   GATEWAY_MEMORY: <current value or "(default: 10.5G)">
 

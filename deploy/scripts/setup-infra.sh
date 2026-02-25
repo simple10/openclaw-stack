@@ -32,7 +32,8 @@ for var in AI_GATEWAY_WORKER_URL AI_GATEWAY_AUTH_TOKEN; do
 done
 [ "$missing" -eq 1 ] && exit 1
 
-INSTALL_DIR="${INSTALL_DIR:-/home/openclaw}"
+# Resolve paths via canonical config helper
+source "$(cd "$(dirname "$0")" && pwd)/source-config.sh"
 
 # INSTANCE_NAMES is required — always-multi-claw means at least "main-claw"
 INSTANCE_NAMES="${INSTANCE_NAMES:-main-claw}"

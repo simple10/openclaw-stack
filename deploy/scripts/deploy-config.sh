@@ -40,7 +40,8 @@ else
   echo "Mode: full deployment (shared + all claws)" >&2
 fi
 
-INSTALL_DIR="${INSTALL_DIR:-/home/openclaw}"
+# Resolve paths via canonical config helper
+source "$(cd "$(dirname "$0")" && pwd)/source-config.sh"
 
 # ---- Defaults for optional vars ----
 YOUR_TELEGRAM_ID="${YOUR_TELEGRAM_ID:-}"
@@ -56,9 +57,9 @@ HOSTALERT_TELEGRAM_BOT_TOKEN="${HOSTALERT_TELEGRAM_BOT_TOKEN:-}"
 HOSTALERT_TELEGRAM_CHAT_ID="${HOSTALERT_TELEGRAM_CHAT_ID:-}"
 OPENCLAW_DOMAIN="${OPENCLAW_DOMAIN:-}"
 
-STAGING="${STAGING_DIR:-${INSTALL_DIR}/.deploy-staging}"
-DEFAULTS_DIR="${STAGING}/openclaws/_defaults"
-INSTANCES_DIR="${STAGING}/openclaws"
+STAGING="$STAGING_DIR"
+DEFAULTS_DIR="${OPENCLAWS_DIR}/_defaults"
+INSTANCES_DIR="$OPENCLAWS_DIR"
 
 # ── Helper: deploy config for a single claw ──────────────────────────
 deploy_claw_config() {

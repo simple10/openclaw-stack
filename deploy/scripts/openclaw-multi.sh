@@ -21,17 +21,11 @@ set -euo pipefail
 #   tunnel-config   Print Cloudflare tunnel rules for all claws
 #     --apply         Apply routes via CF API (requires CF_API_TOKEN)
 
-# Resolve paths relative to the deploy directory
+# Resolve paths via canonical config helper
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-DEPLOY_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-REPO_ROOT="$(cd "$DEPLOY_DIR/.." && pwd)"
-# Dual-context: VPS staging has openclaws/ inside deploy dir; local repo has it at root
-if [ -d "${DEPLOY_DIR}/openclaws" ]; then
-  INSTANCES_DIR="${DEPLOY_DIR}/openclaws"
-else
-  INSTANCES_DIR="${REPO_ROOT}/openclaws"
-fi
-OPENCLAW_HOME="${INSTALL_DIR:-/home/openclaw}"
+source "$SCRIPT_DIR/source-config.sh"
+INSTANCES_DIR="$OPENCLAWS_DIR"
+OPENCLAW_HOME="$INSTALL_DIR"
 
 # Port bases for auto-assignment
 GATEWAY_PORT_BASE=18789
@@ -91,7 +85,7 @@ discover_disabled() {
 # Sets variables in the current shell
 load_config() {
   local name="$1"
-  local config_env="${REPO_ROOT}/openclaw-config.env"
+  local config_env="${CONFIG_ENV_PATH}"
   local instance_config="${INSTANCES_DIR}/${name}/config.env"
 
   [ -f "$config_env" ] || die "openclaw-config.env not found at ${config_env}"
@@ -421,7 +415,7 @@ cmd_tunnel_config() {
     local cf_script="${SCRIPT_DIR}/cf-tunnel-setup.sh"
     [ -x "$cf_script" ] || die "cf-tunnel-setup.sh not found at ${cf_script}"
     # Source config to get CF_API_TOKEN if not already in environment
-    local config_env="${REPO_ROOT}/openclaw-config.env"
+    local config_env="${CONFIG_ENV_PATH}"
     if [ -z "${CF_API_TOKEN:-}" ] && [ -f "$config_env" ]; then
       set -a; source "$config_env"; set +a
     fi
@@ -431,7 +425,7 @@ cmd_tunnel_config() {
 
   # Default: print rules
   # Source config to check for CF_API_TOKEN (for --apply hint)
-  local config_env="${REPO_ROOT}/openclaw-config.env"
+  local config_env="${CONFIG_ENV_PATH}"
   if [ -z "${CF_API_TOKEN:-}" ] && [ -f "$config_env" ]; then
     CF_API_TOKEN=$(grep -E '^CF_API_TOKEN=' "$config_env" 2>/dev/null | cut -d= -f2- | tr -d '"' || true)
   fi

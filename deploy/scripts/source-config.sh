@@ -18,6 +18,7 @@
 #   INSTALL_DIR         — VPS install base (default: /home/openclaw)
 #   VPS_INSTANCES_DIR   — VPS instances path ($INSTALL_DIR/instances)
 #   STAGING_DIR         — VPS deploy staging ($INSTALL_DIR/.deploy-staging)
+#   CONFIG_ENV_PATH     — Path to openclaw-config.env (repo root or staging)
 #   + all vars from openclaw-config.env
 
 _SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
@@ -34,10 +35,11 @@ if [ -f "${_CANDIDATE_ROOT}/openclaw-config.env" ]; then
   REPO_ROOT="$_CANDIDATE_ROOT"
   DEPLOY_DIR="${REPO_ROOT}/deploy"
   OPENCLAWS_DIR="${REPO_ROOT}/openclaws"
+  CONFIG_ENV_PATH="${REPO_ROOT}/openclaw-config.env"
 
   set -a
   # shellcheck disable=SC1091
-  source "${REPO_ROOT}/openclaw-config.env"
+  source "$CONFIG_ENV_PATH"
   set +a
 else
   # VPS: running from staging dir or installed location
@@ -45,6 +47,7 @@ else
   REPO_ROOT=""
   DEPLOY_DIR="$_DEPLOY_DIR"
   OPENCLAWS_DIR="${DEPLOY_DIR}/openclaws"
+  CONFIG_ENV_PATH="${DEPLOY_DIR}/openclaw-config.env"
 fi
 
 # ── Defaults (all VPS paths derive from INSTALL_DIR) ──
@@ -52,7 +55,7 @@ INSTALL_DIR="${INSTALL_DIR:-/home/openclaw}"
 VPS_INSTANCES_DIR="${INSTALL_DIR}/instances"
 STAGING_DIR="${INSTALL_DIR}/.deploy-staging"
 
-export OPENCLAW_CONTEXT REPO_ROOT DEPLOY_DIR OPENCLAWS_DIR INSTALL_DIR VPS_INSTANCES_DIR STAGING_DIR
+export OPENCLAW_CONTEXT REPO_ROOT DEPLOY_DIR OPENCLAWS_DIR INSTALL_DIR VPS_INSTANCES_DIR STAGING_DIR CONFIG_ENV_PATH
 
 # ── Standalone query mode ──
 if [[ "${BASH_SOURCE[0]:-$0}" == "$0" ]]; then

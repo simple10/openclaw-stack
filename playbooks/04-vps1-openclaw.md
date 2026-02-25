@@ -22,7 +22,7 @@ This playbook configures:
 
 ## Variables
 
-From `../openclaw-config.env`:
+Config variables (read via `source-config.sh`):
 
 - `INSTALL_DIR` - Base installation directory on VPS (default: `/home/openclaw`)
 - `VPS1_IP` - Required, public IP of VPS-1
@@ -59,7 +59,7 @@ scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r deploy/* ${SSH_USER}@${VPS1_IP}:${INSTA
 scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r openclaws ${SSH_USER}@${VPS1_IP}:${INSTALL_DIR}/.deploy-staging/openclaws
 
 # Also copy openclaw-config.env (needed by openclaw-multi.sh generate in §4.3 Step 3)
-scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} openclaw-config.env ${SSH_USER}@${VPS1_IP}:/tmp/openclaw-config.env
+scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} openclaw-config.env ${SSH_USER}@${VPS1_IP}:${INSTALL_DIR}/.deploy-staging/openclaw-config.env
 ```
 
 ### Step 2: Run setup-infra.sh
@@ -139,23 +139,23 @@ Capture the `OPENCLAW_GENERATED_TOKEN=<hex>` line from stdout (all other output 
 
 ### Template variables
 
-These are substituted server-side via `sed` after copying from staging:
+These are substituted server-side via `sed` after copying from staging. All config values are read via `source-config.sh` and passed as SSH env vars:
 
 | Variable | Source | Used in |
 |----------|--------|---------|
 | `GATEWAY_TOKEN` | Read from `.env` on VPS | `openclaw.json` |
-| `OPENCLAW_DOMAIN_PATH` | `openclaw-config.env` | `openclaw.json` |
-| `YOUR_TELEGRAM_ID` | `openclaw-config.env` | `openclaw.json` |
-| `OPENCLAW_INSTANCE_ID` | `openclaw-config.env` | `openclaw.json` |
-| `VPS_HOSTNAME` | `openclaw-config.env` | `openclaw.json` |
-| `ENABLE_EVENTS_LOGGING` | `openclaw-config.env` | `openclaw.json` |
-| `ENABLE_LLEMTRY_LOGGING` | `openclaw-config.env` | `openclaw.json` |
+| `OPENCLAW_DOMAIN_PATH` | Config (or per-claw `config.env`) | `openclaw.json` |
+| `YOUR_TELEGRAM_ID` | Config | `openclaw.json` |
+| `OPENCLAW_INSTANCE_ID` | Config | `openclaw.json` |
+| `VPS_HOSTNAME` | Config | `openclaw.json` |
+| `ENABLE_EVENTS_LOGGING` | Config | `openclaw.json` |
+| `ENABLE_LLEMTRY_LOGGING` | Config | `openclaw.json` |
 | `EVENTS_URL` | Derived: `LOG_WORKER_URL` with `/logs` → `/events` | `openclaw.json` |
 | `LLEMTRY_URL` | Derived: `LOG_WORKER_URL` with `/logs` → `/llemtry` | `openclaw.json` |
-| `LOG_WORKER_TOKEN` | `openclaw-config.env` | `openclaw.json` |
-| `OPENCLAW_DOMAIN` | `openclaw-config.env` (or per-claw `config.env`) | Used to derive `ALLOWED_ORIGIN` |
+| `LOG_WORKER_TOKEN` | Config | `openclaw.json` |
+| `OPENCLAW_DOMAIN` | Config (or per-claw `config.env`) | Used to derive `ALLOWED_ORIGIN` |
 | `ALLOWED_ORIGIN` | Derived: `https://${OPENCLAW_DOMAIN}` | `openclaw.json` |
-| `AI_GATEWAY_WORKER_URL` | `openclaw-config.env` | `models.json` |
+| `AI_GATEWAY_WORKER_URL` | Config | `models.json` |
 
 > **`controlUi.allowedOrigins` is required.** When the gateway binds to `lan` (non-loopback), which is always the case for Docker/Tunnel deployments, `controlUi.allowedOrigins` must be set in `openclaw.json`. Without it, the gateway crashes on startup with a security check error. The `deploy-config.sh` script handles this automatically by deriving `ALLOWED_ORIGIN` from `OPENCLAW_DOMAIN` (or from the per-claw `config.env` override). If a claw's `OPENCLAW_DOMAIN` is empty, the origin will be `https://` which will fail — every claw must have a domain configured.
 
@@ -211,18 +211,13 @@ This reads `openclaws/*/` from staging, assigns ports, and writes `docker-compos
 
 > **Multi-claw:** If multiple claws exist (e.g., `main-claw/` and `personal-claw/`), each gets its own service in the override file with auto-assigned ports.
 
-**Cleanup:** `openclaw-config.env` contains secrets (`AI_GATEWAY_AUTH_TOKEN`). The staging directory cleanup at the end of `deploy-config.sh` handles `deploy/*`, but `/tmp/openclaw-config.env` is separate:
-
-```bash
-ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP} \
-  "rm -f /tmp/openclaw-config.env"
-```
+**Cleanup:** `openclaw-config.env` contains secrets (`AI_GATEWAY_AUTH_TOKEN`). It was SCP'd into the staging directory alongside deploy files. The staging directory cleanup at the end of `deploy-config.sh` (`rm -rf ${INSTALL_DIR}/.deploy-staging`) removes it along with everything else — no separate cleanup needed.
 
 **Cron generation rules:**
 
 - **Cron runs in the server's local timezone**, not necessarily UTC. Before converting `HOSTALERT_DAILY_REPORT_TIME` to cron fields, check the server timezone: `timedatectl show -p Timezone --value` (or `cat /etc/timezone` as fallback). Convert the user's specified time to the server's local timezone, then write the cron minute/hour fields in that timezone. Include the server timezone and original user time in the cron comment for clarity.
 - If `HOSTALERT_DAILY_REPORT_TIME` is not set, default to `9:30 AM PST` — still convert to the server's local timezone.
-- Only include the daily report cron line (`--report`) if both `HOSTALERT_TELEGRAM_BOT_TOKEN` and `HOSTALERT_TELEGRAM_CHAT_ID` are set in `openclaw-config.env`. If Telegram is not configured, write only the alerter line (the script exits silently without Telegram credentials, but there's no point scheduling the report).
+- Only include the daily report cron line (`--report`) if both `HOSTALERT_TELEGRAM_BOT_TOKEN` and `HOSTALERT_TELEGRAM_CHAT_ID` are set (read via `source-config.sh`). If Telegram is not configured, write only the alerter line (the script exits silently without Telegram credentials, but there's no point scheduling the report).
 
 **Maintenance cron generation rules:**
 
