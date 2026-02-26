@@ -22,19 +22,7 @@ if [ -f "$config_file" ]; then
   fi
 fi
 
-# ── 1c. Fix sandboxes-home dir ownership (Sysbox uid remapping) ─────
-# Persistent sandbox home dirs: host bind mount arrives with host uid which Sysbox remaps.
-# Chown to node (1000) so sandbox containers (via binds) can access them.
-sandboxes_dir="/home/node/sandboxes-home"
-if [ -d "$sandboxes_dir" ]; then
-  dir_owner=$(stat -c '%u' "$sandboxes_dir" 2>/dev/null)
-  if [ "$dir_owner" != "1000" ]; then
-    chown -R 1000:1000 "$sandboxes_dir"
-    echo "[entrypoint] Fixed sandboxes-home ownership: ${dir_owner} -> 1000"
-  fi
-fi
-
-# ── 1d. Fix .openclaw dir ownership (Sysbox uid remapping) ──────────
+# ── 1c. Fix .openclaw dir ownership (Sysbox uid remapping) ──────────
 # Gateway config/state dir: bind mount arrives with host uid which Sysbox remaps.
 # Some files (identity/, memory/) may be created by root before gosu drops privs.
 # Chown to node (1000) so gateway process can read/write after privilege drop.
@@ -69,10 +57,12 @@ echo "[entrypoint] npm global prefix set to $npm_global"
 
 # ── 1g. Auto-generate gateway shims from sandbox-toolkit.yaml ──────
 # Skills check bins on the gateway (load-time) AND inside the sandbox (runtime).
-# /opt/skill-bins is bind-mounted read-only into all sandboxes, making
-# gateway-installed binaries available without network or image rebuilds.
+# Shims live inside workspace-code so they're within the sandbox's allowed bind
+# source roots — no separate bind mount needed. Inside sandboxes, workspace-code
+# is mounted at /workspace, so shims appear at /workspace/.skill-bins/.
 # Shims satisfy the gateway preflight check; real binaries live in sandbox images.
-mkdir -p /opt/skill-bins
+SKILL_BINS="/home/node/.openclaw/workspace-code/.skill-bins"
+mkdir -p "$SKILL_BINS"
 
 TOOLKIT_CONFIG="/app/deploy/sandbox-toolkit.yaml"
 TOOLKIT_PARSER="/app/deploy/parse-toolkit.mjs"
@@ -84,10 +74,10 @@ if [ -f "$TOOLKIT_CONFIG" ] && [ -f "$TOOLKIT_PARSER" ]; then
   # Shims are pass-through: if the real binary exists elsewhere in PATH (i.e. inside
   # a sandbox where tools are installed), the shim execs it. On the gateway (where only
   # shims exist), they print an error. This prevents shims from shadowing real binaries
-  # when /opt/skill-bins is bind-mounted into sandboxes.
+  # when shims dir is part of the workspace mount.
   for bin in $(echo "$TOOLKIT_JSON" | node -e "process.stdin.on('data',d=>console.log(JSON.parse(d).allBins.join(' ')))"); do
-    if [ ! -f "/opt/skill-bins/$bin" ]; then
-      cat > "/opt/skill-bins/$bin" << 'SHIM'
+    if [ ! -f "$SKILL_BINS/$bin" ]; then
+      cat > "$SKILL_BINS/$bin" << 'SHIM'
 #!/bin/sh
 # Auto-generated shim — pass through to real binary if available
 SELF_DIR=$(dirname "$(readlink -f "$0")")
@@ -99,17 +89,18 @@ fi
 echo "ERROR: $(basename "$0") is a shim — run inside sandbox" >&2
 exit 1
 SHIM
-      chmod +x "/opt/skill-bins/$bin"
+      chmod +x "$SKILL_BINS/$bin"
     fi
   done
-  echo "[entrypoint] Auto-shimmed $(ls /opt/skill-bins | wc -l) binaries from sandbox-toolkit.yaml"
+  chown -R 1000:1000 "$SKILL_BINS"
+  echo "[entrypoint] Auto-shimmed $(ls "$SKILL_BINS" | wc -l) binaries from sandbox-toolkit.yaml"
 else
   echo "[entrypoint] WARNING: sandbox-toolkit.yaml or parser not found, skipping shim generation"
 fi
 
 # Add to gateway PATH for load-time skill checks
-if ! echo "$PATH" | grep -q '/opt/skill-bins'; then
-  export PATH="/opt/skill-bins:$PATH"
+if ! echo "$PATH" | grep -q '.skill-bins'; then
+  export PATH="$SKILL_BINS:$PATH"
 fi
 
 # ── 2. Start nested Docker daemon (Sysbox provides isolation) ───────

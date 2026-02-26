@@ -117,8 +117,8 @@ done
 STEP=2
 printf '\033[33m[%d/%d] Regenerating gateway shims...\033[0m\n' "$STEP" "$TOTAL_STEPS"
 
-# Reuses the same shim logic from entrypoint-gateway.sh (lines 70-108).
-# Runs as root because /opt/skill-bins/ is root-owned.
+# Reuses the same shim logic from entrypoint-gateway.sh.
+# Shims live in workspace-code/.skill-bins/ (owned by node, within sandbox allowed roots).
 # Only creates shims for binaries that don't already exist (idempotent).
 # Piped via heredoc to avoid quoting issues with sh -c through SSH + docker exec.
 
@@ -133,12 +133,13 @@ if [ ! -f "$TOOLKIT_CONFIG" ] || [ ! -f "$TOOLKIT_PARSER" ]; then
   echo "  WARNING: toolkit files not found in container"
   exit 0
 fi
-mkdir -p /opt/skill-bins
+SKILL_BINS="/home/node/.openclaw/workspace-code/.skill-bins"
+mkdir -p "$SKILL_BINS"
 TOOLKIT_JSON=$(node "$TOOLKIT_PARSER" "$TOOLKIT_CONFIG")
 NEW_SHIMS=0
 for bin in $(echo "$TOOLKIT_JSON" | node -e "process.stdin.on('data',d=>console.log(JSON.parse(d).allBins.join(' ')))"); do
-  if [ ! -f "/opt/skill-bins/$bin" ]; then
-    cat > "/opt/skill-bins/$bin" << 'SHIM'
+  if [ ! -f "$SKILL_BINS/$bin" ]; then
+    cat > "$SKILL_BINS/$bin" << 'SHIM'
 #!/bin/sh
 # Auto-generated shim — pass through to real binary if available
 SELF_DIR=$(dirname "$(readlink -f "$0")")
@@ -150,11 +151,12 @@ fi
 echo "ERROR: $(basename "$0") is a shim — run inside sandbox" >&2
 exit 1
 SHIM
-    chmod +x "/opt/skill-bins/$bin"
+    chmod +x "$SKILL_BINS/$bin"
     NEW_SHIMS=$((NEW_SHIMS + 1))
   fi
 done
-TOTAL=$(ls /opt/skill-bins | wc -l)
+chown -R 1000:1000 "$SKILL_BINS"
+TOTAL=$(ls "$SKILL_BINS" | wc -l)
 echo "  $NEW_SHIMS new shims created ($TOTAL total)"
 SHIM_SCRIPT
 fi

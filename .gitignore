@@ -14,7 +14,6 @@ openclaws/*
 
 # Synced from VPS via scripts/sync-configs.sh (large data, not for version control)
 openclaws/*/workspace/
-openclaws/*/sandboxes-home/
 
 tmp/
 _bak/

@@ -566,75 +566,6 @@ build_browser() {
   fi
 }
 
-# ── Seed agent home directories ─────────────────────────────────────────
-
-seed_agent_homes() {
-  local sandboxes_dir="/home/node/sandboxes-home"
-  local config_file="/home/node/.openclaw/openclaw.json"
-
-  if [ ! -d "$sandboxes_dir" ]; then
-    log "No sandboxes-home dir, skipping agent home seeding"
-    return 0
-  fi
-
-  if [ ! -f "$config_file" ]; then
-    log "WARNING: openclaw.json not found, skipping agent home seeding"
-    return 0
-  fi
-
-  # Emit "id image" pairs — each agent's image from config, falling back to defaults
-  # Use JSON5.parse because openclaw.json supports JSON5 (comments, trailing commas, etc.)
-  local agent_entries
-  agent_entries=$(node -e "
-    const JSON5 = require('json5');
-    const cfg = JSON5.parse(require('fs').readFileSync('$config_file', 'utf8'));
-    const defaultImage = cfg.agents?.defaults?.sandbox?.docker?.image || '';
-    for (const a of cfg.agents?.list || []) {
-      const image = a.sandbox?.docker?.image || defaultImage;
-      console.log(a.id + ' ' + image);
-    }
-  " 2>/dev/null) || true
-
-  if [ -z "$agent_entries" ]; then
-    log "No agents found in openclaw.json"
-    return 0
-  fi
-
-  echo "$agent_entries" | while read -r agent_id agent_image; do
-    local agent_dir="$sandboxes_dir/$agent_id"
-
-    # Create agent home dir if missing
-    if [ ! -d "$agent_dir" ]; then
-      if [ "$DRY_RUN" = true ]; then
-        log "[dry-run] Would create $agent_dir/ and seed dotfiles"
-        continue
-      fi
-      mkdir -p "$agent_dir"
-      log "Created $agent_dir/"
-    fi
-
-    # Seed default shell dotfiles from the agent's sandbox image /etc/skel/
-    # so they aren't lost when the bind mount shadows /home/sandbox
-    if [ ! -f "$agent_dir/.bashrc" ]; then
-      if [ "$DRY_RUN" = true ]; then
-        log "[dry-run] Would seed dotfiles into $agent_dir/ from $agent_image"
-        continue
-      fi
-      if [ -n "$agent_image" ] && image_exists "$agent_image"; then
-        docker run --rm "$agent_image" \
-          tar -cf - -C /etc/skel . 2>/dev/null \
-          | tar -xf - -C "$agent_dir/" 2>/dev/null || true
-        log "Seeded dotfiles into $agent_dir/ from $agent_image"
-      else
-        log "WARNING: image '$agent_image' not available for agent '$agent_id', skipping dotfile seeding"
-      fi
-    fi
-  done
-
-  # Fix ownership for all agent sandbox dirs
-  chown -R 1000:1000 "$sandboxes_dir"
-}
-
 # ── Main ──────────────────────────────────────────────────────────────
 
 if ! docker info > /dev/null 2>&1; then
@@ -668,9 +599,6 @@ build_base || FAILED=1
 build_packages "$TOOLKIT_JSON" "$PACKAGES_HASH" || FAILED=1
 build_toolkit "$TOOLKIT_JSON" "$TOOLS_HASH" || FAILED=1
 build_browser || FAILED=1
-
-# Seed persistent agent home directories (needs sandbox-toolkit image)
-seed_agent_homes
 
 # Save digests after all builds complete
 if [ "$DRY_RUN" = false ]; then

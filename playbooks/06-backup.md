@@ -162,7 +162,6 @@ cat <INSTALL_DIR>/logs/session-prune.log
 | `instances/<name>/.openclaw/credentials/` | API keys and tokens (per-claw) |
 | `instances/<name>/.openclaw/workspace/` | User workspaces and data (per-claw) |
 | `openclaw/.env` | Shared environment variables |
-| `instances/<name>/sandboxes-home/` | Persistent sandbox home directories (per-claw) |
 
 ---
 

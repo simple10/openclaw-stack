@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Syncs OpenClaw configs, workspace, and sandboxes-home from VPS to local openclaws/
+# Syncs OpenClaw configs and workspace from VPS to local openclaws/
 #
 # Usage:
 #   ./scripts/sync-configs.sh                          # sync everything for all claws
@@ -61,14 +61,6 @@ sync_instance() {
     "${SSH_USER}@${VPS1_IP}:${remote_base}/.openclaw/workspace/" \
     "$dest/workspace/"
 
-  # sandboxes-home
-  echo "[$name] Syncing sandboxes-home/ ..."
-  mkdir -p "$dest/sandboxes-home"
-  rsync -avz --progress \
-    -e "$SSH_CMD" \
-    --rsync-path="sudo rsync" \
-    "${SSH_USER}@${VPS1_IP}:${remote_base}/sandboxes-home/" \
-    "$dest/sandboxes-home/"
 }
 
 # Discover instances

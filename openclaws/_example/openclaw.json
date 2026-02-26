@@ -72,25 +72,18 @@
           // Requires recreating sandboxes if you need any of these env settings in the sandbox container.
           "env": {
             "LANG": "C.UTF-8",
-            // Add /opt/skill-bins to PATH so gateway passes skill binary preflight checks.
-            // Shims satisfy load-time checks; real binaries live in sandbox images.
-            "PATH": "/opt/skill-bins:/home/linuxbrew/.linuxbrew/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+            // Writable HOME inside workspace — persists across sandbox restarts via
+            // the workspace bind mount chain (host → gateway .openclaw → sandbox /workspace).
+            // Replaces the old sandboxes-home bind mount approach.
+            "HOME": "/workspace/.home",
+            // Skill-bin shims live in workspace-code/.skill-bins/ on the gateway;
+            // inside sandboxes, workspace-code is mounted at /workspace.
+            "PATH": "/workspace/.skill-bins:/home/linuxbrew/.linuxbrew/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
           },
           "pidsLimit": 512, // Add fork-bomb protection
           "memory": "2g", // Default agent container RAM - browser containers also inherit this setting
           "memorySwap": "4g",
-          "cpus": 2, // Default agent container CPU
-          // Default sandbox bind mount
-          // Per agent bind REPLACES not merges with the defaults
-          // Be sure to duplicate each bind mount per agent as needed if agent has any custom bind mounts
-          "binds": [
-            // Skill bins shims — pass through to real binaries inside sandboxes,
-            // satisfy gateway preflight checks on the host.
-            // Note: only truly needed when main runs in sandbox mode. Revisit in a second pass.
-            "/opt/skill-bins:/opt/skill-bins:ro",
-            // OpenClaw docs — accessible via read tool at /workspace/docs/
-            "/app/docs:/workspace/docs:ro"
-          ]
+          "cpus": 2 // Default agent container CPU
         },
         // Each agent has its browser container - requires the "browser" tool
         // Browsers are run in separate sandbox containers, not inside the agent sandbox
@@ -143,11 +136,8 @@
           "docker": {
             // Per-agent binds replace (not merge) defaults — repeat all needed binds
             "binds": [
-              "/opt/skill-bins:/opt/skill-bins:ro",
-              "/app/docs:/workspace/docs:ro", // Needed for main sandbox to read docs without making extra exec tool call
               // Make host-status reports available to any main agent sandbox tool
-              "/home/node/.openclaw/workspace/host-status:/workspace/host-status:ro",
-              "/home/node/sandboxes-home/main:/home/sandbox"
+              "/home/node/.openclaw/workspace/host-status:/workspace/host-status:ro"
             ]
           }
         },
@@ -196,14 +186,7 @@
             "network": "bridge", // enable network access for claude code, codex, etc. to work
             "memory": "4g", // Coding tasks need more headroom (claude code, LSPs, builds)
             "memorySwap": "8g",
-            "cpus": 4,
-            "binds": [
-              // Per-agent binds replace (not merge) defaults — repeat all needed binds
-              "/opt/skill-bins:/opt/skill-bins:ro",
-              "/app/docs:/workspace/docs:ro",
-              // Code agent specific - persistent home for tool configs, shell history, etc.
-              "/home/node/sandboxes-home/code:/home/sandbox"
-            ]
+            "cpus": 4
           },
           // Long prune window — don't kill a sandbox mid-way through a coding session
           "prune": {

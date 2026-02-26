@@ -83,7 +83,6 @@ mkdir -p "${INST_DIR}/.openclaw/workspace"
 mkdir -p "${INST_DIR}/.openclaw/credentials"
 mkdir -p "${INST_DIR}/.openclaw/logs"
 mkdir -p "${INST_DIR}/.openclaw/backups"
-mkdir -p "${INST_DIR}/sandboxes-home"
 mkdir -p "${INST_DIR}/docker"
 
 chmod 700 "${INST_DIR}/.openclaw"
@@ -95,7 +94,6 @@ INSTEOF
   # 'ubuntu' on the host — NOT the openclaw user (uid 1002). Using the openclaw
   # UID breaks container write access to these directories.
   sudo chown -R 1000:1000 "${INSTALL_DIR}/instances/${inst_name}/.openclaw"
-  sudo chown -R 1000:1000 "${INSTALL_DIR}/instances/${inst_name}/sandboxes-home"
 
   # Host status directory — written by root cron scripts, read by agents via workspace
   # Lives under workspace/ so agents can read via relative path (host-status/health.json)

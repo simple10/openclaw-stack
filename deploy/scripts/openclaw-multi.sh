@@ -304,7 +304,6 @@ HEADER
       - "127.0.0.1:${dash_port}:6090"
     volumes:
       - ./scripts/entrypoint-gateway.sh:/app/scripts/entrypoint-gateway.sh:ro
-      - ${OPENCLAW_HOME}/instances/${name}/sandboxes-home:/home/node/sandboxes-home
       - ${OPENCLAW_HOME}/instances/${name}/docker:/var/lib/docker
       - ./deploy:/app/deploy:ro
       - ${OPENCLAW_HOME}/instances/${name}/.openclaw:/home/node/.openclaw
