@@ -1,6 +1,13 @@
 // Example OpenClaw Config — per-claw override
 // This completely replaces (not merges) the _defaults/openclaw.json shared template.
 // Remove this file to use the shared template from _defaults/ instead.
+//
+// This example uses a simpler setup than the default - only two agents: main and code
+// Code runs in a sandbox. Main runs as non-main without the coordinator plugin to route skills.
+// This example more closely resembles a stock openclaw setup. Skills run on main unless they're code related.
+// All sandboxes (including main) use the sandbox-toolkit image with pre-installed bins.
+// By default, OpenClaw execs all tools in a sandbox, meaning main should be able to use the sandbox-toolkit bins
+// without needing to delegate to other agents.
 {
   "commands": {
     "restart": true
