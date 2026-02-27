@@ -39,6 +39,7 @@ ${headExtra}
         <a href="${bp}/media/">Media</a>
         <a href="${bp}/stats/">Stats</a>
         <a href="${bp}/logs/">Logs</a>
+        <a href="${bp}/changelog">Changelog</a>
         <span class="nav-sep">|</span>
         <a href="${cui}/" class="nav-ext">Control UI</a>
       </div>

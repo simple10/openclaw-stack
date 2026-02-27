@@ -1,0 +1,198 @@
+<!-- changelog.html — Changelog page body template.
+     Injected into layout chrome by pages/changelog.mjs.
+     Shows CHANGELOG.md rendered as HTML and 50 git log entries.
+     Changelog content embedded server-side via window.__CHANGELOG_DATA.
+     Git log fetched client-side from the stats API. -->
+
+<!-- Page Title -->
+<h1
+  id="pageTitle"
+  style="font-size: 22px; font-weight: 700; color: var(--textStrong); margin: 0 0 20px"
+>
+  OpenClaw Changelog
+</h1>
+
+<!-- Changelog Box -->
+<div class="glass panel" style="margin-bottom: 24px">
+  <div class="section-header"><span class="section-title">📋 CHANGELOG.md</span></div>
+  <div
+    id="changelogContent"
+    style="
+      max-height: 500px;
+      overflow-y: auto;
+      padding: 8px 12px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text);
+    "
+  >
+    <div class="empty">No changelog available</div>
+  </div>
+</div>
+
+<!-- Git Log Box -->
+<div class="glass panel">
+  <div class="section-header">
+    <span class="section-title">📜 Git Log <span id="gitCount" class="section-count"></span></span>
+  </div>
+  <div id="gitPanel"></div>
+</div>
+
+<style>
+  #changelogContent h1 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--textStrong);
+    margin: 16px 0 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  #changelogContent h2 {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--textStrong);
+    margin: 14px 0 6px;
+  }
+  #changelogContent h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--textStrong);
+    margin: 12px 0 4px;
+  }
+  #changelogContent ul {
+    margin: 4px 0 8px 20px;
+    padding: 0;
+  }
+  #changelogContent li {
+    margin: 2px 0;
+    color: var(--text);
+  }
+  #changelogContent code {
+    background: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 12px;
+    color: var(--accent);
+  }
+  #changelogContent hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 12px 0;
+  }
+  #changelogContent p {
+    margin: 4px 0 8px;
+  }
+  #changelogContent strong {
+    color: var(--textStrong);
+  }
+  #gitPanel .git-msg {
+    max-width: none;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+  }
+</style>
+
+<script>
+  const $ = (id) => document.getElementById(id)
+  const esc = (s) =>
+    String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+  const BASE = window.__DASHBOARD_BASE || ''
+  let D = {},
+    timer = 60
+
+  // ── Minimal markdown renderer ──
+  function renderMarkdown(md) {
+    if (!md) return '<div class="empty">No changelog available</div>'
+    return (
+      md
+        .split('\n')
+        .map((line) => {
+          // Headings
+          if (line.startsWith('### ')) return `<h3>${inlineFormat(line.slice(4))}</h3>`
+          if (line.startsWith('## ')) return `<h2>${inlineFormat(line.slice(3))}</h2>`
+          if (line.startsWith('# ')) return `<h1>${inlineFormat(line.slice(2))}</h1>`
+          // Horizontal rule
+          if (/^---+\s*$/.test(line)) return '<hr>'
+          // List items
+          if (/^[-*]\s/.test(line)) return `<li>${inlineFormat(line.slice(2))}</li>`
+          // Empty lines
+          if (!line.trim()) return '<br>'
+          // Regular paragraph
+          return `<p>${inlineFormat(line)}</p>`
+        })
+        .join('\n')
+        // Wrap consecutive <li> in <ul>
+        .replace(/(<li>.*?<\/li>\n?)+/gs, (m) => `<ul>${m}</ul>`)
+    )
+  }
+
+  function inlineFormat(s) {
+    s = esc(s)
+    // Bold
+    s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    // Inline code
+    s = s.replace(/`([^`]+)`/g, '<code>$1</code>')
+    return s
+  }
+
+  // ── Render changelog ──
+  {
+    const data = window.__CHANGELOG_DATA || {}
+    if (data.version) {
+      $('pageTitle').textContent = '\u{1F4DC} OpenClaw Changelog ' + data.version
+    }
+    const el = $('changelogContent')
+    if (data.changelog) {
+      el.innerHTML = renderMarkdown(data.changelog)
+    }
+  }
+
+  // ── Git log rendering ──
+  function renderGit() {
+    const entries = D.gitLog || []
+    $('gitCount').textContent = entries.length + ' commits'
+    $('gitPanel').innerHTML =
+      entries
+        .map(
+          (g) =>
+            `<div class="git-item"><span class="git-hash">${esc(
+              g.hash
+            )}</span><span class="git-msg" title="${esc(g.message)}">${esc(
+              g.message
+            )}</span><span class="git-ago">${esc(g.ago)}</span></div>`
+        )
+        .join('') || '<div class="empty">No git history</div>'
+  }
+
+  // ── Data loading ──
+  async function loadData() {
+    try {
+      const res = await fetch((window.__STATS_BASE || '') + '/api/refresh?t=' + Date.now())
+      D = await res.json()
+      document.title = 'OpenClaw Changelog ' + (D.version || '')
+      requestAnimationFrame(renderGit)
+      const lu = $('lastUpdate')
+      if (lu) lu.textContent = 'Updated: ' + new Date().toLocaleTimeString()
+      timer = 60
+    } catch (e) {
+      console.error('Failed to load stats:', e)
+    }
+  }
+
+  setInterval(() => {
+    timer--
+    if (timer <= 0) {
+      loadData()
+      timer = 60
+    }
+    $('countdown').textContent = timer + 's'
+  }, 1000)
+  loadData()
+</script>

@@ -32,6 +32,7 @@ import { handleRequest as handleBrowsers } from './pages/browsers.mjs'
 import { handleRequest as handleStats } from './pages/stats.mjs'
 import { handleRequest as handleMedia } from './pages/media.mjs'
 import { handleRequest as handleLogs } from './pages/logs.mjs'
+import { handleRequest as handleChangelog } from './pages/changelog.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PORT = 6090
@@ -158,6 +159,7 @@ const server = createServer(async (req, res) => {
       seg[1] !== 'browsers' &&
       seg[1] !== 'stats' &&
       seg[1] !== 'logs' &&
+      seg[1] !== 'changelog' &&
       seg[1] !== 'api' &&
       seg[1] !== 'public' &&
       !findEntry(seg[1])
@@ -227,6 +229,12 @@ const server = createServer(async (req, res) => {
   if (path === '/logs' || path.startsWith('/logs/')) {
     const subPath = path === '/logs' ? '' : path.slice('/logs'.length)
     return handleLogs(req, res, subPath)
+  }
+
+  // Changelog
+  if (path === '/changelog' || path.startsWith('/changelog/')) {
+    const subPath = path === '/changelog' ? '' : path.slice('/changelog'.length)
+    return handleChangelog(req, res, subPath)
   }
 
   // Media browser

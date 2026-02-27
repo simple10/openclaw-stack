@@ -37,9 +37,11 @@ export function handleRequest(req, res, subPath) {
     if (resolved === MEDIA_ROOT || resolved.startsWith(MEDIA_ROOT + '/')) {
       const html = renderPage({
         title: 'Media Files',
-        bodyHtml: `<h1 style="color:var(--textStrong);margin-bottom:8px">Media Files</h1>
+        bodyHtml: `
          <p><a href="${basePath}/" style="color:var(--accent)">&larr; Back to dashboard</a></p>
-         <p class="empty">No media files yet. Media files appear here when agents capture screenshots or download files.</p>`,
+         <h1 style="color:var(--textStrong);margin:20px 0">Media Files</h1>
+         <p class="empty">No media files yet. Media files appear here when agents capture screenshots or download files.</p>
+        `,
         basePath,
       })
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
@@ -90,7 +92,7 @@ export function getRecentMedia(limit = 5) {
       .sort((a, b) => b.mtimeMs - a.mtimeMs)
       .slice(0, limit)
 
-    return all.map(e => ({
+    return all.map((e) => ({
       name: e.name,
       size: formatSize(e.size),
       sizeBytes: e.size,
@@ -123,9 +125,13 @@ function collectFiles(dir, prefix) {
             ext: extname(name).toLowerCase(),
           })
         }
-      } catch { /* skip unreadable entries */ }
+      } catch {
+        /* skip unreadable entries */
+      }
     }
-  } catch { /* skip unreadable dirs */ }
+  } catch {
+    /* skip unreadable dirs */
+  }
   return results
 }
 
@@ -144,27 +150,46 @@ function directoryPage(dirPath, urlPath, basePath) {
           const stat = lstatSync(join(dirPath, name))
           if (stat.isSymbolicLink()) return null
           return { name, isDir: stat.isDirectory(), size: stat.size, mtimeMs: stat.mtimeMs }
-        } catch { return null }
+        } catch {
+          return null
+        }
       })
       .filter(Boolean)
-  } catch { return null }
+  } catch {
+    return null
+  }
 
   const dirs = entries.filter((e) => e.isDir).sort((a, b) => b.mtimeMs - a.mtimeMs)
   const files = entries.filter((e) => !e.isDir).sort((a, b) => b.mtimeMs - a.mtimeMs)
 
   const prefix = urlPath.endsWith('/') ? urlPath : urlPath + '/'
   const rows = [
-    ...dirs.map(e => `<tr class="dr"><td class="w">&#128193; <a href="${prefix}${e.name}/" style="color:var(--accent)">${e.name}/</a></td><td>&mdash;</td><td></td></tr>`),
-    ...files.map(e => `<tr class="dr"><td class="w">&#128196; <a href="${prefix}${e.name}" style="color:var(--accent)">${e.name}</a></td><td>${formatSize(e.size)}</td><td><a href="${prefix}${e.name}" download class="dl" style="color:var(--accent)">&#8681;</a></td></tr>`),
+    ...dirs.map(
+      (e) =>
+        `<tr class="dr"><td class="w">&#128193; <a href="${prefix}${e.name}/" style="color:var(--accent)">${e.name}/</a></td><td>&mdash;</td><td></td></tr>`
+    ),
+    ...files.map(
+      (e) =>
+        `<tr class="dr"><td class="w">&#128196; <a href="${prefix}${
+          e.name
+        }" style="color:var(--accent)">${e.name}</a></td><td>${formatSize(
+          e.size
+        )}</td><td><a href="${prefix}${
+          e.name
+        }" download class="dl" style="color:var(--accent)">&#8681;</a></td></tr>`
+    ),
   ]
 
   const mediaRoot = basePath + '/media'
   const parentLink = urlPath === mediaRoot ? `${basePath}/` : urlPath.replace(/\/[^/]+\/?$/, '/')
-  const body = `<h1 style="color:var(--textStrong);margin-bottom:8px">Media Files &mdash; ${urlPath.replace(mediaRoot, '') || '/'}</h1>
+  const body = `<h1 style="color:var(--textStrong);margin-bottom:8px">Media Files &mdash; ${
+    urlPath.replace(mediaRoot, '') || '/'
+  }</h1>
      <p style="margin-bottom:16px"><a href="${parentLink}" style="color:var(--accent)">&larr; Back</a></p>
-     ${rows.length === 0
-       ? '<p class="empty">No files yet. Media files appear here when agents capture screenshots or download files.</p>'
-       : `<div class="glass panel media-listing" style="overflow-x:auto"><table class="dtable">
+     ${
+       rows.length === 0
+         ? '<p class="empty">No files yet. Media files appear here when agents capture screenshots or download files.</p>'
+         : `<div class="glass panel media-listing" style="overflow-x:auto"><table class="dtable">
        <thead><tr><th>Name</th><th>Size</th><th></th></tr></thead>
        <tbody>${rows.join('\n')}</tbody>
      </table></div>`

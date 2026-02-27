@@ -65,7 +65,7 @@ fi
 # Snapshot recent commit history so the stats dashboard can show what
 # version is running. COPY . . picks this up; cleaned after build.
 echo "[build] Generating .git-info..."
-git log --format='%h%x09%s%x09%aI' -10 > .git-info
+git log --format='%h%x09%s%x09%aI' -50 > .git-info
 
 # ── Build image ──────────────────────────────────────────────────────
 echo "[build] Building openclaw:local..."
