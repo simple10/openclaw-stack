@@ -51,7 +51,7 @@ resolve_gateway() {
 
   if [[ -z "$containers" ]]; then
     echo "Error: No OpenClaw gateway containers running." >&2
-    echo "  Start with: openclaw-multi.sh start" >&2
+    echo "  Deploy with: bun run deploy" >&2
     return 1
   fi
 
