@@ -41,10 +41,10 @@ window), improving deployment reliability.
 
 | Script | Playbook | Purpose |
 |--------|----------|---------|
-| `scripts/setup-infra.sh` | 04 §4.2 | Creates Docker networks, directories, clones repo, generates `.env` |
+| `scripts/setup-infra.sh` | 04 §4.2 | Creates directories, clones repo |
 | `scripts/deploy-config.sh` | 04 §4.3 | Copies config files, substitutes templates, sets permissions |
 | `scripts/register-cron-jobs.sh` | 04 §4.5 | Registers OpenClaw cron jobs via `openclaw cron add` |
 
 All three scripts use `set -euo pipefail`, send progress to stderr, and emit a
-single machine-parseable line on stdout (`OPENCLAW_GENERATED_TOKEN=<hex>` or
-`DEPLOY_CONFIG_OK`). Config values are passed as environment variables.
+single machine-parseable line on stdout (`SETUP_INFRA_OK` or
+`DEPLOY_CONFIG_OK`). Config values come from `source-config.sh`.

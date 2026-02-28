@@ -339,7 +339,7 @@ A full deployment consumes significant context. To avoid mid-deploy compaction, 
 | 02: System update + package install | apt output (hundreds of lines) | pass/fail | `02-base-setup.md` | Full file |
 | 02: System hardening (2.5–2.6) | swap, fail2ban, kernel config output | pass/fail, cloudflared version | `02-base-setup.md` | Full file |
 | 03b: Sysbox runtime | dpkg install + AppArmor check | pass/fail | `03b-sysbox.md` | Full file |
-| 04: Infrastructure setup (4.2) | network/directory creation + SCP | pass/fail, OPENCLAW_GENERATED_TOKEN | `04-infra-config.md` | §4.2 |
+| 04: Infrastructure setup (4.2) | directory creation + SCP | pass/fail | `04-infra-config.md` | §4.2 |
 | 04: Deploy configuration (4.3) | pre-deploy artifacts pushed to VPS | pass/fail | `04-deploy-config.md` | §4.3 |
 | 04: Build + start (4.4) | Full Docker build log | pass/fail | `04-build-start.md` | §4.4 |
 
@@ -347,20 +347,16 @@ A full deployment consumes significant context. To avoid mid-deploy compaction, 
 
 > **Parallel launch:** 01 and 02 subagents should be launched together in a single message (multiple Task tool calls). Both must return their values before step 04 can begin — 04 needs worker URLs/tokens from 01 and requires Docker (step 03, which depends on 02).
 
-**Keep in main context:** Steps that generate credentials (user creation in 02, gateway token recording in 04 after setup-infra.sh returns it), SSH hardening port transition (02), **03-docker.md** (short — use `2>&1 | tail -5` for apt output), device pairing (04/08), **06-backup.md** (short — uses `SOURCE:` pattern, no verbose output), user-facing interactions (08), **07-verification.md** (all checks — runs after heavy steps are done, gives user real-time progress and direct error handling), and the **sandbox build wait** (04: §4.4 — use background task + progress polling pattern for user feedback, ~100 tokens per poll).
+**Keep in main context:** Steps that generate credentials (user creation in 02), SSH hardening port transition (02), **03-docker.md** (short — use `2>&1 | tail -5` for apt output), device pairing (04/08), **06-backup.md** (short — uses `SOURCE:` pattern, no verbose output), user-facing interactions (08), **07-verification.md** (all checks — runs after heavy steps are done, gives user real-time progress and direct error handling), and the **sandbox build wait** (04: §4.4 — use background task + progress polling pattern for user feedback, ~100 tokens per poll).
 
 **Critical: avoid reading playbooks before delegating.** Do NOT read a playbook into main context and then pass its contents to a subagent — this doubles the context cost. Instead, tell the subagent to read the playbook section itself:
 
 ```
 Read playbooks/04-vps1-openclaw.md §4.2 and execute the infrastructure setup.
 SSH: ssh -i <key> -p <port> <user>@<ip>
-Config values (pass as env vars to setup-infra.sh):
-  AI_GATEWAY_WORKER_URL=<value>
-  AI_GATEWAY_AUTH_TOKEN=<value>
-  ...
 Log: Write detailed execution log (all commands, full output, errors, recovery steps)
   to .deploy-logs/<timestamp>/04-infra-config.md
-Return: pass/fail, OPENCLAW_GENERATED_TOKEN from stdout.
+Return: pass/fail.
 ```
 
 **Deployment in subagents:** `bun run pre-deploy` builds all deployment artifacts locally into `.deploy/`. The `.deploy/` directory is then pushed to the VPS. Config values are resolved at build time — the subagent just needs SSH access and the pre-built artifacts.

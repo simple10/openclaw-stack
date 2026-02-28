@@ -11,10 +11,10 @@ All secrets should be rotated on a regular cadence. If a token is suspected comp
 | Token | Location | Rotation Cadence |
 |-------|----------|-----------------|
 | Gateway token (per-claw) | VPS `<INSTALL_DIR>/instances/<name>/.openclaw/openclaw.json` | 90 days |
-| `AI_GATEWAY_AUTH_TOKEN` | VPS `.env` + AI Gateway Worker secret | 90 days |
-| `LOG_WORKER_TOKEN` | VPS `.env` + Log Receiver Worker secret | 90 days |
+| `AI_GATEWAY_AUTH_TOKEN` | Local `.env` + AI Gateway Worker secret | 90 days |
+| `LOG_WORKER_TOKEN` | Local `.env` + Log Receiver Worker secret | 90 days |
 | Provider API keys (Anthropic, OpenAI, etc.) | AI Gateway Worker secrets (Cloudflare Dashboard) | Per provider policy |
-| `HOSTALERT_TELEGRAM_BOT_TOKEN` | VPS `.env` | As needed |
+| `HOSTALERT_TELEGRAM_BOT_TOKEN` | Local `.env` (deployed via `bun run pre-deploy`) | As needed |
 | SSH keys (`~/.ssh/vps1_openclaw_ed25519`) | Local machine + VPS `authorized_keys` | Annual |
 
 ### Rotation Procedures
@@ -54,9 +54,11 @@ NEW_TOKEN=$(openssl rand -hex 32)
 cd workers/ai-gateway
 echo "$NEW_TOKEN" | npx wrangler secret put AUTH_TOKEN
 
-# 3. Update VPS .env — change AI_GATEWAY_AUTH_TOKEN value
+# 3. Update AI_GATEWAY_TOKEN in local .env, rebuild and push artifacts
+bun run pre-deploy
+# Push updated artifacts to VPS (via .deploy/ or SCP)
 
-# 4. Recreate all claws to pick up new .env values (no rebuild needed — token is an env var)
+# 4. Recreate all claws to pick up new env values
 sudo -u openclaw bash -c 'cd <INSTALL_DIR>/deploy && docker compose up -d'
 ```
 
@@ -74,9 +76,11 @@ NEW_TOKEN=$(openssl rand -hex 32)
 cd workers/log-receiver
 echo "$NEW_TOKEN" | npx wrangler secret put AUTH_TOKEN
 
-# 3. Update VPS vector/.env — change LOG_WORKER_TOKEN value
+# 3. Update LOG_WORKER_TOKEN in local .env, rebuild and push artifacts
+bun run pre-deploy
+# Push updated artifacts to VPS (via .deploy/ or SCP)
 
-# 4. Recreate Vector to pick up new .env values (see CLAUDE.md: restart vs up -d)
+# 4. Recreate Vector to pick up new env values (see CLAUDE.md: restart vs up -d)
 sudo -u openclaw bash -c 'cd <INSTALL_DIR>/deploy && docker compose up -d vector'
 ```
 

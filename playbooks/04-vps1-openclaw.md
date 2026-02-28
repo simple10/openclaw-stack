@@ -6,7 +6,6 @@ Install and configure OpenClaw gateway on VPS-1.
 
 This playbook configures:
 
-- Docker networks for OpenClaw
 - Directory structure and permissions
 - OpenClaw repository and configuration
 - Docker Compose with security hardening
@@ -37,7 +36,7 @@ Config values are read from `.env` and `stack.yml` (resolved by `bun run pre-dep
 
 ## 4.2 Infrastructure Setup
 
-> **Pre-deploy + SCP + single script.** Run `bun run pre-deploy` locally to build `.deploy/` artifacts, SCP them to the VPS staging area, then run `setup-infra.sh` which creates networks, directories, clones the repo, and generates the `.env` file. Returns the generated `GATEWAY_TOKEN` which must be saved locally before proceeding.
+> **Pre-deploy + SCP + single script.** Run `bun run pre-deploy` locally to build `.deploy/` artifacts, SCP them to the VPS staging area, then run `setup-infra.sh` which creates directories and clones the repo.
 
 ### Step 0: Build deployment artifacts locally
 
@@ -261,8 +260,7 @@ Runs all verification checks across every running claw: sandbox images, binaries
 
 ```bash
 ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
-  "env OPENCLAW_DOMAIN_PATH='${OPENCLAW_DOMAIN_PATH}' \
-  bash ${INSTALL_DIR}/.deploy-staging/scripts/verify-deployment.sh"
+  "bash ${INSTALL_DIR}/.deploy-staging/scripts/verify-deployment.sh"
 ```
 
 Expects `VERIFY_DEPLOYMENT_OK` on stdout. Detailed per-claw results go to stderr.
@@ -474,14 +472,15 @@ done
 ### Vector Not Shipping Logs
 
 ```bash
-# Check Vector logs for config errors
-sudo docker logs vector 2>&1 | head -20
+# Check Vector logs for config errors (container name is <project>-vector)
+VECTOR=$(sudo docker ps --format '{{.Names}}' | grep 'vector$')
+sudo docker logs "$VECTOR" 2>&1 | head -20
 
 # Verify vector.yaml is mounted correctly
-sudo docker exec vector ls -la /etc/vector/
+sudo docker exec "$VECTOR" ls -la /etc/vector/
 
 # Test the Worker endpoint is reachable from within the container
-sudo docker exec vector wget -q -O- <LOG_WORKER_URL>/health
+sudo docker exec "$VECTOR" wget -q -O- <LOG_WORKER_URL>/health
 
 # Restart Vector after fixing (use `up -d` instead if .env values changed)
 sudo -u openclaw bash -c 'cd <INSTALL_DIR>/deploy && docker compose restart vector'
@@ -508,12 +507,11 @@ If CLI commands fail, check:
 ### Network Issues
 
 ```bash
-# Verify network exists
-docker network ls | grep openclaw
+# Verify network exists (created by docker compose)
+docker network ls | grep openclaw-net
 
-# Recreate if needed
-docker network rm openclaw-gateway-net
-docker network create --driver bridge --subnet 172.30.0.0/24 openclaw-gateway-net
+# Recreate by restarting compose (compose manages the network)
+sudo -u openclaw bash -c 'cd <INSTALL_DIR>/deploy && docker compose down && docker compose up -d'
 ```
 
 ---

@@ -199,8 +199,10 @@ Capture the Worker URL from the deploy output and update `LOG_WORKER_URL` in `.e
 **Re-deployment only** — if Vector is already running on VPS and you're updating the worker:
 
 ```bash
-# On VPS-1: update LOG_WORKER_URL and LOG_WORKER_TOKEN in vector/.env, then recreate Vector
-# IMPORTANT: `restart` does NOT reload .env — use `up -d` to recreate with new env vars
+# On local machine: update LOG_WORKER_URL and LOG_WORKER_TOKEN in .env, rebuild and push artifacts
+bun run pre-deploy
+# Push updated .deploy/ artifacts to VPS, then recreate Vector
+# IMPORTANT: `restart` does NOT reload env vars — use `up -d` to recreate with new values
 sudo -u openclaw bash -c 'cd <INSTALL_DIR>/deploy && docker compose up -d vector'
 ```
 
@@ -252,8 +254,8 @@ npx wrangler deploy --dry-run
 ### Logs Not Appearing
 
 ```bash
-# Check Vector logs on VPS-1
-sudo docker logs --tail 50 vector
+# Check Vector logs on VPS-1 (container name is <project>-vector)
+sudo docker logs --tail 50 $(sudo docker ps --format '{{.Names}}' | grep 'vector$')
 
 # Verify Worker URL is correct
 echo $LOG_WORKER_URL
