@@ -11,8 +11,7 @@
 # Patches applied (each auto-skips when upstream fixes the issue):
 #   1. Dockerfile: install Docker + gosu for nested Docker (sandbox isolation via Sysbox)
 #   2. Dockerfile: clear build-time jiti cache (belt-and-suspenders with entrypoint §2c)
-#   3. docker.ts: apply sandbox env vars (docker.env) to container creation
-#   4. .dockerignore: exclude local runtime dirs (data/, deploy/) from build context
+#   3. .dockerignore: exclude local runtime dirs (data/, deploy/) from build context
 #
 # Usage: sudo -u openclaw ${INSTALL_DIR}/scripts/build-openclaw.sh
 set -euo pipefail
@@ -101,16 +100,7 @@ else
   echo "[build] Dockerfile jiti patch already present"
 fi
 
-# 4c. docker.ts: apply env vars from sandbox config
-DOCKER_FILE="src/agents/sandbox/docker.ts"
-if [ -f "$DOCKER_FILE" ] && ! grep -q 'params.cfg.env' "$DOCKER_FILE"; then
-  echo "[build] Patching docker.ts to apply sandbox env vars..."
-  sed -i '/^  return args;$/i\  if (params.cfg.env) {\n    for (const [key, value] of Object.entries(params.cfg.env)) {\n      if (key && value !== undefined) {\n        args.push("-e", `${key}=${value}`);\n      }\n    }\n  }' "$DOCKER_FILE"
-else
-  echo "[build] docker.ts already applies env vars (already patched or upstream fix)"
-fi
-
-# 4d. .dockerignore: exclude local runtime dirs from build context
+# 4c. .dockerignore: exclude local runtime dirs from build context
 if ! grep -q '^data/' .dockerignore; then
   echo "[build] Patching .dockerignore to exclude data/ and deploy/..."
   printf '\n# Local runtime dirs (not part of upstream)\ndata/\ndeploy/\nscripts/entrypoint-gateway.sh\n' >> .dockerignore
@@ -124,7 +114,7 @@ fi
 # the VPS but aren't part of upstream — bloating the commit and the
 # .git object store that ships inside the container image.
 echo "[build] Committing patches to ${PATCH_BRANCH}..."
-git add Dockerfile "$DOCKER_FILE" .dockerignore
+git add Dockerfile .dockerignore
 # Only commit if there are changes (patches may have been no-ops)
 if ! git diff --cached --quiet; then
   git commit -m "VPS patches for ${RESOLVED_VERSION}" --no-gpg-sign
