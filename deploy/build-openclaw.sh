@@ -90,7 +90,7 @@ HOST_NEEDS_RESTORE=true
 # 4a. Dockerfile: install Docker + gosu for nested Docker
 if ! grep -q "docker.io" Dockerfile; then
   echo "[build] Patching Dockerfile to install Docker + gosu..."
-  sed -i '0,/^USER node/{/^USER node/i RUN apt-get update && apt-get install -y --no-install-recommends docker.io gosu && usermod -aG docker node && rm -rf /var/lib/apt/lists/*
+  sed -i '0,/^USER node/{/^USER node/i RUN apt-get update && apt-get install -y --no-install-recommends docker.io gosu gettext-base && usermod -aG docker node && rm -rf /var/lib/apt/lists/*
 }' Dockerfile
 else
   echo "[build] Docker already in Dockerfile (already patched)"

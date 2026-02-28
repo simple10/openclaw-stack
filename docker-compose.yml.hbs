@@ -4,7 +4,7 @@
      Claw service blocks are auto-generated from stack.yml claws. --}}
 
 x-openclaw-claw: &claw
-  image: {{stack.project_name}}:local
+  image: openclaw-{{stack.project_name}}:local
   runtime: sysbox-runc
   read_only: false
   tmpfs:
@@ -17,7 +17,7 @@ x-openclaw-claw: &claw
   entrypoint: ["/app/scripts/entrypoint-gateway.sh"]
   command: >-
     sh -c 'node dist/index.js gateway
-    --allow-unconfigured --bind lan --port $OPENCLAW_GATEWAY_PORT'
+    --allow-unconfigured --bind lan --port $$OPENCLAW_GATEWAY_PORT'
   restart: unless-stopped
   logging:
     driver: json-file
@@ -116,6 +116,7 @@ services:
     environment:
       - LOG_WORKER_URL={{stack.logging.worker_url}}
       - LOG_WORKER_TOKEN={{stack.logging.worker_token}}
+      - VPS_IP={{env.VPS_IP}}
     networks: [openclaw-net]
     deploy:
       resources:

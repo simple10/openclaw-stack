@@ -248,7 +248,7 @@ function computeDerivedValues(
     const gwUrl = claw.ai_gateway?.url || stack.ai_gateway.url;
     const gwToken = claw.ai_gateway?.token || stack.ai_gateway.token;
 
-    claw.gateway_token = claw.gateway_token || "";
+    claw.gateway_token = claw.gateway_token || crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
     claw.anthropic_api_key = gwToken;
     claw.anthropic_base_url = gwUrl + "/anthropic";
     claw.openai_api_key = gwToken;
@@ -408,7 +408,7 @@ async function main() {
   info(`Rendering compose template: ${templatePath}...`);
   const templateSrc = readRoot(templatePath);
   const template = Handlebars.compile(templateSrc, { noEscape: true });
-  const composeFinal = template({ stack, host, claws });
+  const composeFinal = template({ stack, host, claws, env });
   success("Compose template rendered");
 
   if (DRY_RUN) {

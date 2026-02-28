@@ -12,7 +12,7 @@ transforms:
     type: remap
     inputs:
       - docker_logs
-    source: '.vps_ip = "${ENV__VPS_IP}"'
+    source: '.vps_ip = "${VPS_IP}"'
 
   # Detect log level from message text so the worker can filter cheaply by field
   tag_level:
