@@ -71,7 +71,8 @@ function resolveEnvRefs(text: string, env: Record<string, string>): string {
     return line.replace(/\$\{([^}]+)\}/g, (_match, expr: string) => {
       const defaultMatch = expr.match(/^([^:]+):-(.*)$/);
       if (defaultMatch) {
-        const [, key, defaultVal] = defaultMatch;
+        const key = defaultMatch[1]!;
+        const defaultVal = defaultMatch[2]!;
         return env[key] !== undefined && env[key] !== "" ? env[key] : defaultVal;
       }
       const value = env[expr];
@@ -139,8 +140,8 @@ async function queryVpsCapacity(env: Record<string, string>): Promise<VpsCapacit
   }
 
   const lines = stdout.trim().split("\n");
-  const cpus = parseInt(lines[0], 10);
-  const memKb = parseInt(lines[1], 10);
+  const cpus = parseInt(lines[0] ?? "", 10);
+  const memKb = parseInt(lines[1] ?? "", 10);
   const memMb = Math.floor(memKb / 1024);
 
   success(`VPS capacity: ${cpus} CPUs, ${memMb} MB memory`);
@@ -151,7 +152,7 @@ function parseMemoryValue(val: string): { mb: number; original: string } {
   const str = String(val).trim();
   const match = str.match(/^(\d+(?:\.\d+)?)\s*(G|M|GB|MB|g|m|gb|mb)?$/i);
   if (!match) fatal(`Invalid memory value: ${val}`);
-  const num = parseFloat(match[1]);
+  const num = parseFloat(match[1]!);
   const unit = (match[2] || "M").toUpperCase().replace("B", "");
   const mb = unit === "G" ? Math.floor(num * 1024) : Math.floor(num);
   return { mb, original: str };
@@ -388,8 +389,9 @@ async function main() {
   info("Merging defaults into claws...");
   const claws: Record<string, Record<string, any>> = {};
   for (const [name, clawConfig] of Object.entries(clawsRaw)) {
-    claws[name] = deepMerge(defaults, clawConfig);
-    validateClaw(name, claws[name]);
+    const merged = deepMerge(defaults, clawConfig ?? {});
+    claws[name] = merged;
+    validateClaw(name, merged);
   }
   success("Claws merged and validated");
 
