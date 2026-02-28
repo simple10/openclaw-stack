@@ -63,8 +63,14 @@ DEPLOY_DIR="${STACK__STACK__INSTALL_DIR}/deploy"
 
 # Files to sync: local path -> VPS host path
 # These are bind-mounted into the container via docker-compose.yml volumes
+if [ -z "${STACK__STACK__SANDBOX_TOOLKIT:-}" ]; then
+  echo "Error: stack.sandbox_toolkit not configured in stack.yml" >&2
+  echo "Nothing to sync — sandbox toolkit is disabled for this stack." >&2
+  exit 1
+fi
+
 SYNC_LOCAL=(
-  "${STACK__STACK__SANDBOX_TOOLKIT:-openclaw/default/sandbox-toolkit.yaml}"
+  "$STACK__STACK__SANDBOX_TOOLKIT"
   "deploy/parse-toolkit.mjs"
   "deploy/rebuild-sandboxes.sh"
 )

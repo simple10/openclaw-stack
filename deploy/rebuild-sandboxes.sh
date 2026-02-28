@@ -337,14 +337,12 @@ build_packages() {
     build_base || return 1
   fi
 
-  # Read packages from toolkit config (falls back to minimal set)
+  # Read packages from toolkit config (if present)
+  # When no toolkit config exists, PACKAGES is left empty so the upstream
+  # sandbox-common-setup.sh uses its own built-in default package list.
   local toolkit_packages=""
   if [ -n "$toolkit_json" ]; then
     toolkit_packages=$(echo "$toolkit_json" | node -e "process.stdin.on('data',d=>console.log(JSON.parse(d).packages.join(' ')))")
-  fi
-  if [ -z "$toolkit_packages" ]; then
-    log "WARNING: No toolkit config, using fallback package list"
-    toolkit_packages="curl wget jq coreutils grep nodejs python3 git ca-certificates golang-go rustc cargo unzip pkg-config libasound2-dev build-essential file ffmpeg imagemagick"
   fi
 
   # Step 1: Build rooted intermediate from base image
@@ -365,10 +363,16 @@ build_packages() {
   # The Dockerfile has no COPY instructions so the context dir doesn't matter.
   mkdir -p /tmp/sandbox-build
   ln -sf /app/Dockerfile.sandbox-common /tmp/sandbox-build/Dockerfile.sandbox-common
+  # Only pass PACKAGES when toolkit config provides them; otherwise let
+  # upstream sandbox-common-setup.sh use its own built-in default list.
+  local pkg_env=()
+  if [ -n "$toolkit_packages" ]; then
+    pkg_env=(PACKAGES="$toolkit_packages")
+  fi
   (cd /tmp/sandbox-build && \
     BASE_IMAGE=openclaw-sandbox-base-root:bookworm-slim \
     TARGET_IMAGE=openclaw-sandbox-packages:bookworm-slim \
-    PACKAGES="$toolkit_packages" \
+    "${pkg_env[@]+"${pkg_env[@]}"}" \
     /app/scripts/sandbox-common-setup.sh) || true
 
   # Cleanup intermediate image

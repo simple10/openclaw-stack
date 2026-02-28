@@ -505,12 +505,16 @@ async function main() {
   }
   success("Copied deploy artifacts");
 
-  // 7h. Copy sandbox toolkit (config-driven path with fallback)
-  const toolkitPath = String(stack.sandbox_toolkit || "openclaw/default/sandbox-toolkit.yaml");
-  const toolkitSrc = join(ROOT, toolkitPath);
-  if (!existsSync(toolkitSrc)) fatal(`Sandbox toolkit not found: ${toolkitPath}`);
-  cpSync(toolkitSrc, join(DEPLOY_DIR, "deploy", "sandbox-toolkit.yaml"));
-  success(`Copied sandbox toolkit (from ${toolkitPath})`);
+  // 7h. Copy sandbox toolkit (only if configured in stack.yml)
+  if (stack.sandbox_toolkit) {
+    const toolkitPath = String(stack.sandbox_toolkit);
+    const toolkitSrc = join(ROOT, toolkitPath);
+    if (!existsSync(toolkitSrc)) fatal(`Sandbox toolkit not found: ${toolkitPath}`);
+    cpSync(toolkitSrc, join(DEPLOY_DIR, "deploy", "sandbox-toolkit.yaml"));
+    success(`Copied sandbox toolkit (from ${toolkitPath})`);
+  } else {
+    info("No sandbox_toolkit configured — sandboxes will build without extra tools");
+  }
 
   // 7i. Copy vector config if logging enabled
   if (stack.vector) {
