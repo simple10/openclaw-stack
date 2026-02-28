@@ -36,34 +36,35 @@ Then ask the user to fill in the required values (see section 0.2).
 
 ## 0.2 Required Config
 
-Validate all of these fields:
+Run this single validation command to check all required fields at once:
 
-1. **`VPS_IP`** (`.env`) — Must be set and not a placeholder (not empty or containing `<`).
-2. **`CLOUDFLARE_TUNNEL_TOKEN`** or **`CLOUDFLARE_API_TOKEN`** (`.env`) — At least one must be non-empty. If both are empty, report: "Set `CLOUDFLARE_TUNNEL_TOKEN` (manual — create tunnel in CF Dashboard) or `CLOUDFLARE_API_TOKEN` (automated — Claude creates tunnel + routes + DNS). See [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md)."
-3. **`domain`** (`stack.yml` → `defaults.domain`) — Must not be a placeholder (no `<example>` or angle brackets).
-4. **`ADMIN_TELEGRAM_ID`** (`.env`) — Must be set and numeric (Telegram user IDs are integers). If empty, warn the user: "Send a message to @userinfobot on Telegram to get your numeric user ID."
-5. **Claw Telegram bot tokens** (`.env`) — Each claw needs a `<NAME>_TELEGRAM_BOT_TOKEN`. If empty, warn: "Create a Telegram bot via @BotFather and paste the token here. See `docs/TELEGRAM.md`."
+```bash
+source .env 2>/dev/null && \
+echo "=== .env ===" && \
+echo "VPS_IP=${VPS_IP:-EMPTY}" && \
+echo "CF_TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:+SET}" && \
+echo "CF_API_TOKEN=${CLOUDFLARE_API_TOKEN:+SET}" && \
+echo "ADMIN_TELEGRAM_ID=${ADMIN_TELEGRAM_ID:-EMPTY}" && \
+echo "SSH_KEY=${SSH_KEY:-~/.ssh/vps1_openclaw_ed25519}" && \
+grep '_TELEGRAM_BOT_TOKEN=' .env | grep -v '^#' && \
+echo "=== stack.yml ===" && \
+grep '^\s*domain:' stack.yml | head -1 && \
+echo "=== claws ===" && \
+grep -A1 '^claws:' stack.yml | tail -n +2 | grep '^\s\+[a-z]' | sed 's/://;s/^\s*//'
+```
+
+### Validation rules
+
+1. **`VPS_IP`** — Must not be `EMPTY` or contain `<`.
+2. **`CF_TUNNEL_TOKEN`** or **`CF_API_TOKEN`** — At least one must show `SET`. If both missing: "Set `CLOUDFLARE_TUNNEL_TOKEN` (manual — create tunnel in CF Dashboard) or `CLOUDFLARE_API_TOKEN` (automated). See [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md)."
+3. **`domain`** — The `stack.yml` domain line must not contain angle brackets (e.g., `<example>`). `${VAR}` references are OK — verify the referenced `.env` variable (e.g., `ROOT_DOMAIN`) is set.
+4. **`ADMIN_TELEGRAM_ID`** — Must be numeric. If empty: "Send a message to @userinfobot on Telegram to get your numeric user ID."
+5. **Bot tokens** — Each claw name needs a matching `<NAME>_TELEGRAM_BOT_TOKEN` line in `.env` (uppercased, hyphens→underscores). If missing: "Create a Telegram bot via @BotFather and paste the token. See `docs/TELEGRAM.md`."
+6. **Claws** — The `claws` section lists claw names. Single claw = standard deploy. Multiple claws: inform user each gets its own container/domain.
 
 ### If any fields are invalid or missing
 
-Report **all** issues at once (don't stop at the first one). Present them as:
-
-> **Configuration issues found:**
->
-> - `VPS_IP` is empty — set it to your VPS public IP in `.env`
-> - `CLOUDFLARE_TUNNEL_TOKEN` and `CLOUDFLARE_API_TOKEN` are both empty — set one in `.env`:
->   `CLOUDFLARE_TUNNEL_TOKEN` (manual — create tunnel in CF Dashboard) or
->   `CLOUDFLARE_API_TOKEN` (automated — see [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md))
-> - `defaults.domain` is still a placeholder in `stack.yml` — set it to your actual domain
->   (e.g., `openclaw.yourdomain.com`). You need to configure Cloudflare Tunnel
->   public hostname routes first (see [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md))
-> - `ADMIN_TELEGRAM_ID` is empty in `.env` — send a message to @userinfobot on Telegram to get your ID
-> - Claw Telegram bot tokens are empty in `.env` — create bots via @BotFather and paste tokens
->   (see [`docs/TELEGRAM.md`](../docs/TELEGRAM.md))
->
-> Update `.env` and `stack.yml` and let me know when ready.
-
-Wait for user to fix all issues before continuing. Re-validate after they confirm.
+Report **all** issues at once (don't stop at the first one). Wait for user to fix all issues before continuing. Re-validate after they confirm.
 
 ---
 
@@ -110,18 +111,6 @@ When `CF_API_TOKEN` is set, automate tunnel creation, route configuration, and D
 > protect all instance subdomains. This must still be configured manually in the CF Dashboard.
 
 ---
-
-## 0.2c Multi-Claw Detection
-
-Check for additional claws in `stack.yml` under the `claws` section. Each key under `claws` is a claw name.
-
-If only one claw is defined (or no `claws` section), this is a single-claw deployment — proceed normally. The deployment process is the same regardless of claw count.
-
-If multiple claws are found, inform the user:
-
-> "Found N claw configurations: personal-claw, work-claw, ..."
-> "Each will get its own container, domain, and gateway token."
-> "Ensure each claw in `stack.yml` has the correct `domain` if using separate subdomains."
 
 ---
 
