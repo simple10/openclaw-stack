@@ -65,7 +65,7 @@ CLAWS=$(sudo docker ps --format '{{.Names}}' --filter 'name=^openclaw-' | grep -
 echo "Claw containers: $CLAWS"
 
 # Check containers are running
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose ps'
+sudo -u openclaw bash -c 'cd <INSTALL_DIR>/deploy && docker compose ps'
 
 # Check claw logs for errors
 for CLAW in $CLAWS; do
@@ -104,8 +104,8 @@ sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose up -d'
 > **Skip this section** if `ENABLE_VECTOR_LOG_SHIPPING` is `false`.
 
 ```bash
-# Check Vector is running (separate compose project)
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/vector && docker compose ps'
+# Check Vector is running (part of main compose project)
+sudo docker ps --filter 'name=vector'
 
 # Check Vector logs for errors
 sudo docker logs --tail 20 vector
@@ -140,7 +140,7 @@ curl -X POST https://<LOG_WORKER_URL>/logs \
 **If health check fails:**
 
 > "The Log Receiver Worker isn't responding. Check that the worker is deployed
-> and the URL is correct in `openclaw-config.env`. You can verify the worker
+> and `LOG_WORKER_URL` is correct in `.env`. You can verify the worker
 > status in the Cloudflare Dashboard under Workers & Pages."
 
 ### AI Gateway Worker
@@ -157,7 +157,7 @@ curl -s https://<AI_GATEWAY_WORKER_URL>/health
 **If either worker health check fails:**
 
 > "A Cloudflare Worker isn't responding. Check that it's deployed and the URL
-> is correct in `openclaw-config.env`. Verify the worker status in the
+> is correct in `.env`. Verify the worker status in the
 > Cloudflare Dashboard under Workers & Pages. If not deployed, run
 > `01-workers.md` to deploy it."
 
@@ -216,7 +216,7 @@ ss -tlnp | grep <SSH_PORT>
 
 # Services and cron jobs
 sudo systemctl status sysbox
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose ps'
+sudo -u openclaw bash -c 'cd <INSTALL_DIR>/deploy && docker compose ps'
 sudo docker logs --tail 5 vector
 cat /etc/cron.d/openclaw-backup
 cat /etc/cron.d/openclaw-alerts
@@ -485,7 +485,7 @@ sudo docker exec --user node "$FIRST_CLAW" \
 
 ## 7.5c Verify Resource Limits
 
-Verify deployed claw resource limits match VPS hardware. Read `source-config.sh GATEWAY_CPUS` and `source-config.sh GATEWAY_MEMORY` (see § 0.4).
+Verify deployed claw resource limits match VPS hardware. Read `OPENCLAW_CONTAINER_CPU` and `OPENCLAW_CONTAINER_MEM` from `.env` (see § 0.4).
 
 ```bash
 # On VPS: query hardware and deployed limits
@@ -504,7 +504,7 @@ Compare per-claw limits against VPS hardware divided by claw count (see `00-fres
 
 **If mismatch during fresh deploy:** Resource limits were already reviewed in `00-fresh-deploy-setup.md` § 0.4. Auto-apply only if the gap is significant (CPUs differ or memory off by >2GB); otherwise report and continue.
 
-**If mismatch outside fresh deploy:** Show comparison and ask user. If confirmed, update `GATEWAY_CPUS` and `GATEWAY_MEMORY` in `openclaw-config.env`, then redeploy the `.env` to the VPS and recreate the container:
+**If mismatch outside fresh deploy:** Show comparison and ask user. If confirmed, update `OPENCLAW_CONTAINER_CPU` and `OPENCLAW_CONTAINER_MEM` in `.env`, run `bun run pre-deploy`, then push the updated artifacts to the VPS and recreate the container:
 
 ```bash
 # Update the .env on VPS with new resource limits
@@ -525,7 +525,7 @@ ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
 
 ## 7.6a Telemetry (unified plugin)
 
-> Skip this section if `source-config.sh ENABLE_LLEMTRY_LOGGING` is not `true`.
+> Skip this section if `ENABLE_LLEMTRY_LOGGING` is not `true` in the deployed config.
 
 **1. Events endpoint (D1 storage):**
 
@@ -597,8 +597,8 @@ npx wrangler d1 execute <D1_DATABASE_NAME> --command="SELECT type, category, age
 ### Container Issues
 
 ```bash
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose ps'
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose logs -f <service>'
+sudo -u openclaw bash -c 'cd <INSTALL_DIR>/deploy && docker compose ps'
+sudo -u openclaw bash -c 'cd <INSTALL_DIR>/deploy && docker compose logs -f <service>'
 docker system df
 free -h
 ```
@@ -609,8 +609,8 @@ free -h
 # Check Vector logs
 sudo docker logs --tail 50 vector
 
-# Restart Vector (use `up -d` instead if .env values changed)
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/vector && docker compose restart'
+# Restart Vector (use `up -d vector` instead if .env values changed)
+sudo -u openclaw bash -c 'cd <INSTALL_DIR>/deploy && docker compose restart vector'
 
 # Check if Worker endpoint is reachable
 curl -s https://<LOG_WORKER_URL>/health

@@ -21,7 +21,7 @@ All secrets should be rotated on a regular cadence. If a token is suspected comp
 
 #### Gateway Token
 
-Each claw has its own `GATEWAY_TOKEN` baked into its `openclaw.json` by `deploy-config.sh`. Rotate each claw's token independently.
+Each claw has its own `GATEWAY_TOKEN` resolved from its environment. Rotate each claw's token independently.
 
 ```bash
 # 1. Generate new token
@@ -30,17 +30,17 @@ NEW_TOKEN=$(openssl rand -hex 32)
 # 2. Write new token to per-claw .gateway-token file
 echo "$NEW_TOKEN" | sudo tee <INSTALL_DIR>/instances/<CLAW_NAME>/.openclaw/.gateway-token > /dev/null
 
-# 3. Regenerate .env so PREFIX_GATEWAY_TOKEN gets the new value
-<INSTALL_DIR>/scripts/openclaw-multi.sh generate
+# 3. Update the deploy .env with the new token
+# Edit <INSTALL_DIR>/deploy/.env to update the claw's GATEWAY_TOKEN variable
 
 # 4. Recreate the claw container (up -d, NOT restart — restart doesn't reload .env)
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose up -d openclaw-<CLAW_NAME>'
+sudo -u openclaw bash -c 'cd <INSTALL_DIR>/deploy && docker compose up -d openclaw-<CLAW_NAME>'
 
 # 5. Update all paired devices with new token (existing browser URLs will need the new token parameter)
 # Repeat steps 2-5 for each claw being rotated
 ```
 
-> **Note:** The shared `.env` contains `OPENCLAW_GATEWAY_TOKEN` from initial setup, but this is not used by multi-claw containers. Each claw reads its token from its own `openclaw.json`. You do not need to update `.env` when rotating a claw's token.
+> **Note:** Each claw reads its token from its own `openclaw.json` (resolved at startup via `envsubst`). The `.gateway-token` file is the persistent source.
 
 > **Verify:** Run § 7.1 — each rotated claw's health endpoint responds. Re-pair devices per `08b-pair-devices.md`.
 
@@ -57,7 +57,7 @@ echo "$NEW_TOKEN" | npx wrangler secret put AUTH_TOKEN
 # 3. Update VPS .env — change AI_GATEWAY_AUTH_TOKEN value
 
 # 4. Recreate all claws to pick up new .env values (no rebuild needed — token is an env var)
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose up -d'
+sudo -u openclaw bash -c 'cd <INSTALL_DIR>/deploy && docker compose up -d'
 ```
 
 > **Verify:** Run § 7.3 — AI Gateway Worker health check returns `{"status":"ok"}`.
@@ -77,7 +77,7 @@ echo "$NEW_TOKEN" | npx wrangler secret put AUTH_TOKEN
 # 3. Update VPS vector/.env — change LOG_WORKER_TOKEN value
 
 # 4. Recreate Vector to pick up new .env values (see CLAUDE.md: restart vs up -d)
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/vector && docker compose up -d'
+sudo -u openclaw bash -c 'cd <INSTALL_DIR>/deploy && docker compose up -d vector'
 ```
 
 > **Verify:** Run § 7.2 (Vector running) and § 7.3 (Log Receiver Worker health check returns `{"status":"ok"}`).
@@ -119,7 +119,7 @@ ssh -i ~/.ssh/vps1_openclaw_ed25519 -p <SSH_PORT> adminclaw@<VPS1_IP> \
 ssh -i ~/.ssh/vps1_openclaw_ed25519_new -p <SSH_PORT> adminclaw@<VPS1_IP> echo "OK"
 
 # 4. Remove old key from VPS authorized_keys
-# 5. Update openclaw-config.env with new SSH_KEY_PATH
+# 5. Update .env with new SSH_KEY path
 # 6. Delete old private key
 ```
 
@@ -210,58 +210,42 @@ To update just one claw's `openclaw.json` without affecting other claws:
 
 ```bash
 # From local machine
-# 1. SCP updated deploy files + claw configs to VPS
-ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP} "sudo mkdir -p ${INSTALL_DIR}/.deploy-staging && sudo chown ${SSH_USER}:${SSH_USER} ${INSTALL_DIR}/.deploy-staging"
-scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r deploy/* ${SSH_USER}@${VPS1_IP}:${INSTALL_DIR}/.deploy-staging/
-scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r openclaws ${SSH_USER}@${VPS1_IP}:${INSTALL_DIR}/.deploy-staging/openclaws
+# 1. Rebuild deployment artifacts
+bun run pre-deploy
 
-# 2. Deploy config for one claw only
-ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP} \
-  "env INSTANCE_NAME=personal-claw \
-    OPENCLAW_DOMAIN='${OPENCLAW_DOMAIN}' \
-    OPENCLAW_DOMAIN_PATH='${OPENCLAW_DOMAIN_PATH}' \
-    YOUR_TELEGRAM_ID='${YOUR_TELEGRAM_ID}' \
-    OPENCLAW_INSTANCE_ID='${OPENCLAW_INSTANCE_ID}' \
-    VPS_HOSTNAME='${VPS_HOSTNAME}' \
-    ENABLE_EVENTS_LOGGING='${ENABLE_EVENTS_LOGGING}' \
-    ENABLE_LLEMTRY_LOGGING='${ENABLE_LLEMTRY_LOGGING}' \
-    LOG_WORKER_TOKEN='${LOG_WORKER_TOKEN}' \
-    LOG_WORKER_URL='${LOG_WORKER_URL}' \
-    AI_GATEWAY_WORKER_URL='${AI_GATEWAY_WORKER_URL}' \
-    ENABLE_VECTOR_LOG_SHIPPING='${ENABLE_VECTOR_LOG_SHIPPING}' \
-  bash ${INSTALL_DIR}/.deploy-staging/scripts/deploy-config.sh"
+# 2. Copy the updated claw config to VPS
+scp -P ${SSH_PORT} -i ${SSH_KEY} .deploy/claws/personal-claw/openclaw.json \
+  ${SSH_USER}@${VPS_IP}:${INSTALL_DIR}/instances/personal-claw/.openclaw/openclaw.json
 
-# 3. Restart that claw to pick up new config
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose restart openclaw-personal-claw'
+# 3. Restart that claw to pick up new config (restart is fine for bind-mounted file changes)
+ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
+  "sudo -u openclaw bash -c 'cd ${INSTALL_DIR}/deploy && docker compose restart openclaw-personal-claw'"
 ```
 
 ---
 
 ## Adding a New Claw
 
-1. Create `openclaws/<name>/config.env` (copy from `_example/config.env`)
-2. Set per-claw overrides (domain, resources, etc.) in the new `config.env`
-3. SCP deploy files + claw configs to VPS:
+1. Add a new entry under `claws` in `stack.yml` with per-claw overrides (domain, resources, Telegram bot token, etc.)
+2. Add the claw's Telegram bot token to `.env` (e.g., `NEW_CLAW_TELEGRAM_BOT_TOKEN=...`)
+3. Rebuild deployment artifacts:
    ```bash
-   ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP} "sudo mkdir -p ${INSTALL_DIR}/.deploy-staging && sudo chown ${SSH_USER}:${SSH_USER} ${INSTALL_DIR}/.deploy-staging"
-   scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r deploy/* ${SSH_USER}@${VPS1_IP}:${INSTALL_DIR}/.deploy-staging/
-   scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r openclaws ${SSH_USER}@${VPS1_IP}:${INSTALL_DIR}/.deploy-staging/openclaws
-   scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} openclaw-config.env ${SSH_USER}@${VPS1_IP}:${INSTALL_DIR}/.deploy-staging/openclaw-config.env
+   bun run pre-deploy
    ```
-4. Run `openclaw-multi.sh generate` to update `docker-compose.override.yml`:
+4. Push updated artifacts to VPS:
    ```bash
-   ssh ... "bash ${INSTALL_DIR}/.deploy-staging/scripts/openclaw-multi.sh generate"
+   scp -P ${SSH_PORT} -i ${SSH_KEY} -r .deploy/* ${SSH_USER}@${VPS_IP}:${INSTALL_DIR}/.deploy-staging/
    ```
-5. Run `deploy-config.sh` for the new claw:
+5. Copy the new claw's config and updated compose file into place:
    ```bash
-   ssh ... "env INSTANCE_NAME=<name> ... bash ${INSTALL_DIR}/.deploy-staging/scripts/deploy-config.sh"
+   ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} "
+     sudo -u openclaw mkdir -p ${INSTALL_DIR}/instances/<name>/.openclaw
+     sudo -u openclaw cp ${INSTALL_DIR}/.deploy-staging/claws/<name>/openclaw.json ${INSTALL_DIR}/instances/<name>/.openclaw/
+     sudo -u openclaw cp ${INSTALL_DIR}/.deploy-staging/docker-compose.yml ${INSTALL_DIR}/deploy/docker-compose.yml
+   "
    ```
-6. If using `CF_API_TOKEN`, configure tunnel routes and DNS:
+6. Start the new claw:
    ```bash
-   ssh ... "bash ${INSTALL_DIR}/.deploy-staging/scripts/openclaw-multi.sh tunnel-config --apply"
+   ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
+     "sudo -u openclaw bash -c 'cd ${INSTALL_DIR}/deploy && docker compose up -d openclaw-<name>'"
    ```
-7. Start the new claw:
-   ```bash
-   sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose up -d openclaw-<name>'
-   ```
-8. Clean up staging: `ssh ... "rm -rf ${INSTALL_DIR}/.deploy-staging"`

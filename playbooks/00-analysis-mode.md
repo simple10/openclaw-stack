@@ -28,7 +28,7 @@ Use this playbook when connecting to VPSs that may already have OpenClaw deploye
 ## Prerequisites
 
 - SSH access to target VPS(s)
-- `openclaw-config.env` configured with VPS IPs
+- `.env` configured with VPS IP
 
 ---
 

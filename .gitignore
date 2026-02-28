@@ -7,26 +7,14 @@ certs/
 stack.yml
 openclaw-config.env
 
-# ── Legacy per-claw env files ──────────────────────────────────
+# ── Per-claw env files ────────────────────────────────────────
 *.env
-!openclaws/main-claw/config.env
-!openclaws/_example/config.env
-
-# Multi-claw configs: track _defaults/, _example/, and main-claw/; ignore user-created claws
-# Copy _example/ to create your own (e.g., openclaws/my-claw/)
-openclaws/*
-!openclaws/_defaults/
-!openclaws/_example/
-!openclaws/main-claw/
 
 # New config structure: track default/ and example/; ignore user-created claw configs
 openclaw/*
 !openclaw/default/
 !openclaw/example/
 !openclaw/README.md
-
-# Synced from VPS via scripts/sync-configs.sh (large data, not for version control)
-openclaws/*/workspace/
 
 # ── Build output ───────────────────────────────────────────────
 .deploy/

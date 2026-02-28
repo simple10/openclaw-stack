@@ -17,10 +17,10 @@ This playbook deploys:
 
 ## Variables
 
-Config variables (read each via `source-config.sh VAR_NAME`):
+Config variables (read from `.env`):
 
-- `AI_GATEWAY_WORKER_URL` — Set after deploying AI Gateway Worker
-- `AI_GATEWAY_AUTH_TOKEN` — Auth token for AI Gateway Worker
+- `AI_GATEWAY_URL` — Set after deploying AI Gateway Worker
+- `AI_GATEWAY_TOKEN` — Auth token for AI Gateway Worker
 - `LOG_WORKER_URL` — Set after deploying Log Receiver Worker
 - `LOG_WORKER_TOKEN` — Auth token for Log Receiver Worker
 
@@ -51,7 +51,7 @@ No values need to be changed for a standard deployment. If using multiple Cloudf
 
 ### Check for Existing AI Gateway Worker Deployment
 
-Before deploying, check if the worker is already live. If `source-config.sh AI_GATEWAY_WORKER_URL` is not a placeholder (no angle brackets), curl its health endpoint:
+Before deploying, check if the worker is already live. If `AI_GATEWAY_URL` in `.env` is not a placeholder (no angle brackets), curl its health endpoint:
 
 ```bash
 curl -s https://<AI_GATEWAY_WORKER_URL>/health
@@ -64,7 +64,7 @@ curl -s https://<AI_GATEWAY_WORKER_URL>/health
 
 #### 1. AUTH_TOKEN
 
-If `source-config.sh AI_GATEWAY_AUTH_TOKEN` still contains a placeholder (angle brackets), auto-generate a random token:
+If `AI_GATEWAY_TOKEN` in `.env` is still empty or contains a placeholder, auto-generate a random token:
 
 ```bash
 openssl rand -hex 32
@@ -74,10 +74,10 @@ Set the secret and update the config file:
 
 ```bash
 echo "<generated-token>" | npx wrangler secret put AUTH_TOKEN
-# Update AI_GATEWAY_AUTH_TOKEN in openclaw-config.env with the generated value
+# Update AI_GATEWAY_TOKEN in .env with the generated value
 ```
 
-If `AI_GATEWAY_AUTH_TOKEN` already has a real value, use that value instead.
+If `AI_GATEWAY_TOKEN` already has a real value, use that value instead.
 
 ### Deploy AI Gateway Worker
 
@@ -85,7 +85,7 @@ If `AI_GATEWAY_AUTH_TOKEN` already has a real value, use that value instead.
 npm run deploy
 ```
 
-Capture the Worker URL from the output (e.g., `https://ai-gateway-proxy.<account>.workers.dev`). Update `AI_GATEWAY_WORKER_URL` in `openclaw-config.env` with the real URL.
+Capture the Worker URL from the output (e.g., `https://ai-gateway-proxy.<account>.workers.dev`). Update `AI_GATEWAY_URL` in `.env` with the real URL.
 
 ### Verify
 
@@ -123,7 +123,7 @@ The D1 `database_id` placeholder will be updated after creating the database (se
 
 ### Check for Existing Log Receiver Deployment
 
-Before deploying, check if the worker is already live. If `source-config.sh LOG_WORKER_URL` is not a placeholder (no angle brackets), curl its health endpoint:
+Before deploying, check if the worker is already live. If `LOG_WORKER_URL` in `.env` is not a placeholder (no angle brackets), curl its health endpoint:
 
 ```bash
 curl -s https://<LOG_WORKER_URL>/health
@@ -134,12 +134,12 @@ curl -s https://<LOG_WORKER_URL>/health
 
 ### Configure Log Worker Secrets
 
-If `source-config.sh LOG_WORKER_TOKEN` still contains a placeholder (angle brackets), auto-generate a random token:
+If `LOG_WORKER_TOKEN` in `.env` is still empty or contains a placeholder, auto-generate a random token:
 
 ```bash
 openssl rand -hex 32
 echo "<generated-token>" | npx wrangler secret put AUTH_TOKEN
-# Update LOG_WORKER_TOKEN in openclaw-config.env with the generated value
+# Update LOG_WORKER_TOKEN in .env with the generated value
 ```
 
 If `LOG_WORKER_TOKEN` already has a real value, use that value instead:
@@ -190,18 +190,18 @@ Note the Worker URL from the output (e.g., `https://log-receiver.<account>.worke
 
 ### Update VPS Configuration
 
-Capture the Worker URL from the deploy output and update `LOG_WORKER_URL` in `openclaw-config.env` (base URL only, no path suffix). `LOG_WORKER_TOKEN` should already be set from the secret configuration step above.
+Capture the Worker URL from the deploy output and update `LOG_WORKER_URL` in `.env` (base URL only, no path suffix). `LOG_WORKER_TOKEN` should already be set from the secret configuration step above.
 
 > **Fresh deploy:** During initial deployment, skip the VPS update below — Vector
-> isn't running yet. The correct values will be used when `04-vps1-openclaw.md`
-> creates the `.env` file from `openclaw-config.env`.
+> isn't running yet. The correct values will be resolved by `bun run pre-deploy`
+> when building deployment artifacts.
 
 **Re-deployment only** — if Vector is already running on VPS and you're updating the worker:
 
 ```bash
 # On VPS-1: update LOG_WORKER_URL and LOG_WORKER_TOKEN in vector/.env, then recreate Vector
 # IMPORTANT: `restart` does NOT reload .env — use `up -d` to recreate with new env vars
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/vector && docker compose up -d'
+sudo -u openclaw bash -c 'cd <INSTALL_DIR>/deploy && docker compose up -d vector'
 ```
 
 ### Verify

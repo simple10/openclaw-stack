@@ -17,7 +17,7 @@ Collect the following values and present them in a single, neatly formatted repo
 
 ## Values to collect
 
-1. **User passwords** — these were generated and displayed during `02-base-setup.md` section 2.2. If you no longer have them in context (e.g., context was compressed), check the `# DEPLOYED:` lines in `openclaw-config.env` first (`grep 'DEPLOYED.*PASSWORD' openclaw-config.env`). If those are also empty, inform the user the passwords were displayed during base setup and can be reset via VNC/console access.
+1. **User passwords** — these were generated and displayed during `02-base-setup.md` section 2.2. If you no longer have them in context (e.g., context was compressed), inform the user the passwords were displayed during base setup and can be reset via VNC/console access.
 
 2. **Per-claw gateway tokens** — read from container env var (NOT openclaw.json):
 
@@ -31,7 +31,7 @@ Collect the following values and present them in a single, neatly formatted repo
    done
    ```
 
-3. **Domain and URLs** — read `source-config.sh OPENCLAW_DOMAIN`, `source-config.sh OPENCLAW_DOMAIN_PATH`, `source-config.sh OPENCLAW_DASHBOARD_DOMAIN`, and per-claw tunnel routes.
+3. **Domain and URLs** — read from `stack.yml` (`defaults.domain`, `defaults.domain_path`) and per-claw overrides under `claws.<name>`.
 
 ## AI proxy status
 
@@ -114,7 +114,7 @@ All URLs are protected by Cloudflare Access.
 | Maintenance checker | Daily (30 min before daily report) | Active |
 ```
 
-Read `source-config.sh HOSTALERT_TELEGRAM_BOT_TOKEN` and `source-config.sh HOSTALERT_TELEGRAM_CHAT_ID`.
+Read `HOSTALERT_TELEGRAM_BOT_TOKEN` and `HOSTALERT_TELEGRAM_CHAT_ID` from `.env`.
 
 **If both are set:** Host alerter and daily report are active. Show status as `Active` in both rows. For the daily report schedule, use the value of `HOSTALERT_DAILY_REPORT_TIME` (default: `9:00 AM UTC`).
 
@@ -145,7 +145,7 @@ Read `source-config.sh HOSTALERT_TELEGRAM_BOT_TOKEN` and `source-config.sh HOSTA
 
 > For additional AI provider configuration (OpenAI, Cloudflare AI Gateway, Claude Code subscription), see [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md).
 
-> **Note:** If user passwords are no longer in the conversation context, check `openclaw-config.env` for `# DEPLOYED:` lines first (`grep 'DEPLOYED' openclaw-config.env`). These are written automatically during deployment as a safety net. If those are also empty, the passwords can be reset via VNC/console access.
+> **Note:** If user passwords are no longer in the conversation context, they can be reset via VNC/console access on the VPS.
 
 ## Save and display
 

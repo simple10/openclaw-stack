@@ -29,14 +29,14 @@ This playbook configures:
 
 ## Variables
 
-Config variables (read each via `source-config.sh VAR_NAME`):
+Config variables (read from `.env`):
 
-- `VPS1_IP` - Public IP of VPS-1
-- `SSH_KEY_PATH` - Path to SSH private key
+- `VPS_IP` - Public IP of VPS-1
+- `SSH_KEY` - Path to SSH private key
 - `SSH_USER` - Initial SSH user (e.g., ubuntu, root, debian — depends on provider)
 - `SSH_HARDENED_PORT` - Target SSH port for hardening (default: 222 if not set)
-- `CF_TUNNEL_TOKEN` - Cloudflare Tunnel token
-- `VPS_HOSTNAME` - Optional, friendly hostname (replaces provider default)
+- `CLOUDFLARE_TUNNEL_TOKEN` - Cloudflare Tunnel token
+- `HOSTNAME` - Optional, friendly hostname (replaces provider default)
 
 ## Execution Order
 
@@ -79,7 +79,7 @@ sudo apt install -y \
 
 ## 2.1a Set Hostname
 
-If `source-config.sh VPS_HOSTNAME` returns a value, replace the provider's default hostname (e.g., `vps-54a00e96`) with a friendly name. Skip if empty.
+If `HOSTNAME` is set in `.env`, replace the provider's default hostname (e.g., `vps-54a00e96`) with a friendly name. Skip if empty.
 
 ```bash
 #!/bin/bash
@@ -157,9 +157,7 @@ echo "  openclaw:  ${OPENCLAW_PASS}"
 echo "========================================="
 ```
 
-**Record passwords locally:** Immediately after the script above runs, use the `Edit` tool to update the `ADMINCLAW_PASSWORD` and `OPENCLAW_PASSWORD` values in the `# DEPLOYED:` section of `openclaw-config.env`. Replace the existing `# DEPLOYED: ADMINCLAW_PASSWORD=` and `# DEPLOYED: OPENCLAW_PASSWORD=` lines with the generated passwords. Do NOT use `sed` — it creates backup files on macOS.
-
-> These are comments — `source openclaw-config.env` won't export them. They're a safety net in case the session ends before the deployment report (`08c-deploy-report.md`).
+**Record passwords:** Note the generated passwords. They will be needed for the deployment report (`08c-deploy-report.md`). These are for emergency KVM/console access only — normal access is via SSH key.
 
 **Workflow after setup:**
 
@@ -312,10 +310,10 @@ echo "Test port <SSH_HARDENED_PORT> from your LOCAL machine before proceeding."
 ssh -i <SSH_KEY_PATH> -p <SSH_HARDENED_PORT> adminclaw@<VPS1_IP> "echo 'Port <SSH_HARDENED_PORT> works!'"
 ```
 
-**If port `<SSH_HARDENED_PORT>` test succeeds:** Update `openclaw-config.env` on the LOCAL machine using the `Edit` tool (do NOT use `sed` — it creates backup files on macOS):
+**If port `<SSH_HARDENED_PORT>` test succeeds:** Update `.env` on the LOCAL machine using the `Edit` tool (do NOT use `sed` — it creates backup files on macOS):
 
-1. Change `SSH_USER=<SSH_USER>` to `SSH_USER=adminclaw            # Changed from <SSH_USER> during hardening`
-2. Change `SSH_PORT=<SSH_PORT>` to `SSH_PORT=<SSH_HARDENED_PORT>                  # Changed from <SSH_PORT> during hardening`
+1. Change `SSH_USER=ubuntu` to `SSH_USER=adminclaw            # Changed from ubuntu during hardening`
+2. Change `SSH_PORT=22` to `SSH_PORT=<SSH_HARDENED_PORT>                  # Changed from 22 during hardening`
 3. Delete the `SSH_HARDENED_PORT=` line entirely
 
 Then lock down SSH:
@@ -404,7 +402,7 @@ rm -f /tmp/system-hardening.sh
 
 Run on: **VPS-1**
 
-Install cloudflared and register the tunnel as a systemd service. Read the token via `source-config.sh CF_TUNNEL_TOKEN`.
+Install cloudflared and register the tunnel as a systemd service. Read `CLOUDFLARE_TUNNEL_TOKEN` from `.env`.
 
 ```bash
 # Download and install cloudflared
@@ -432,8 +430,8 @@ sudo ufw delete allow 443/tcp 2>/dev/null || true
 
 **If `cloudflared service install` fails:**
 
-> "The tunnel token may be invalid or expired. Verify the token in
-> `openclaw-config.env` matches the one in Cloudflare Dashboard
+> "The tunnel token may be invalid or expired. Verify `CLOUDFLARE_TUNNEL_TOKEN` in
+> `.env` matches the one in Cloudflare Dashboard
 > (Zero Trust -> Networks -> Tunnels -> your tunnel -> Configure)."
 
 **If cloudflared starts but immediately exits (check with `systemctl status`):**

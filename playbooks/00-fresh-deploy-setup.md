@@ -18,16 +18,16 @@ This playbook validates the configuration needed to deploy OpenClaw on a fresh U
 
 ## 0.1 Config File Check
 
-Check that `openclaw-config.env` exists:
+Check that `.env` and `stack.yml` exist:
 
 ```bash
-ls openclaw-config.env
+ls .env stack.yml
 ```
 
-**If missing:** Offer to create it from the example:
+**If missing:** Offer to create from examples:
 
 ```bash
-cp openclaw-config.env.example openclaw-config.env
+cp .env.example .env && cp stack.yml.example stack.yml
 ```
 
 Then ask the user to fill in the required values (see section 0.2).
@@ -38,14 +38,11 @@ Then ask the user to fill in the required values (see section 0.2).
 
 Validate all of these fields:
 
-1. **`VPS1_IP`** — Must be set and not a placeholder (not `x.x.x.x` or containing `<`).
-2. **`CF_TUNNEL_TOKEN`** or **`CF_API_TOKEN`** — At least one must be non-empty. If both are empty, report: "Set `CF_TUNNEL_TOKEN` (manual — create tunnel in CF Dashboard) or `CF_API_TOKEN` (automated — Claude creates tunnel + routes + DNS). See [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md)."
-3. **`OPENCLAW_DOMAIN`** — Must not be a placeholder (no `<example>` or angle brackets).
-4. **`OPENCLAW_DASHBOARD_DOMAIN`** — Must not be a placeholder.
-5. **`OPENCLAW_DASHBOARD_DOMAIN_PATH`** — Validated (can be empty for separate subdomain, or a path like `/browser`).
-6. **`OPENCLAW_DOMAIN_PATH`** — Validated (can be empty for root).
-7. **`YOUR_TELEGRAM_ID`** — Must be set and numeric (Telegram user IDs are integers). If empty, warn the user: "Send a message to @userinfobot on Telegram to get your numeric user ID."
-8. **`OPENCLAW_TELEGRAM_BOT_TOKEN`** — Must be set. If empty, warn the user: "Create a Telegram bot via @BotFather and paste the token here. See `docs/TELEGRAM.md`."
+1. **`VPS_IP`** (`.env`) — Must be set and not a placeholder (not empty or containing `<`).
+2. **`CLOUDFLARE_TUNNEL_TOKEN`** or **`CLOUDFLARE_API_TOKEN`** (`.env`) — At least one must be non-empty. If both are empty, report: "Set `CLOUDFLARE_TUNNEL_TOKEN` (manual — create tunnel in CF Dashboard) or `CLOUDFLARE_API_TOKEN` (automated — Claude creates tunnel + routes + DNS). See [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md)."
+3. **`domain`** (`stack.yml` → `defaults.domain`) — Must not be a placeholder (no `<example>` or angle brackets).
+4. **`ADMIN_TELEGRAM_ID`** (`.env`) — Must be set and numeric (Telegram user IDs are integers). If empty, warn the user: "Send a message to @userinfobot on Telegram to get your numeric user ID."
+5. **Claw Telegram bot tokens** (`.env`) — Each claw needs a `<NAME>_TELEGRAM_BOT_TOKEN`. If empty, warn: "Create a Telegram bot via @BotFather and paste the token here. See `docs/TELEGRAM.md`."
 
 ### If any fields are invalid or missing
 
@@ -53,19 +50,18 @@ Report **all** issues at once (don't stop at the first one). Present them as:
 
 > **Configuration issues found:**
 >
-> - `VPS1_IP` is still a placeholder (`x.x.x.x`) — set it to your VPS public IP
-> - `CF_TUNNEL_TOKEN` and `CF_API_TOKEN` are both empty — set one:
->   `CF_TUNNEL_TOKEN` (manual — create tunnel in CF Dashboard) or
->   `CF_API_TOKEN` (automated — see [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md))
-> - `OPENCLAW_DOMAIN` is still a placeholder — set it to your actual domain
+> - `VPS_IP` is empty — set it to your VPS public IP in `.env`
+> - `CLOUDFLARE_TUNNEL_TOKEN` and `CLOUDFLARE_API_TOKEN` are both empty — set one in `.env`:
+>   `CLOUDFLARE_TUNNEL_TOKEN` (manual — create tunnel in CF Dashboard) or
+>   `CLOUDFLARE_API_TOKEN` (automated — see [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md))
+> - `defaults.domain` is still a placeholder in `stack.yml` — set it to your actual domain
 >   (e.g., `openclaw.yourdomain.com`). You need to configure Cloudflare Tunnel
 >   public hostname routes first (see [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md))
-> - `OPENCLAW_DASHBOARD_DOMAIN` is still a placeholder — same as above
-> - `YOUR_TELEGRAM_ID` is empty — send a message to @userinfobot on Telegram to get your ID
-> - `OPENCLAW_TELEGRAM_BOT_TOKEN` is empty — create a bot via @BotFather and paste the token
+> - `ADMIN_TELEGRAM_ID` is empty in `.env` — send a message to @userinfobot on Telegram to get your ID
+> - Claw Telegram bot tokens are empty in `.env` — create bots via @BotFather and paste tokens
 >   (see [`docs/TELEGRAM.md`](../docs/TELEGRAM.md))
 >
-> Update `openclaw-config.env` and let me know when ready.
+> Update `.env` and `stack.yml` and let me know when ready.
 
 Wait for user to fix all issues before continuing. Re-validate after they confirm.
 
@@ -99,7 +95,7 @@ When `CF_API_TOKEN` is set, automate tunnel creation, route configuration, and D
      ```
      This outputs `TUNNEL_ID=...` and `CF_TUNNEL_TOKEN=...`.
 
-4. **Write `CF_TUNNEL_TOKEN`** to `openclaw-config.env` (the value from step 3).
+4. **Write `CLOUDFLARE_TUNNEL_TOKEN`** to `.env` (the value from step 3).
 
 5. **Configure routes + DNS:**
    ```bash
@@ -117,26 +113,22 @@ When `CF_API_TOKEN` is set, automate tunnel creation, route configuration, and D
 
 ## 0.2c Multi-Claw Detection
 
-Check for additional claws beyond the default `main-claw`:
+Check for additional claws in `stack.yml` under the `claws` section. Each key under `claws` is a claw name.
 
-```bash
-ls -d openclaws/*/ 2>/dev/null | xargs -I{} basename {} | grep -v '^_'
-```
+If only one claw is defined (or no `claws` section), this is a single-claw deployment — proceed normally. The deployment process is the same regardless of claw count.
 
-If only `main-claw` is found (or no directories exist), this is a single-claw deployment — proceed normally. The deployment process is the same regardless of claw count.
+If multiple claws are found, inform the user:
 
-If multiple active claws are found, inform the user:
-
-> "Found N claw configurations: main-claw, personal-claw, ..."
+> "Found N claw configurations: personal-claw, work-claw, ..."
 > "Each will get its own container, domain, and gateway token."
-> "Ensure each claw's `config.env` has the correct `OPENCLAW_DOMAIN` if using separate subdomains."
+> "Ensure each claw in `stack.yml` has the correct `domain` if using separate subdomains."
 
 ---
 
 ## 0.3 SSH Check
 
-1. Validate `SSH_KEY_PATH` exists on the local system (default: `~/.ssh/vps1_openclaw_ed25519`).
-2. Test SSH connectivity using config values (`SSH_USER`, `SSH_PORT`):
+1. Validate `SSH_KEY` exists on the local system (default: `~/.ssh/vps1_openclaw_ed25519`).
+2. Test SSH connectivity using values from `.env` (`SSH_USER`, `SSH_PORT`):
 
 ```bash
 ssh -i <SSH_KEY_PATH> -o ConnectTimeout=10 -o BatchMode=yes -p <SSH_PORT> <SSH_USER>@<VPS1_IP> echo "VPS OK"
@@ -149,7 +141,7 @@ ssh -i <SSH_KEY_PATH> -o ConnectTimeout=10 -o BatchMode=yes -p <SSH_PORT> <SSH_U
 > "Can't reach the VPS on port <SSH_PORT>. Possible causes:
 >
 > - The VPS isn't running or hasn't finished booting
-> - The IP address is incorrect — double-check `VPS1_IP` in `openclaw-config.env`
+> - The IP address is incorrect — double-check `VPS_IP` in `.env`
 > - The VPS provider's firewall is blocking SSH — check the provider's dashboard"
 
 **"Host key verification failed" (REMOTE HOST IDENTIFICATION HAS CHANGED):**
@@ -188,13 +180,13 @@ This returns two lines: CPU count (e.g., `6`) and total memory in bytes (e.g., `
 
 ### Compare Against Config
 
-Read current gateway resource limits: `source-config.sh GATEWAY_CPUS` and `source-config.sh GATEWAY_MEMORY`. If not set, the compose file defaults apply (6 CPUs, 10.5G).
+Read current gateway resource limits from `.env`: `OPENCLAW_CONTAINER_CPU` and `OPENCLAW_CONTAINER_MEM`. If not set, the compose file defaults apply (6 CPUs, 12G).
 
 ### Expected Values
 
 `GATEWAY_CPUS` and `GATEWAY_MEMORY` are **per-container** limits — each claw gets these resources. With multiple claws, divide the available VPS resources by the number of active claws.
 
-1. Count active claws from § 0.2c (directories in `openclaws/` excluding `_`-prefixed).
+1. Count active claws from § 0.2c (entries under `claws` in `stack.yml`).
 2. Calculate system overhead: Vector (~128M) + system/kernel (~500M) = ~750M total.
 3. Compute per-claw resources:
    - **CPUs per claw:** `floor(nproc / claw_count)`
@@ -212,9 +204,9 @@ VPS Resources:
   Memory: <total from free, human-readable>
   Active claws: <count> (<names>)
 
-Current per-claw limits (via source-config.sh):
-  GATEWAY_CPUS:   <current value or "(default: 6)">
-  GATEWAY_MEMORY: <current value or "(default: 10.5G)">
+Current per-claw limits (from .env):
+  OPENCLAW_CONTAINER_CPU:   <current value or "(default: 6)">
+  OPENCLAW_CONTAINER_MEM:   <current value or "(default: 12G)">
 
 Recommended per-claw limits (<count> claws):
   GATEWAY_CPUS:   <floor(nproc / claw_count)>
@@ -228,7 +220,7 @@ Ask the user if they want to adjust the limits. They may choose:
 - Enter custom values
 - Keep the current values (skip)
 
-If the user confirms changes, update `GATEWAY_CPUS` and `GATEWAY_MEMORY` in `openclaw-config.env`. Per-claw overrides can also be set in each claw's `config.env` (e.g., `openclaws/main-claw/config.env`) using `GATEWAY_CPUS` and `GATEWAY_MEMORY` — these override the global defaults for that specific claw.
+If the user confirms changes, update `OPENCLAW_CONTAINER_CPU` and `OPENCLAW_CONTAINER_MEM` in `.env`. Per-claw overrides can be set in `stack.yml` under `claws.<name>.cpu` and `claws.<name>.mem`.
 
 ---
 
@@ -294,7 +286,7 @@ Only proceed without Access if the user explicitly confirms.
 
 ## 0.6 Worker Placeholder Detection
 
-Scan `AI_GATEWAY_WORKER_URL` and `LOG_WORKER_URL` for angle-bracket placeholders (e.g., `<account>`).
+Scan `AI_GATEWAY_URL` and `LOG_WORKER_URL` in `.env` for empty or angle-bracket placeholders (e.g., `<account>`).
 
 **If placeholders found:** Note that workers will be deployed via `01-workers.md` before VPS setup begins. The user doesn't need to do anything now — this happens automatically as the first deployment step.
 
@@ -348,14 +340,14 @@ A full deployment consumes significant context. To avoid mid-deploy compaction, 
 | 02: System hardening (2.5–2.6) | swap, fail2ban, kernel config output | pass/fail, cloudflared version | `02-base-setup.md` | Full file |
 | 03b: Sysbox runtime | dpkg install + AppArmor check | pass/fail | `03b-sysbox.md` | Full file |
 | 04: Infrastructure setup (4.2) | network/directory creation + SCP | pass/fail, OPENCLAW_GENERATED_TOKEN | `04-infra-config.md` | §4.2 |
-| 04: Deploy configuration (4.3) | deploy-config.sh runs on VPS | pass/fail | `04-deploy-config.md` | §4.3 |
+| 04: Deploy configuration (4.3) | pre-deploy artifacts pushed to VPS | pass/fail | `04-deploy-config.md` | §4.3 |
 | 04: Build + start (4.4) | Full Docker build log | pass/fail | `04-build-start.md` | §4.4 |
 
 > **Scoping:** Tell subagents which sections to read (e.g., "Read §4.2 of playbooks/04-vps1-openclaw.md"). This prevents subagents from loading troubleshooting, updating, and verification sections they don't need.
 
 > **Parallel launch:** 01 and 02 subagents should be launched together in a single message (multiple Task tool calls). Both must return their values before step 04 can begin — 04 needs worker URLs/tokens from 01 and requires Docker (step 03, which depends on 02).
 
-**Keep in main context:** Steps that generate credentials stored in `openclaw-config.env` (user creation in 02, gateway token recording in 04 after setup-infra.sh returns it), SSH hardening port transition (02), **03-docker.md** (short — use `2>&1 | tail -5` for apt output), device pairing (04/08), **06-backup.md** (short — uses `SOURCE:` pattern, no verbose output), user-facing interactions (08), **07-verification.md** (all checks — runs after heavy steps are done, gives user real-time progress and direct error handling), and the **sandbox build wait** (04: §4.4 — use background task + progress polling pattern for user feedback, ~100 tokens per poll).
+**Keep in main context:** Steps that generate credentials (user creation in 02, gateway token recording in 04 after setup-infra.sh returns it), SSH hardening port transition (02), **03-docker.md** (short — use `2>&1 | tail -5` for apt output), device pairing (04/08), **06-backup.md** (short — uses `SOURCE:` pattern, no verbose output), user-facing interactions (08), **07-verification.md** (all checks — runs after heavy steps are done, gives user real-time progress and direct error handling), and the **sandbox build wait** (04: §4.4 — use background task + progress polling pattern for user feedback, ~100 tokens per poll).
 
 **Critical: avoid reading playbooks before delegating.** Do NOT read a playbook into main context and then pass its contents to a subagent — this doubles the context cost. Instead, tell the subagent to read the playbook section itself:
 
@@ -371,7 +363,7 @@ Log: Write detailed execution log (all commands, full output, errors, recovery s
 Return: pass/fail, OPENCLAW_GENERATED_TOKEN from stdout.
 ```
 
-**Template substitution in subagents:** Sections 4.2 and 4.3 now use standalone scripts (`deploy/scripts/setup-infra.sh` and `deploy/scripts/deploy-config.sh`) that are bulk-copied to `${INSTALL_DIR}/.deploy-staging/` as part of the `deploy/` directory copy in § 4.2 Step 1, then run remotely. Config values are passed as env vars — the subagent just needs the variable values, not the script contents.
+**Deployment in subagents:** `bun run pre-deploy` builds all deployment artifacts locally into `.deploy/`. The `.deploy/` directory is then pushed to the VPS. Config values are resolved at build time — the subagent just needs SSH access and the pre-built artifacts.
 
 **Deploy logs:** At the start of deployment (before launching subagents), create `.deploy-logs/YYYYMMDD-HHMMSS/`. The `.deploy-logs/` directory is gitignored. At the end of deployment, tell the user where the logs are.
 

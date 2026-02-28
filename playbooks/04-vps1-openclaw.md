@@ -22,27 +22,30 @@ This playbook configures:
 
 ## Variables
 
-Config variables (read each via `source-config.sh VAR_NAME`):
+Config values are read from `.env` and `stack.yml` (resolved by `bun run pre-deploy` into `.deploy/`):
 
-- `INSTALL_DIR` - Base installation directory on VPS (default: `/home/openclaw`)
-- `VPS1_IP` - Required, public IP of VPS-1
-- `AI_GATEWAY_WORKER_URL` - Required, AI Gateway Worker URL
-- `AI_GATEWAY_AUTH_TOKEN` - Required, AI Gateway auth token
-- `LOG_WORKER_URL` - Optional, Log Receiver Worker URL (for Vector log shipping)
-- `LOG_WORKER_TOKEN` - Optional, Log Receiver auth token (for Vector log shipping)
-- `YOUR_TELEGRAM_ID` - Required, numeric Telegram user ID (for `tools.elevated` access gating)
-- `OPENCLAW_TELEGRAM_BOT_TOKEN` - Required, Telegram bot token for OpenClaw channel (see `docs/TELEGRAM.md`)
-- `HOSTALERT_TELEGRAM_BOT_TOKEN` - Optional (for host alerter; can reuse `OPENCLAW_TELEGRAM_BOT_TOKEN`)
-- `HOSTALERT_TELEGRAM_CHAT_ID` - Optional (for host alerter)
-- `HOSTALERT_DAILY_REPORT_TIME` - Optional, daily health report time (default: `9:30 AM PST`)
-- `OPENCLAW_DOMAIN_PATH` - URL subpath for the gateway UI (default: `/_openclaw`)
-- `OPENCLAW_DASHBOARD_DOMAIN_PATH` - Base path for the dashboard server (e.g., `/dashboard`), empty if using a separate subdomain
+- `VPS_IP` (`.env`) - Public IP of VPS-1
+- `AI_GATEWAY_URL`, `AI_GATEWAY_TOKEN` (`.env`) - AI Gateway Worker URL and auth token
+- `LOG_WORKER_URL`, `LOG_WORKER_TOKEN` (`.env`) - Log Receiver Worker (for Vector log shipping)
+- `ADMIN_TELEGRAM_ID` (`.env`) - Numeric Telegram user ID (for `tools.elevated` access gating)
+- `HOSTALERT_TELEGRAM_BOT_TOKEN`, `HOSTALERT_TELEGRAM_CHAT_ID` (`.env`) - Host alerter Telegram config
+- `defaults.domain`, `defaults.domain_path` (`stack.yml`) - Gateway domain and URL subpath
+- `defaults.install_dir` (`stack.yml`) - Base installation directory on VPS (default: `/home/openclaw`)
+- Per-claw overrides in `stack.yml` under `claws.<name>`
 
 ---
 
 ## 4.2 Infrastructure Setup
 
-> **SCP + single script.** Copies `deploy/` to VPS staging, then runs `setup-infra.sh` which creates networks, directories, clones the repo, and generates the `.env` file. Returns the generated `GATEWAY_TOKEN` which must be saved locally before proceeding.
+> **Pre-deploy + SCP + single script.** Run `bun run pre-deploy` locally to build `.deploy/` artifacts, SCP them to the VPS staging area, then run `setup-infra.sh` which creates networks, directories, clones the repo, and generates the `.env` file. Returns the generated `GATEWAY_TOKEN` which must be saved locally before proceeding.
+
+### Step 0: Build deployment artifacts locally
+
+```bash
+bun run pre-deploy
+```
+
+This builds `.deploy/` from `.env` + `stack.yml` + `docker-compose.yml.hbs`, resolving all templates and generating the final `docker-compose.yml`, per-claw `openclaw.json` files, and `stack.json`.
 
 ### Step 1: SCP deploy directory to VPS
 
@@ -50,43 +53,30 @@ Config variables (read each via `source-config.sh VAR_NAME`):
 
 ```bash
 # Create staging directory on VPS (under INSTALL_DIR, not world-writable /tmp)
-ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP} "sudo mkdir -p ${INSTALL_DIR}/.deploy-staging && sudo chown ${SSH_USER}:${SSH_USER} ${INSTALL_DIR}/.deploy-staging"
+ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} "sudo mkdir -p ${INSTALL_DIR}/.deploy-staging && sudo chown ${SSH_USER}:${SSH_USER} ${INSTALL_DIR}/.deploy-staging"
 
-# Bulk-copy entire deploy/ directory (includes scripts/, used by both 4.2 and 4.3)
-scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r deploy/* ${SSH_USER}@${VPS1_IP}:${INSTALL_DIR}/.deploy-staging/
+# Copy pre-built deployment artifacts
+scp -P ${SSH_PORT} -i ${SSH_KEY} -r .deploy/* ${SSH_USER}@${VPS_IP}:${INSTALL_DIR}/.deploy-staging/
 
-# Copy claw configurations (openclaws/ is at repo root, separate from deploy/)
-scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r openclaws ${SSH_USER}@${VPS1_IP}:${INSTALL_DIR}/.deploy-staging/openclaws
-
-# Also copy openclaw-config.env (needed by openclaw-multi.sh generate in §4.3 Step 3)
-scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} openclaw-config.env ${SSH_USER}@${VPS1_IP}:${INSTALL_DIR}/.deploy-staging/openclaw-config.env
+# Copy deploy scripts (entrypoint, build script, etc.)
+scp -P ${SSH_PORT} -i ${SSH_KEY} -r deploy/* ${SSH_USER}@${VPS_IP}:${INSTALL_DIR}/.deploy-staging/
 ```
 
 ### Step 2: Run setup-infra.sh
 
-Discover claw names from `openclaws/` (exclude `_`-prefixed template dirs):
+Discover claw names from the pre-built `.deploy/stack.json`:
 
 ```bash
-# Discover claw instance names from local repo
-INSTANCE_NAMES=$(ls -d openclaws/*/ 2>/dev/null | xargs -I{} basename {} | grep -v '^_' | tr '\n' ' ')
-INSTANCE_NAMES="${INSTANCE_NAMES:-main-claw}"
+# Discover claw instance names from pre-built stack config
+INSTANCE_NAMES=$(bun -e "const s = require('./.deploy/stack.json'); console.log(Object.keys(s.claws).join(' '))")
 echo "Instances: $INSTANCE_NAMES"
 ```
 
 ```bash
-ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP} \
+ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
   "env \
     INSTALL_DIR='${INSTALL_DIR}' \
     INSTANCE_NAMES='${INSTANCE_NAMES}' \
-    AI_GATEWAY_WORKER_URL='${AI_GATEWAY_WORKER_URL}' \
-    AI_GATEWAY_AUTH_TOKEN='${AI_GATEWAY_AUTH_TOKEN}' \
-    OPENCLAW_TELEGRAM_BOT_TOKEN='${OPENCLAW_TELEGRAM_BOT_TOKEN}' \
-    HOSTALERT_TELEGRAM_BOT_TOKEN='${HOSTALERT_TELEGRAM_BOT_TOKEN}' \
-    HOSTALERT_TELEGRAM_CHAT_ID='${HOSTALERT_TELEGRAM_CHAT_ID}' \
-    OPENCLAW_DASHBOARD_DOMAIN_PATH='${OPENCLAW_DASHBOARD_DOMAIN_PATH}' \
-    OPENCLAW_DOMAIN_PATH='${OPENCLAW_DOMAIN_PATH}' \
-    GATEWAY_CPUS='${GATEWAY_CPUS}' \
-    GATEWAY_MEMORY='${GATEWAY_MEMORY}' \
   bash ${INSTALL_DIR}/.deploy-staging/scripts/setup-infra.sh"
 ```
 
@@ -107,115 +97,64 @@ Capture the `OPENCLAW_GENERATED_TOKEN=<hex>` line from stdout (all other output 
 >
 > `sudo rm -rf <INSTALL_DIR>/openclaw`
 
-**Record gateway token locally:** Immediately after the script runs, use the `Edit` tool to update the `GATEWAY_TOKEN` and `GATEWAY_URL` values in the `# DEPLOYED:` section of `openclaw-config.env`. Replace the existing `# DEPLOYED: GATEWAY_TOKEN=` and `# DEPLOYED: GATEWAY_URL=` lines with the generated token and composed URL (`https://<OPENCLAW_DOMAIN><OPENCLAW_DOMAIN_PATH>/chat?token=<TOKEN>`). Do NOT use `sed` — it creates backup files on macOS.
-
-> These are comments — `source openclaw-config.env` won't export them. They're a safety net in case the session ends before the deployment report (`08c-deploy-report.md`).
+**Record gateway token locally:** Note the generated `OPENCLAW_GENERATED_TOKEN` from stdout. This will be needed for the deployment report (`08c-deploy-report.md`). The token is also written to `.deploy/` artifacts during pre-deploy.
 
 ---
 
 ## 4.3 Deploy Configuration
 
-> **Single script.** Runs `deploy-config.sh` from the staging directory (already on VPS from §4.2 step 1). Copies all files into place, substitutes template variables, sets permissions, creates crons, and deploys plugins. The staging directory is cleaned up at the end.
+> **Pre-built artifacts.** All configuration is resolved locally by `bun run pre-deploy` (run in §4.2 Step 0). The `.deploy/` directory contains the final `docker-compose.yml`, per-claw `openclaw.json` files (with `$VAR` placeholders for runtime `envsubst`), and deploy scripts. This step copies artifacts from staging into their final locations.
 
 ### File manifest
 
-| Source | Destination | Type | Notes |
-|--------|------------|------|-------|
-| (generated by `openclaw-multi.sh`) | `<INSTALL_DIR>/openclaw/docker-compose.override.yml` | generated | Per-claw service definitions |
-| `deploy/vector/docker-compose.yml` | `<INSTALL_DIR>/vector/docker-compose.yml` | static | Skip if `ENABLE_VECTOR_LOG_SHIPPING=false` |
-| `deploy/vector/vector.yaml` | `<INSTALL_DIR>/vector/vector.yaml` | static | Skip if `ENABLE_VECTOR_LOG_SHIPPING=false` |
-| `openclaws/_defaults/openclaw.json` | `<INSTALL_DIR>/instances/<name>/.openclaw/openclaw.json` | template | Per-claw (overlaid with claw-specific overrides if present) |
-| `deploy/build-openclaw.sh` | `<INSTALL_DIR>/scripts/build-openclaw.sh` | static | |
-| `deploy/entrypoint-gateway.sh` | `<INSTALL_DIR>/openclaw/scripts/entrypoint-gateway.sh` | static | |
-| `deploy/host-alert.sh` | `<INSTALL_DIR>/scripts/host-alert.sh` | static | |
-| `deploy/host-maintenance-check.sh` | `<INSTALL_DIR>/scripts/host-maintenance-check.sh` | static | |
-| `deploy/logrotate-openclaw` | `/etc/logrotate.d/openclaw` | static | |
-| `deploy/plugins/*` | `<INSTALL_DIR>/openclaw/deploy/plugins/` | static | Owned by uid 1000 |
-| `deploy/sandbox-toolkit.yaml` | `<INSTALL_DIR>/openclaw/deploy/` | static | Bind-mounted into container |
-| `deploy/parse-toolkit.mjs` | `<INSTALL_DIR>/openclaw/deploy/` | static | Bind-mounted into container |
-| `deploy/rebuild-sandboxes.sh` | `<INSTALL_DIR>/openclaw/deploy/` | static | Bind-mounted into container |
-| `deploy/dashboard/*` | `<INSTALL_DIR>/openclaw/deploy/dashboard/` | static | Bind-mounted into container |
+| Source (from staging) | Destination | Notes |
+|--------|------------|-------|
+| `.deploy/docker-compose.yml` | `<INSTALL_DIR>/deploy/docker-compose.yml` | Pre-generated from `.hbs` template |
+| `.deploy/claws/<name>/openclaw.json` | `<INSTALL_DIR>/instances/<name>/.openclaw/openclaw.json` | Per-claw config (runtime `$VAR` resolved by entrypoint) |
+| `deploy/build-openclaw.sh` | `<INSTALL_DIR>/scripts/build-openclaw.sh` | |
+| `deploy/entrypoint-gateway.sh` | `<INSTALL_DIR>/deploy/scripts/entrypoint-gateway.sh` | |
+| `deploy/host-alert.sh` | `<INSTALL_DIR>/scripts/host-alert.sh` | |
+| `deploy/host-maintenance-check.sh` | `<INSTALL_DIR>/scripts/host-maintenance-check.sh` | |
+| `deploy/logrotate-openclaw` | `/etc/logrotate.d/openclaw` | |
+| `deploy/plugins/*` | `<INSTALL_DIR>/deploy/plugins/` | Owned by uid 1000 |
+| `deploy/sandbox-toolkit.yaml` | `<INSTALL_DIR>/deploy/` | Bind-mounted into container |
+| `deploy/parse-toolkit.mjs` | `<INSTALL_DIR>/deploy/` | Bind-mounted into container |
+| `deploy/rebuild-sandboxes.sh` | `<INSTALL_DIR>/deploy/` | Bind-mounted into container |
+| `deploy/dashboard/*` | `<INSTALL_DIR>/deploy/dashboard/` | Bind-mounted into container |
 
-### Template variables
+### Template resolution
 
-These are substituted server-side via `sed` after copying from staging. All config values are read via `source-config.sh VAR_NAME` and passed as SSH env vars:
+Template variables in `openclaw.jsonc` use `$VAR` syntax and are resolved at container startup by `envsubst` in `entrypoint-gateway.sh`. The docker-compose.yml passes environment variables from `stack.yml` (resolved at build time by `pre-deploy.ts`) into containers, where the entrypoint substitutes them into `openclaw.json`.
 
-| Variable | Source | Used in |
-|----------|--------|---------|
-| `GATEWAY_TOKEN` | Read from `.env` on VPS | `openclaw.json` |
-| `OPENCLAW_DOMAIN_PATH` | Config (or per-claw `config.env`) | `openclaw.json` |
-| `YOUR_TELEGRAM_ID` | Config | `openclaw.json` |
-| `OPENCLAW_INSTANCE_ID` | Config | `openclaw.json` |
-| `VPS_HOSTNAME` | Config | `openclaw.json` |
-| `ENABLE_EVENTS_LOGGING` | Config | `openclaw.json` |
-| `ENABLE_LLEMTRY_LOGGING` | Config | `openclaw.json` |
-| `EVENTS_URL` | Derived: `${LOG_WORKER_URL}/openclaw/events` | `openclaw.json` |
-| `LLEMTRY_URL` | Derived: `${LOG_WORKER_URL}/llemtry` | `openclaw.json` |
-| `LOG_WORKER_TOKEN` | Config | `openclaw.json` |
-| `OPENCLAW_DOMAIN` | Config (or per-claw `config.env`) | Used to derive `ALLOWED_ORIGIN` |
-| `ALLOWED_ORIGIN` | Derived: `https://${OPENCLAW_DOMAIN}` | `openclaw.json` |
+> **`controlUi.allowedOrigins` is required.** When the gateway binds to `lan` (non-loopback), which is always the case for Docker/Tunnel deployments, `controlUi.allowedOrigins` must be set in `openclaw.json`. Without it, the gateway crashes on startup with a security check error. This is handled automatically — `pre-deploy.ts` derives `ALLOWED_ORIGIN` from the claw's `domain` in `stack.yml`. Every claw must have a domain configured.
 
-> **`controlUi.allowedOrigins` is required.** When the gateway binds to `lan` (non-loopback), which is always the case for Docker/Tunnel deployments, `controlUi.allowedOrigins` must be set in `openclaw.json`. Without it, the gateway crashes on startup with a security check error. The `deploy-config.sh` script handles this automatically by deriving `ALLOWED_ORIGIN` from `OPENCLAW_DOMAIN` (or from the per-claw `config.env` override). If a claw's `OPENCLAW_DOMAIN` is empty, the origin will be `https://` which will fail — every claw must have a domain configured.
+### Step 1: Copy artifacts into place
 
-### Step 1: Query server timezone
+The staging directory (from §4.2 Step 1) already has all pre-built artifacts. Copy them to final locations:
 
 ```bash
-ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP} "timedatectl show -p Timezone --value"
+ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
+  "sudo -u openclaw bash -c '
+    # Copy docker-compose.yml
+    cp ${INSTALL_DIR}/.deploy-staging/docker-compose.yml ${INSTALL_DIR}/deploy/docker-compose.yml
+
+    # Copy per-claw openclaw.json files
+    for claw_dir in ${INSTALL_DIR}/.deploy-staging/claws/*/; do
+      CLAW_NAME=\$(basename \"\$claw_dir\")
+      mkdir -p ${INSTALL_DIR}/instances/\${CLAW_NAME}/.openclaw
+      cp \"\${claw_dir}openclaw.json\" ${INSTALL_DIR}/instances/\${CLAW_NAME}/.openclaw/openclaw.json
+    done
+
+    # Copy deploy scripts and static files
+    cp -r ${INSTALL_DIR}/.deploy-staging/deploy/* ${INSTALL_DIR}/deploy/ 2>/dev/null || true
+  '"
 ```
-
-Use the returned timezone to compute `CRON_MINUTE`, `CRON_HOUR`, `CRON_MAINTENANCE_MINUTE`, and `CRON_MAINTENANCE_HOUR` from `HOSTALERT_DAILY_REPORT_TIME` (see cron generation rules below).
-
-### Step 2: Run deploy-config.sh
-
-> **Important:** `OPENCLAW_DOMAIN_PATH` may be empty (serves UI at root). The script handles empty values correctly. ALL `{{VAR}}` placeholders are substituted by the script — it exits with error if any remain.
-
-```bash
-ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP} \
-  "env \
-    INSTALL_DIR='${INSTALL_DIR}' \
-    OPENCLAW_DOMAIN='${OPENCLAW_DOMAIN}' \
-    OPENCLAW_DOMAIN_PATH='${OPENCLAW_DOMAIN_PATH}' \
-    YOUR_TELEGRAM_ID='${YOUR_TELEGRAM_ID}' \
-    OPENCLAW_INSTANCE_ID='${OPENCLAW_INSTANCE_ID}' \
-    VPS_HOSTNAME='${VPS_HOSTNAME}' \
-    ENABLE_EVENTS_LOGGING='${ENABLE_EVENTS_LOGGING}' \
-    ENABLE_LLEMTRY_LOGGING='${ENABLE_LLEMTRY_LOGGING}' \
-    LOG_WORKER_TOKEN='${LOG_WORKER_TOKEN}' \
-    LOG_WORKER_URL='${LOG_WORKER_URL}' \
-    AI_GATEWAY_WORKER_URL='${AI_GATEWAY_WORKER_URL}' \
-    ENABLE_VECTOR_LOG_SHIPPING='${ENABLE_VECTOR_LOG_SHIPPING}' \
-    VPS1_IP='${VPS1_IP}' \
-    CRON_MINUTE='${CRON_MINUTE}' \
-    CRON_HOUR='${CRON_HOUR}' \
-    CRON_MAINTENANCE_MINUTE='${CRON_MAINTENANCE_MINUTE}' \
-    CRON_MAINTENANCE_HOUR='${CRON_MAINTENANCE_HOUR}' \
-    HOSTALERT_TELEGRAM_BOT_TOKEN='${HOSTALERT_TELEGRAM_BOT_TOKEN}' \
-    HOSTALERT_TELEGRAM_CHAT_ID='${HOSTALERT_TELEGRAM_CHAT_ID}' \
-  bash ${INSTALL_DIR}/.deploy-staging/scripts/deploy-config.sh"
-```
-
-Expect `DEPLOY_CONFIG_OK` on stdout when successful. All progress output goes to stderr.
-
-### Step 3: Generate Docker Compose override
-
-`deploy-config.sh` deploys per-claw configs but does NOT generate `docker-compose.override.yml`. Run `openclaw-multi.sh generate` to create it from the discovered claws:
-
-```bash
-ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP} \
-  "bash ${INSTALL_DIR}/.deploy-staging/scripts/openclaw-multi.sh generate"
-```
-
-This reads `openclaws/*/` from staging, assigns ports, and writes `docker-compose.override.yml` + per-instance `.env` variables. The existing shared `.env` (created by `setup-infra.sh`) is preserved.
-
-> **Multi-claw:** If multiple claws exist (e.g., `main-claw/` and `personal-claw/`), each gets its own service in the override file with auto-assigned ports.
-
-**Cleanup:** `openclaw-config.env` contains secrets (`AI_GATEWAY_AUTH_TOKEN`). It was SCP'd into the staging directory alongside deploy files. Staging is cleaned up explicitly after the Verification section — scripts in §4.4 and §4.5 also read from staging.
 
 **Cron generation rules:**
 
 - **Cron runs in the server's local timezone**, not necessarily UTC. Before converting `HOSTALERT_DAILY_REPORT_TIME` to cron fields, check the server timezone: `timedatectl show -p Timezone --value` (or `cat /etc/timezone` as fallback). Convert the user's specified time to the server's local timezone, then write the cron minute/hour fields in that timezone. Include the server timezone and original user time in the cron comment for clarity.
 - If `HOSTALERT_DAILY_REPORT_TIME` is not set, default to `9:30 AM PST` — still convert to the server's local timezone.
-- Only include the daily report cron line (`--report`) if both `source-config.sh HOSTALERT_TELEGRAM_BOT_TOKEN` and `source-config.sh HOSTALERT_TELEGRAM_CHAT_ID` return values. If Telegram is not configured, write only the alerter line (the script exits silently without Telegram credentials, but there's no point scheduling the report).
+- Only include the daily report cron line (`--report`) if both `HOSTALERT_TELEGRAM_BOT_TOKEN` and `HOSTALERT_TELEGRAM_CHAT_ID` are set in `.env`. If Telegram is not configured, write only the alerter line (the script exits silently without Telegram credentials, but there's no point scheduling the report).
 
 **Maintenance cron generation rules:**
 
@@ -303,15 +242,15 @@ Print the result as a status update to the user (e.g., `[entrypoint] Building to
 If `CLAW_COUNT > 1`, sync sandbox images from the first claw to the others before starting them. This avoids redundant ~15-25 min builds in each additional claw.
 
 ```bash
-ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP} \
-  "bash ${INSTALL_DIR}/.deploy-staging/scripts/openclaw-multi.sh sync-images --source <first-claw-name>"
+ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
+  "bash ${INSTALL_DIR}/.deploy-staging/scripts/sync-sandbox-images.sh --source <first-claw-name>"
 ```
 
 Then start all remaining claws (entrypoints detect the pre-placed tar and load in ~30 seconds instead of building):
 
 ```bash
-ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP} \
-  "sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose up -d'"
+ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
+  "sudo -u openclaw bash -c 'cd <INSTALL_DIR>/deploy && docker compose up -d'"
 ```
 
 > **Single-claw:** Skip this step — there are no other claws to sync to.
@@ -449,7 +388,7 @@ Or for quick manual checks:
 
 ```bash
 # Check containers are running
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose ps'
+sudo -u openclaw bash -c 'cd <INSTALL_DIR>/deploy && docker compose ps'
 
 # Check gateway logs for each claw
 for CLAW in $(sudo docker ps --format '{{.Names}}' --filter 'name=^openclaw-' | grep -v '^openclaw-cli$' | grep -v '^openclaw-sbx-' | sort); do
@@ -465,8 +404,7 @@ for CLAW in $(sudo docker ps --format '{{.Names}}' --filter 'name=^openclaw-' | 
   curl -s "http://localhost:${GW_PORT}${OPENCLAW_DOMAIN_PATH}/" | head -5
 done
 
-# Check Vector is running (separate compose project)
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/vector && docker compose ps'
+# Check Vector is running (part of main compose when stack.logging.vector: true)
 sudo docker logs --tail 10 vector
 ```
 
@@ -474,7 +412,7 @@ sudo docker logs --tail 10 vector
 
 ## 4.6 Clean Up Staging
 
-Staging contains secrets (`openclaw-config.env`) and deploy scripts. Remove it now that all steps are complete.
+Staging contains deploy artifacts and scripts. Remove it now that all steps are complete.
 
 ```bash
 ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP} \
@@ -504,9 +442,9 @@ df -h
 
 When the gateway binds to `lan` (which all Docker/Tunnel deployments do via `--bind lan`), it requires `controlUi.allowedOrigins` to be set in `openclaw.json`. If missing or empty, the gateway exits immediately with a security check error.
 
-**Cause:** `OPENCLAW_DOMAIN` was not passed to `deploy-config.sh`, so `{{ALLOWED_ORIGIN}}` was substituted as `https://` (empty domain).
+**Cause:** The claw's `domain` was empty in `stack.yml` when `bun run pre-deploy` ran, so `ALLOWED_ORIGIN` resolved to `https://` (empty domain).
 
-**Fix:** Ensure `OPENCLAW_DOMAIN` is set in `openclaw-config.env` (or overridden per-claw in `config.env`), then re-run the deploy-config step from § 4.3 Step 2. Restart the claw container after updating the config.
+**Fix:** Ensure `domain` is set in `stack.yml` (either in `defaults` or per-claw under `claws.<name>`), then re-run `bun run pre-deploy` and redeploy the updated `openclaw.json`. Restart the claw container after updating the config.
 
 ```bash
 # Verify the deployed config has a valid allowedOrigins
@@ -545,7 +483,7 @@ sudo docker exec vector ls -la /etc/vector/
 sudo docker exec vector wget -q -O- <LOG_WORKER_URL>/health
 
 # Restart Vector after fixing (use `up -d` instead if .env values changed)
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/vector && docker compose restart'
+sudo -u openclaw bash -c 'cd <INSTALL_DIR>/deploy && docker compose restart vector'
 ```
 
 ### Config Overwritten After Manual Edit
@@ -556,7 +494,7 @@ The OpenClaw gateway rewrites `openclaw.json` on startup. It strips JSONC commen
 - **File size changes are expected** — the rewritten file is typically smaller (comments removed) or larger (meta fields added) than the deployed version.
 - **The gateway creates a `.bak` backup** before rewriting, so the previous version is recoverable.
 
-To make persistent config changes, update the template in `openclaws/_defaults/openclaw.json` (or a per-claw override) and re-run `deploy-config.sh`, then restart the container.
+To make persistent config changes, update `openclaw/default/openclaw.jsonc` (or per-claw overrides in `stack.yml`), re-run `bun run pre-deploy`, push the updated artifacts, then restart the container.
 
 ### CLI Commands Failing
 
@@ -588,8 +526,8 @@ The build script auto-patches the Dockerfile and restores the git working tree a
 ```bash
 #!/bin/bash
 # Image name is stack-scoped: openclaw-<project>:local
-# Source config to get OPENCLAW_IMAGE
-source <INSTALL_DIR>/scripts/source-config.sh
+# Read OPENCLAW_IMAGE from the deploy .env
+OPENCLAW_IMAGE=$(grep '^OPENCLAW_IMAGE=' <INSTALL_DIR>/deploy/.env | cut -d= -f2)
 
 # 1. Tag current state for rollback
 sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && git tag -f pre-update'
@@ -604,7 +542,7 @@ sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && git pull origin main'
 sudo -u openclaw <INSTALL_DIR>/scripts/build-openclaw.sh
 
 # 4. Recreate containers with the new image
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose up -d'
+sudo -u openclaw bash -c 'cd <INSTALL_DIR>/deploy && docker compose up -d'
 
 # 5. Verify new version
 openclaw --version
@@ -627,7 +565,7 @@ If an update causes issues, roll back to the previous known-good state:
 
 ```bash
 #!/bin/bash
-source <INSTALL_DIR>/scripts/source-config.sh
+OPENCLAW_IMAGE=$(grep '^OPENCLAW_IMAGE=' <INSTALL_DIR>/deploy/.env | cut -d= -f2)
 
 # 1. Revert source to pre-update tag
 sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && git checkout pre-update'
@@ -636,7 +574,7 @@ sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && git checkout pre-update'
 docker tag "${OPENCLAW_IMAGE%:*}:rollback-$(date +%Y%m%d)" "${OPENCLAW_IMAGE}"
 
 # 3. Recreate containers with the old image
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose up -d'
+sudo -u openclaw bash -c 'cd <INSTALL_DIR>/deploy && docker compose up -d'
 
 # 4. Verify
 openclaw --version
