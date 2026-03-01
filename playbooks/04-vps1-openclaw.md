@@ -21,7 +21,7 @@ This playbook configures:
 
 ## Variables
 
-Config values are read from `.env` and `stack.yml` (resolved by `bun run pre-deploy` into `.deploy/`):
+Config values are read from `.env` and `stack.yml` (resolved by `npm run pre-deploy` into `.deploy/`):
 
 - `VPS_IP` (`.env`) - Public IP of VPS-1
 - `AI_GATEWAY_URL`, `AI_GATEWAY_TOKEN` (`.env`) - AI Gateway Worker URL and auth token
@@ -36,12 +36,12 @@ Config values are read from `.env` and `stack.yml` (resolved by `bun run pre-dep
 
 ## 4.2 Infrastructure Setup
 
-> **Pre-deploy + SCP + single script.** Run `bun run pre-deploy` locally to build `.deploy/` artifacts, SCP them to the VPS staging area, then run `setup-infra.sh` which creates directories and clones the repo.
+> **Pre-deploy + SCP + single script.** Run `npm run pre-deploy` locally to build `.deploy/` artifacts, SCP them to the VPS staging area, then run `setup-infra.sh` which creates directories and clones the repo.
 
 ### Step 0: Build deployment artifacts locally
 
 ```bash
-bun run pre-deploy
+npm run pre-deploy
 ```
 
 This builds `.deploy/` from `.env` + `stack.yml` + `docker-compose.yml.hbs`, resolving all templates and generating the final `docker-compose.yml`, per-claw `openclaw.json` files, and `stack.json`.
@@ -67,7 +67,7 @@ Discover claw names from the pre-built `.deploy/stack.json`:
 
 ```bash
 # Discover claw instance names from pre-built stack config
-INSTANCE_NAMES=$(bun -e "const s = require('./.deploy/stack.json'); console.log(Object.keys(s.claws).join(' '))")
+INSTANCE_NAMES=$(node -e "const s = require('./.deploy/stack.json'); console.log(Object.keys(s.claws).join(' '))")
 echo "Instances: $INSTANCE_NAMES"
 ```
 
@@ -95,13 +95,13 @@ Expects `SETUP_INFRA_OK` on stdout (all other output goes to stderr).
 >
 > `sudo rm -rf <INSTALL_DIR>/openclaw`
 
-**Note:** Gateway tokens are configured in `stack.yml` and resolved by `bun run pre-deploy`. No token capture is needed from this step.
+**Note:** Gateway tokens are configured in `stack.yml` and resolved by `npm run pre-deploy`. No token capture is needed from this step.
 
 ---
 
 ## 4.3 Deploy Configuration
 
-> **Pre-built artifacts.** All configuration is resolved locally by `bun run pre-deploy` (run in §4.2 Step 0). The `.deploy/` directory contains the final `docker-compose.yml`, per-claw `openclaw.json` files (with `$VAR` placeholders for runtime `envsubst`), and deploy scripts. This step copies artifacts from staging into their final locations.
+> **Pre-built artifacts.** All configuration is resolved locally by `npm run pre-deploy` (run in §4.2 Step 0). The `.deploy/` directory contains the final `docker-compose.yml`, per-claw `openclaw.json` files (with `$VAR` placeholders for runtime `envsubst`), and deploy scripts. This step copies artifacts from staging into their final locations.
 
 ### File manifest
 
@@ -286,7 +286,7 @@ connections yet, the output will show an empty device list — that's normal.
 
 ## 4.5 Deploy OpenClaw Cron Jobs
 
-Register the Daily VPS Health Check cron job on all claws. The script is self-contained — it sources `stack.env` for claw IDs, schedule, timezone, and Telegram delivery config. Schedule and timezone are pre-resolved from `host.host_alerter.daily_report` in `stack.yml` by `bun run pre-deploy`.
+Register the Daily VPS Health Check cron job on all claws. The script is self-contained — it sources `stack.env` for claw IDs, schedule, timezone, and Telegram delivery config. Schedule and timezone are pre-resolved from `host.host_alerter.daily_report` in `stack.yml` by `npm run pre-deploy`.
 
 ```bash
 ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
@@ -374,9 +374,9 @@ df -h
 
 When the gateway binds to `lan` (which all Docker/Tunnel deployments do via `--bind lan`), it requires `controlUi.allowedOrigins` to be set in `openclaw.json`. If missing or empty, the gateway exits immediately with a security check error.
 
-**Cause:** The claw's `domain` was empty in `stack.yml` when `bun run pre-deploy` ran, so `ALLOWED_ORIGIN` resolved to `https://` (empty domain).
+**Cause:** The claw's `domain` was empty in `stack.yml` when `npm run pre-deploy` ran, so `ALLOWED_ORIGIN` resolved to `https://` (empty domain).
 
-**Fix:** Ensure `domain` is set in `stack.yml` (either in `defaults` or per-claw under `claws.<name>`), then re-run `bun run pre-deploy` and redeploy the updated `openclaw.json`. Restart the claw container after updating the config.
+**Fix:** Ensure `domain` is set in `stack.yml` (either in `defaults` or per-claw under `claws.<name>`), then re-run `npm run pre-deploy` and redeploy the updated `openclaw.json`. Restart the claw container after updating the config.
 
 ```bash
 # Verify the deployed config has a valid allowedOrigins
@@ -427,7 +427,7 @@ The OpenClaw gateway rewrites `openclaw.json` on startup. It strips JSONC commen
 - **File size changes are expected** — the rewritten file is typically smaller (comments removed) or larger (meta fields added) than the deployed version.
 - **The gateway creates a `.bak` backup** before rewriting, so the previous version is recoverable.
 
-To make persistent config changes, update the openclaw config template (see `defaults.openclaw_json` in `stack.yml` for its path), re-run `bun run pre-deploy`, push the updated artifacts, then restart the container.
+To make persistent config changes, update the openclaw config template (see `defaults.openclaw_json` in `stack.yml` for its path), re-run `npm run pre-deploy`, push the updated artifacts, then restart the container.
 
 ### CLI Commands Failing
 

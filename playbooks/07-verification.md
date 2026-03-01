@@ -506,7 +506,7 @@ Compare per-claw limits against VPS hardware divided by claw count (see `00-fres
 
 ```bash
 # Locally: update stack.yml resource values, then rebuild artifacts
-bun run pre-deploy
+npm run pre-deploy
 
 # Push updated artifacts to VPS (via .deploy/ git repo)
 cd .deploy && git add -A && git commit -m "Update resource limits" && git push

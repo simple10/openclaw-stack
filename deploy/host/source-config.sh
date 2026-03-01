@@ -32,7 +32,7 @@ done
 
 if [ -z "$_STACK_ENV" ] || [ ! -f "$_STACK_ENV" ]; then
   echo "Error: stack.env not found (searched up from $_SC_DIR)" >&2
-  echo "Run 'bun run pre-deploy' to generate it." >&2
+  echo "Run 'npm run pre-deploy' to generate it." >&2
   return 1 2>/dev/null || exit 1
 fi
 

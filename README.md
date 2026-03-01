@@ -254,7 +254,7 @@ Configuration uses two files — `.env` for secrets/VPS access and `stack.yml` f
 cp .env.example .env && cp stack.yml.example stack.yml
 ```
 
-Run `bun run pre-deploy` to build deployment artifacts from these files.
+Run `npm run pre-deploy` to build deployment artifacts from these files.
 
 You can prepopulate the config files or claude will ask for any missing required settings.
 

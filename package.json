@@ -3,20 +3,13 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "pre-deploy": "bun run build/pre-deploy.ts",
-    "pre-deploy:dry": "bun run build/pre-deploy.ts --dry-run"
+    "pre-deploy": "node build/pre-deploy.mjs",
+    "pre-deploy:dry": "node build/pre-deploy.mjs --dry-run"
   },
   "dependencies": {
     "dotenv": "^17.3.1",
     "handlebars": "^4.7.8",
     "js-yaml": "^4.1.0",
     "jsonc-parser": "^3.3.1"
-  },
-  "devDependencies": {
-    "@types/bun": "latest",
-    "@types/js-yaml": "^4.0.9"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
   }
 }

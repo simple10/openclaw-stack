@@ -1,17 +1,20 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
- * pre-deploy.ts — Build pipeline for OpenClaw stack deployment
+ * pre-deploy.mjs — Build pipeline for OpenClaw stack deployment
  *
  * Reads .env + stack.yml + docker-compose.yml.hbs and produces
  * a fully-resolved .deploy/ directory ready to git-push to VPS.
  *
  * Usage:
- *   bun run pre-deploy          # Full build
- *   bun run pre-deploy:dry      # Dry run (show what would be generated)
+ *   npm run pre-deploy          # Full build
+ *   npm run pre-deploy:dry      # Dry run (show what would be generated)
  */
 
 import { readFileSync, writeFileSync, mkdirSync, cpSync, existsSync, rmSync, readdirSync } from "fs";
-import { join, resolve } from "path";
+import { join, resolve, dirname } from "path";
+import { fileURLToPath } from "url";
+import { spawn } from "child_process";
+import { randomUUID } from "crypto";
 import * as yaml from "js-yaml";
 import * as dotenv from "dotenv";
 import Handlebars from "handlebars";
@@ -19,31 +22,32 @@ import { parse as parseJsonc, printParseErrorCode } from "jsonc-parser";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const ROOT = resolve(import.meta.dir, "..");
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = resolve(__dirname, "..");
 const DEPLOY_DIR = join(ROOT, ".deploy");
 const DRY_RUN = process.argv.includes("--dry-run");
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function fatal(msg: string): never {
+function fatal(msg) {
   console.error(`\x1b[31m✗ ${msg}\x1b[0m`);
   process.exit(1);
 }
 
-function info(msg: string) {
+function info(msg) {
   console.log(`\x1b[36m→ ${msg}\x1b[0m`);
 }
 
-function success(msg: string) {
+function success(msg) {
   console.log(`\x1b[32m✓ ${msg}\x1b[0m`);
 }
 
-function warn(msg: string) {
+function warn(msg) {
   console.log(`\x1b[33m⚠ ${msg}\x1b[0m`);
 }
 
 /** Read a file relative to project root */
-function readRoot(path: string): string {
+function readRoot(path) {
   const full = join(ROOT, path);
   if (!existsSync(full)) fatal(`File not found: ${path}`);
   return readFileSync(full, "utf-8");
@@ -51,28 +55,28 @@ function readRoot(path: string): string {
 
 // ── Step 1: Read .env ────────────────────────────────────────────────────────
 
-function readDotEnv(): Record<string, string> {
+function readDotEnv() {
   const envPath = join(ROOT, ".env");
   if (!existsSync(envPath)) fatal(".env not found. Run: cp .env.example .env");
 
   const parsed = dotenv.parse(readFileSync(envPath));
-  return parsed as Record<string, string>;
+  return parsed;
 }
 
 // ── Step 2: Resolve ${VAR} in stack.yml ──────────────────────────────────────
 
-function resolveEnvRefs(text: string, env: Record<string, string>): string {
+function resolveEnvRefs(text, env) {
   // Process line-by-line to skip YAML comments
   return text.split("\n").map((line) => {
     // Skip comment lines (YAML comments start with optional whitespace + #)
     if (line.trimStart().startsWith("#")) return line;
 
     // Match ${VAR} and ${VAR:-default}
-    return line.replace(/\$\{([^}]+)\}/g, (_match, expr: string) => {
+    return line.replace(/\$\{([^}]+)\}/g, (_match, expr) => {
       const defaultMatch = expr.match(/^([^:]+):-(.*)$/);
       if (defaultMatch) {
-        const key = defaultMatch[1]!;
-        const defaultVal = defaultMatch[2]!;
+        const key = defaultMatch[1];
+        const defaultVal = defaultMatch[2];
         return env[key] !== undefined && env[key] !== "" ? env[key] : defaultVal;
       }
       const value = env[expr];
@@ -87,20 +91,20 @@ function resolveEnvRefs(text: string, env: Record<string, string>): string {
 
 // ── Step 3: Deep merge ───────────────────────────────────────────────────────
 
-function isPlainObject(val: unknown): val is Record<string, unknown> {
+function isPlainObject(val) {
   return typeof val === "object" && val !== null && !Array.isArray(val);
 }
 
 /** Deep merge source into target. Source values win at any depth. */
-function deepMerge<T extends Record<string, unknown>>(target: T, source: Record<string, unknown>): T {
+function deepMerge(target, source) {
   const result = { ...target };
   for (const key of Object.keys(source)) {
     const srcVal = source[key];
-    const tgtVal = (result as Record<string, unknown>)[key];
+    const tgtVal = result[key];
     if (isPlainObject(srcVal) && isPlainObject(tgtVal)) {
-      (result as Record<string, unknown>)[key] = deepMerge(tgtVal as Record<string, unknown>, srcVal as Record<string, unknown>);
+      result[key] = deepMerge(tgtVal, srcVal);
     } else {
-      (result as Record<string, unknown>)[key] = srcVal;
+      result[key] = srcVal;
     }
   }
   return result;
@@ -108,12 +112,19 @@ function deepMerge<T extends Record<string, unknown>>(target: T, source: Record<
 
 // ── Step 4: Resolve resource percentages ─────────────────────────────────────
 
-interface VpsCapacity {
-  cpus: number;
-  memory_mb: number;
+function spawnAsync(cmd, args) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(cmd, args, { stdio: ["pipe", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    proc.stdout.on("data", (chunk) => { stdout += chunk; });
+    proc.stderr.on("data", (chunk) => { stderr += chunk; });
+    proc.on("error", reject);
+    proc.on("close", (code) => resolve({ stdout, stderr, exitCode: code }));
+  });
 }
 
-async function queryVpsCapacity(env: Record<string, string>): Promise<VpsCapacity> {
+async function queryVpsCapacity(env) {
   const ip = env.VPS_IP;
   const user = env.SSH_USER || "adminclaw";
   const port = env.SSH_PORT || "222";
@@ -124,16 +135,13 @@ async function queryVpsCapacity(env: Record<string, string>): Promise<VpsCapacit
   const expandedKey = keyPath.replace(/^~/, process.env.HOME || "");
   info(`Querying VPS capacity at ${user}@${ip}:${port}...`);
 
-  const sshCmd = [
-    "ssh", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10",
+  const sshArgs = [
+    "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10",
     "-i", expandedKey, "-p", port, `${user}@${ip}`,
     "nproc && grep MemTotal /proc/meminfo | awk '{print $2}'"
   ];
 
-  const proc = Bun.spawn(sshCmd, { stdout: "pipe", stderr: "pipe" });
-  const stdout = await new Response(proc.stdout).text();
-  const stderr = await new Response(proc.stderr).text();
-  const exitCode = await proc.exited;
+  const { stdout, stderr, exitCode } = await spawnAsync("ssh", sshArgs);
 
   if (exitCode !== 0) {
     fatal(`SSH to VPS failed (exit ${exitCode}): ${stderr.trim()}\nCannot resolve resource percentages.`);
@@ -148,52 +156,44 @@ async function queryVpsCapacity(env: Record<string, string>): Promise<VpsCapacit
   return { cpus, memory_mb: memMb };
 }
 
-function parseMemoryValue(val: string): { mb: number; original: string } {
+function parseMemoryValue(val) {
   const str = String(val).trim();
   const match = str.match(/^(\d+(?:\.\d+)?)\s*(G|M|GB|MB|g|m|gb|mb)?$/i);
   if (!match) fatal(`Invalid memory value: ${val}`);
-  const num = parseFloat(match[1]!);
+  const num = parseFloat(match[1]);
   const unit = (match[2] || "M").toUpperCase().replace("B", "");
   const mb = unit === "G" ? Math.floor(num * 1024) : Math.floor(num);
   return { mb, original: str };
 }
 
-function formatMemory(mb: number): string {
+function formatMemory(mb) {
   if (mb >= 1024 && mb % 1024 === 0) return `${mb / 1024}G`;
   return `${mb}M`;
 }
 
-interface ResolvedResources {
-  max_cpu: number;
-  max_mem_mb: number;
-}
-
-async function resolveStackResources(
-  stackResources: { max_cpu?: string; max_mem?: string },
-  env: Record<string, string>
-): Promise<ResolvedResources> {
+async function resolveStackResources(stackResources, env) {
   const maxCpu = String(stackResources?.max_cpu || "100%");
   const maxMem = String(stackResources?.max_mem || "100%");
 
   const needsVps = maxCpu.includes("%") || maxMem.includes("%");
-  let capacity: VpsCapacity | null = null;
+  let capacity = null;
 
   if (needsVps) {
     capacity = await queryVpsCapacity(env);
   }
 
-  let resolvedCpu: number;
+  let resolvedCpu;
   if (maxCpu.endsWith("%")) {
     const pct = parseInt(maxCpu, 10) / 100;
-    resolvedCpu = Math.floor(capacity!.cpus * pct);
+    resolvedCpu = Math.floor(capacity.cpus * pct);
   } else {
     resolvedCpu = parseInt(maxCpu, 10);
   }
 
-  let resolvedMemMb: number;
+  let resolvedMemMb;
   if (maxMem.endsWith("%")) {
     const pct = parseInt(maxMem, 10) / 100;
-    resolvedMemMb = Math.floor(capacity!.memory_mb * pct);
+    resolvedMemMb = Math.floor(capacity.memory_mb * pct);
   } else {
     resolvedMemMb = parseMemoryValue(maxMem).mb;
   }
@@ -204,8 +204,8 @@ async function resolveStackResources(
 
 // ── Step 5: Parse JSONC (JSON with Comments) ─────────────────────────────────
 
-function parseJsoncFile(text: string, filePath: string): unknown {
-  const errors: import("jsonc-parser").ParseError[] = [];
+function parseJsoncFile(text, filePath) {
+  const errors = [];
   const result = parseJsonc(text, errors, { allowTrailingComma: true });
   if (errors.length > 0) {
     const errorMsgs = errors.map(e => `  offset ${e.offset}: ${printParseErrorCode(e.error)}`).join("\n");
@@ -216,7 +216,7 @@ function parseJsoncFile(text: string, filePath: string): unknown {
 
 // ── Step 6: Validate required fields ─────────────────────────────────────────
 
-function validateClaw(name: string, claw: Record<string, unknown>) {
+function validateClaw(name, claw) {
   const required = ["domain", "gateway_port", "dashboard_port"];
   for (const field of required) {
     if (claw[field] === undefined || claw[field] === "") {
@@ -224,7 +224,7 @@ function validateClaw(name: string, claw: Record<string, unknown>) {
     }
   }
 
-  const telegram = claw.telegram as Record<string, unknown> | undefined;
+  const telegram = claw.telegram;
   if (!telegram?.bot_token) {
     warn(`Claw '${name}' has no telegram.bot_token — Telegram will be disabled`);
   }
@@ -234,11 +234,7 @@ function validateClaw(name: string, claw: Record<string, unknown>) {
 // Pre-computes all values the Handlebars template needs so the template
 // is a pure data projection with no inline logic.
 
-function computeDerivedValues(
-  claws: Record<string, Record<string, any>>,
-  stack: Record<string, any>,
-  host: Record<string, any>,
-) {
+function computeDerivedValues(claws, stack, host) {
   const logUrl = stack.logging?.worker_url || "";
   const logToken = stack.logging?.worker_token || "";
 
@@ -249,7 +245,7 @@ function computeDerivedValues(
     const gwUrl = claw.ai_gateway?.url || stack.ai_gateway.url;
     const gwToken = claw.ai_gateway?.token || stack.ai_gateway.token;
 
-    claw.gateway_token = claw.gateway_token || crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
+    claw.gateway_token = claw.gateway_token || randomUUID().replace(/-/g, "") + randomUUID().replace(/-/g, "");
     claw.anthropic_api_key = gwToken;
     claw.anthropic_base_url = gwUrl + "/anthropic";
     claw.openai_api_key = gwToken;
@@ -283,7 +279,7 @@ const ENVSUBST_VARS = [
 
 // ── Step 8b: Parse human-readable time → cron expression + IANA timezone ─────
 
-const TZ_ABBREVIATIONS: Record<string, string> = {
+const TZ_ABBREVIATIONS = {
   PST: "America/Los_Angeles", PDT: "America/Los_Angeles",
   EST: "America/New_York", EDT: "America/New_York",
   CST: "America/Chicago", CDT: "America/Chicago",
@@ -292,13 +288,8 @@ const TZ_ABBREVIATIONS: Record<string, string> = {
   CET: "Europe/Berlin", CEST: "Europe/Berlin",
 };
 
-interface ParsedSchedule {
-  cronExpr: string;
-  ianaTz: string;
-}
-
-function parseDailyReportTime(timeStr: string | undefined): ParsedSchedule {
-  const fallback: ParsedSchedule = { cronExpr: "30 9 * * *", ianaTz: "America/Los_Angeles" };
+function parseDailyReportTime(timeStr) {
+  const fallback = { cronExpr: "30 9 * * *", ianaTz: "America/Los_Angeles" };
   if (!timeStr) return fallback;
 
   const match = String(timeStr).match(/^(\d{1,2}):(\d{2})\s*(AM|PM)\s*(\w+)$/i);
@@ -307,10 +298,10 @@ function parseDailyReportTime(timeStr: string | undefined): ParsedSchedule {
     return fallback;
   }
 
-  let hour = parseInt(match[1]!, 10);
-  const minute = parseInt(match[2]!, 10);
-  const ampm = match[3]!.toUpperCase();
-  const tzAbbr = match[4]!.toUpperCase();
+  let hour = parseInt(match[1], 10);
+  const minute = parseInt(match[2], 10);
+  const ampm = match[3].toUpperCase();
+  const tzAbbr = match[4].toUpperCase();
 
   if (ampm === "PM" && hour !== 12) hour += 12;
   if (ampm === "AM" && hour === 12) hour = 0;
@@ -328,7 +319,7 @@ function parseDailyReportTime(timeStr: string | undefined): ParsedSchedule {
 // Bash-sourceable key=value file for shell scripts.
 // Convention: ENV__<key> for .env vars, STACK__<path> for stack.yml vars.
 
-function formatEnvValue(val: unknown): string {
+function formatEnvValue(val) {
   const s = String(val ?? "");
   if (s === "") return "";
   if (/[\s'"\\$`!#&|;()<>{}]/.test(s)) {
@@ -337,14 +328,10 @@ function formatEnvValue(val: unknown): string {
   return s;
 }
 
-function generateStackEnv(
-  env: Record<string, string>,
-  config: Record<string, any>,
-  claws: Record<string, Record<string, any>>,
-): string {
-  const lines: string[] = [
-    "# Generated by pre-deploy.ts — DO NOT EDIT",
-    "# To regenerate: bun run pre-deploy",
+function generateStackEnv(env, config, claws) {
+  const lines = [
+    "# Generated by pre-deploy — DO NOT EDIT",
+    "# To regenerate: npm run pre-deploy",
     "",
   ];
 
@@ -431,7 +418,7 @@ async function main() {
   info("Reading stack.yml...");
   const stackRaw = readRoot("stack.yml");
   const stackResolved = resolveEnvRefs(stackRaw, env);
-  const config = yaml.load(stackResolved) as Record<string, any>;
+  const config = yaml.load(stackResolved);
 
   if (!config.stack) fatal("stack.yml missing 'stack' section");
   if (!config.claws || Object.keys(config.claws).length === 0) fatal("stack.yml has no claws defined");
@@ -439,13 +426,13 @@ async function main() {
   const stack = config.stack;
   const host = config.host || {};
   const defaults = config.defaults || {};
-  const clawsRaw = config.claws as Record<string, Record<string, unknown>>;
+  const clawsRaw = config.claws;
 
   success(`stack.yml loaded: ${Object.keys(clawsRaw).length} claw(s)`);
 
   // 3. Deep merge defaults into each claw
   info("Merging defaults into claws...");
-  const claws: Record<string, Record<string, any>> = {};
+  const claws = {};
   for (const [name, clawConfig] of Object.entries(clawsRaw)) {
     const merged = deepMerge(defaults, clawConfig ?? {});
     claws[name] = merged;
@@ -545,7 +532,7 @@ async function main() {
 
   // 7g. Process openclaw.jsonc for each claw → .deploy/openclaw/<name>/openclaw.json
   for (const [name, claw] of Object.entries(claws)) {
-    const templateFile = (claw.openclaw_json as string) || "openclaw/default/openclaw.jsonc";
+    const templateFile = claw.openclaw_json || "openclaw/default/openclaw.jsonc";
     info(`Processing openclaw config for ${name} (from ${templateFile})...`);
 
     const raw = readRoot(templateFile);

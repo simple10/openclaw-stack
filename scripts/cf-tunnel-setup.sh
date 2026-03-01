@@ -36,7 +36,7 @@ if [ "$OPENCLAW_CONTEXT" = "local" ]; then
 else
   STACK_JSON="$(dirname "$SCRIPT_DIR")/stack.json"
 fi
-[ -f "$STACK_JSON" ] || { echo "Error: stack.json not found at $STACK_JSON. Run 'bun run pre-deploy'." >&2; exit 1; }
+[ -f "$STACK_JSON" ] || { echo "Error: stack.json not found at $STACK_JSON. Run 'npm run pre-deploy'." >&2; exit 1; }
 
 CF_API_BASE="https://api.cloudflare.com/client/v4"
 

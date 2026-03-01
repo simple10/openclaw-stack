@@ -19,7 +19,6 @@ openclaw/*
 # ── Build output ───────────────────────────────────────────────
 .deploy/
 node_modules/
-bun.lock
 
 tmp/
 _bak/

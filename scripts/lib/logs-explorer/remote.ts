@@ -74,7 +74,7 @@ export function loadConfig(): Config {
   const stackJsonPath = resolve(repoRoot, '.deploy/stack.json')
 
   if (!existsSync(stackJsonPath)) {
-    throw new Error(`stack.json not found at ${stackJsonPath}. Run 'bun run pre-deploy' first.`)
+    throw new Error(`stack.json not found at ${stackJsonPath}. Run 'npm run pre-deploy' first.`)
   }
 
   const stackConfig = JSON.parse(readFileSync(stackJsonPath, 'utf-8'))

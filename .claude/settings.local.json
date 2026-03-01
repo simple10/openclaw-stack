@@ -33,7 +33,7 @@
       "Bash(git check-ignore:*)",
       "Bash(head:*)",
       "Bash(shellcheck:*)",
-      "Bash(bun:*)",
+      "Bash(node:*)",
       "Bash(git:*)",
       "Bash(bash:*)"
     ]

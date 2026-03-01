@@ -363,10 +363,10 @@ Each subdomain needs its own Cloudflare Access application (or extend a single a
 ### Adding a New Claw
 
 1. Add a new claw definition under `claws` in `stack.yml` with `domain` set
-2. Run `bun run pre-deploy` to regenerate deployment artifacts
+2. Run `npm run pre-deploy` to regenerate deployment artifacts
 3. Configure tunnel routes in the Cloudflare Dashboard (or use `CF_API_TOKEN` for automation)
 4. Create a Cloudflare Access application for the new subdomain (or use a wildcard policy)
-5. Deploy: `bun run deploy`
+5. Deploy: `npm run deploy`
 
 ---
 
@@ -403,7 +403,7 @@ If the token is compromised:
 4. Rebuild deployment artifacts and recreate the container:
 
    ```bash
-   bun run pre-deploy
+   npm run pre-deploy
    # Push updated stack.env to VPS, then:
    sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d cloudflared'
    ```

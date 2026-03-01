@@ -14,7 +14,7 @@ All secrets should be rotated on a regular cadence. If a token is suspected comp
 | `AI_GATEWAY_AUTH_TOKEN` | Local `.env` + AI Gateway Worker secret | 90 days |
 | `LOG_WORKER_TOKEN` | Local `.env` + Log Receiver Worker secret | 90 days |
 | Provider API keys (Anthropic, OpenAI, etc.) | AI Gateway Worker secrets (Cloudflare Dashboard) | Per provider policy |
-| `HOSTALERT_TELEGRAM_BOT_TOKEN` | Local `.env` (deployed via `bun run pre-deploy`) | As needed |
+| `HOSTALERT_TELEGRAM_BOT_TOKEN` | Local `.env` (deployed via `npm run pre-deploy`) | As needed |
 | SSH keys (`~/.ssh/vps1_openclaw_ed25519`) | Local machine + VPS `authorized_keys` | Annual |
 
 ### Rotation Procedures
@@ -55,7 +55,7 @@ cd workers/ai-gateway
 echo "$NEW_TOKEN" | npx wrangler secret put AUTH_TOKEN
 
 # 3. Update AI_GATEWAY_TOKEN in local .env, rebuild and push artifacts
-bun run pre-deploy
+npm run pre-deploy
 # Push updated artifacts to VPS (via .deploy/ or SCP)
 
 # 4. Recreate all claws to pick up new env values
@@ -77,7 +77,7 @@ cd workers/log-receiver
 echo "$NEW_TOKEN" | npx wrangler secret put AUTH_TOKEN
 
 # 3. Update LOG_WORKER_TOKEN in local .env, rebuild and push artifacts
-bun run pre-deploy
+npm run pre-deploy
 # Push updated artifacts to VPS (via .deploy/ or SCP)
 
 # 4. Recreate Vector to pick up new env values (see CLAUDE.md: restart vs up -d)
@@ -215,7 +215,7 @@ To update just one claw's `openclaw.json` without affecting other claws:
 ```bash
 # From local machine
 # 1. Rebuild deployment artifacts
-bun run pre-deploy
+npm run pre-deploy
 
 # 2. Copy the updated claw config to VPS
 scp -P ${SSH_PORT} -i ${SSH_KEY} .deploy/claws/personal-claw/openclaw.json \
@@ -234,7 +234,7 @@ ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
 2. Add the claw's Telegram bot token to `.env` (e.g., `NEW_CLAW_TELEGRAM_BOT_TOKEN=...`)
 3. Rebuild deployment artifacts:
    ```bash
-   bun run pre-deploy
+   npm run pre-deploy
    ```
 4. Push updated artifacts to VPS:
    ```bash

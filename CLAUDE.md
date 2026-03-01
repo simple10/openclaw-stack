@@ -41,7 +41,7 @@ See [playbooks/README.md](playbooks/README.md) for detailed playbook documentati
 - **Add comments for non-obvious settings.** Explain *why*, not *what*.
 - **Always use bind mounts, never named volumes.** All Docker container data must use bind mounts to directories under the service's working directory (e.g., `./data/<service>:/path`). Named volumes hide data inside `/var/lib/docker/volumes/` where it cannot be easily backed up with `rsync`. Bind mounts keep everything on the host filesystem under known paths.
 - **Use the `openclaw` CLI wrapper for OpenClaw commands.** VPS host: `openclaw <subcommand>` (auto-detects claw). Inside container: `openclaw <subcommand>` (symlink). For explicit docker exec: `sudo docker exec --user node openclaw-<name> openclaw <subcommand>`.
-- **Single source of truth for deployment.** `bun run pre-deploy` builds `.deploy/` from `.env` + `stack.yml` + `docker-compose.yml.hbs`. All deployed files are generated — never manually edit `.deploy/` contents.
+- **Single source of truth for deployment.** `npm run pre-deploy` builds `.deploy/` from `.env` + `stack.yml` + `docker-compose.yml.hbs`. All deployed files are generated — never manually edit `.deploy/` contents.
 - **Template syntax.** `${VAR}` in `stack.yml` (resolved from `.env` at build time), `{{expr}}` in `.hbs` templates (Handlebars, resolved at build time), `$VAR` in `openclaw.jsonc` (resolved by `envsubst` at container startup).
 
 ---
@@ -58,7 +58,7 @@ Configuration uses three files:
 
 Create from examples: `cp .env.example .env && cp stack.yml.example stack.yml`
 
-**To build deployment artifacts:** `bun run pre-deploy` (or `bun run pre-deploy:dry` to preview)
+**To build deployment artifacts:** `npm run pre-deploy` (or `npm run pre-deploy:dry` to preview)
 
 See `.env.example` for secrets/VPS fields. See `stack.yml.example` for stack structure. Per-claw config lives in `stack.yml` under `claws.<name>` — deep-merged with `defaults`.
 

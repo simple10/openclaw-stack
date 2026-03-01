@@ -40,7 +40,6 @@ Run this single validation command to check all required fields at once:
 
 ```bash
 echo "=== local tools ===" && \
-echo "bun: $(bun --version 2>/dev/null || echo MISSING)" && \
 echo "node: $(node --version 2>/dev/null || echo MISSING)" && \
 source .env 2>/dev/null && \
 echo "=== .env ===" && \
@@ -58,7 +57,7 @@ grep -A1 '^claws:' stack.yml | tail -n +2 | grep '^\s\+[a-z]' | sed 's/://;s/^\s
 
 ### Validation rules
 
-1. **Local tools** — `bun` is required for `bun run pre-deploy` (builds deployment artifacts). `node` is required for worker deployment (`npm install`, `npx wrangler`). Both must show a version, not `MISSING`. Install: [bun.sh](https://bun.sh), [nodejs.org](https://nodejs.org).
+1. **Local tools** — `node` is required for `npm run pre-deploy` (builds deployment artifacts) and worker deployment (`npm install`, `npx wrangler`). It must show a version, not `MISSING`. Install: [nodejs.org](https://nodejs.org).
 2. **`VPS_IP`** — Must not be `EMPTY` or contain `<`.
 3. **`CF_TUNNEL_TOKEN`** or **`CF_API_TOKEN`** — At least one must show `SET`. If both missing: "Set `CLOUDFLARE_TUNNEL_TOKEN` (manual — create tunnel in CF Dashboard) or `CLOUDFLARE_API_TOKEN` (automated). See [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md)."
 4. **`domain`** — The `stack.yml` domain line must not contain angle brackets (e.g., `<example>`). `${VAR}` references are OK — verify the referenced `.env` variable (e.g., `ROOT_DOMAIN`) is set.
@@ -352,7 +351,7 @@ Log: Write detailed execution log (all commands, full output, errors, recovery s
 Return: pass/fail.
 ```
 
-**Deployment in subagents:** `bun run pre-deploy` builds all deployment artifacts locally into `.deploy/`. The `.deploy/` directory is then pushed to the VPS. Config values are resolved at build time — the subagent just needs SSH access and the pre-built artifacts.
+**Deployment in subagents:** `npm run pre-deploy` builds all deployment artifacts locally into `.deploy/`. The `.deploy/` directory is then pushed to the VPS. Config values are resolved at build time — the subagent just needs SSH access and the pre-built artifacts.
 
 **Deploy logs:** At the start of deployment (before launching subagents), create `.deploy-logs/YYYYMMDD-HHMMSS/`. The `.deploy-logs/` directory is gitignored. At the end of deployment, tell the user where the logs are.
 
