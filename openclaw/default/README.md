@@ -3,7 +3,7 @@
 Default openclaw.jsonc template used when a claw doesn't specify its own `openclaw_json` path in stack.yml.
 
 JSONC (JSON with Comments) is used for the source template — comments are stripped during pre-deploy
-and the output is saved as `.deploy/openclaw/<name>/openclaw.json`.
+and the output is saved as `.deploy/instances/<name>/.openclaw/openclaw.json`.
 
 `$VAR` references are resolved at container startup by entrypoint envsubst.
 Docker env vars are set by docker-compose.yml (the single source of truth for what config values flow into the container).

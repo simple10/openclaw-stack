@@ -217,9 +217,8 @@ To update just one claw's `openclaw.json` without affecting other claws:
 # 1. Rebuild deployment artifacts
 npm run pre-deploy
 
-# 2. Copy the updated claw config to VPS
-scp -P ${SSH_PORT} -i ${SSH_KEY} .deploy/claws/personal-claw/openclaw.json \
-  ${SSH_USER}@${VPS_IP}:${INSTALL_DIR}/instances/personal-claw/.openclaw/openclaw.json
+# 2. Sync the updated claw config to VPS
+scripts/sync-deploy.sh --instance personal-claw
 
 # 3. Restart that claw to pick up new config (restart is fine for bind-mounted file changes)
 ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
@@ -232,23 +231,12 @@ ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
 
 1. Add a new entry under `claws` in `stack.yml` with per-claw overrides (domain, resources, Telegram bot token, etc.)
 2. Add the claw's Telegram bot token to `.env` (e.g., `NEW_CLAW_TELEGRAM_BOT_TOKEN=...`)
-3. Rebuild deployment artifacts:
+3. Rebuild deployment artifacts and sync to VPS:
    ```bash
    npm run pre-deploy
+   scripts/sync-deploy.sh --all
    ```
-4. Push updated artifacts to VPS:
-   ```bash
-   scp -P ${SSH_PORT} -i ${SSH_KEY} -r .deploy/* ${SSH_USER}@${VPS_IP}:${INSTALL_DIR}/.deploy-staging/
-   ```
-5. Copy the new claw's config and updated compose file into place:
-   ```bash
-   ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} "
-     sudo -u openclaw mkdir -p ${INSTALL_DIR}/instances/<name>/.openclaw
-     sudo -u openclaw cp ${INSTALL_DIR}/.deploy-staging/claws/<name>/openclaw.json ${INSTALL_DIR}/instances/<name>/.openclaw/
-     sudo -u openclaw cp ${INSTALL_DIR}/.deploy-staging/docker-compose.yml ${INSTALL_DIR}/docker-compose.yml
-   "
-   ```
-6. Start the new claw:
+4. Start the new claw:
    ```bash
    ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
      "sudo -u openclaw bash -c 'cd ${INSTALL_DIR} && docker compose up -d openclaw-<name>'"

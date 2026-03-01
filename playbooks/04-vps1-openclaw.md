@@ -36,7 +36,7 @@ Config values are read from `.env` and `stack.yml` (resolved by `npm run pre-dep
 
 ## 4.2 Infrastructure Setup
 
-> **Pre-deploy + SCP + single script.** Run `npm run pre-deploy` locally to build `.deploy/` artifacts, SCP them to the VPS staging area, then run `setup-infra.sh` which creates directories and clones the repo.
+> **Pre-deploy + rsync + setup script.** Run `npm run pre-deploy` locally to build `.deploy/` artifacts, rsync them directly to the VPS, then run `setup-infra.sh` which creates directories and clones the repo.
 
 ### Step 0: Build deployment artifacts locally
 
@@ -46,20 +46,15 @@ npm run pre-deploy
 
 This builds `.deploy/` from `.env` + `stack.yml` + `docker-compose.yml.hbs`, resolving all templates and generating the final `docker-compose.yml`, per-claw `openclaw.json` files, and `stack.json`.
 
-### Step 1: SCP deploy directory to VPS
+### Step 1: Sync deploy artifacts to VPS
 
 **Run from LOCAL machine:**
 
 ```bash
-# Create staging directory on VPS (under INSTALL_DIR, not world-writable /tmp)
-ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} "sudo mkdir -p ${INSTALL_DIR}/.deploy-staging && sudo chown ${SSH_USER}:${SSH_USER} ${INSTALL_DIR}/.deploy-staging"
-
-# Copy pre-built deployment artifacts
-scp -P ${SSH_PORT} -i ${SSH_KEY} -r .deploy/* ${SSH_USER}@${VPS_IP}:${INSTALL_DIR}/.deploy-staging/
-
-# Copy deploy scripts (entrypoint, build script, etc.)
-scp -P ${SSH_PORT} -i ${SSH_KEY} -r deploy/* ${SSH_USER}@${VPS_IP}:${INSTALL_DIR}/.deploy-staging/
+scripts/sync-deploy.sh --fresh
 ```
+
+This rsyncs `.deploy/` directly into `<INSTALL_DIR>/` on the VPS, placing files at their final locations (no staging directory needed). The `--fresh` flag includes all instance configs and prints post-sync next steps.
 
 ### Step 2: Run setup-infra.sh
 
@@ -75,7 +70,7 @@ echo "Instances: $INSTANCE_NAMES"
 ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
   "env \
     INSTANCE_NAMES='${INSTANCE_NAMES}' \
-  bash ${INSTALL_DIR}/.deploy-staging/setup/setup-infra.sh"
+  bash ${INSTALL_DIR}/setup/setup-infra.sh"
 ```
 
 Expects `SETUP_INFRA_OK` on stdout (all other output goes to stderr).
@@ -101,25 +96,25 @@ Expects `SETUP_INFRA_OK` on stdout (all other output goes to stderr).
 
 ## 4.3 Deploy Configuration
 
-> **Pre-built artifacts.** All configuration is resolved locally by `npm run pre-deploy` (run in §4.2 Step 0). The `.deploy/` directory contains the final `docker-compose.yml`, per-claw `openclaw.json` files (with `$VAR` placeholders for runtime `envsubst`), and deploy scripts. This step copies artifacts from staging into their final locations.
+> **Pre-built artifacts.** All configuration is resolved locally by `npm run pre-deploy` (run in §4.2 Step 0). The `.deploy/` directory mirrors the VPS `<INSTALL_DIR>/` layout and is synced directly via `scripts/sync-deploy.sh`. Files are placed at their final locations — no staging or manual copying needed.
 
 ### File manifest
 
-| Source (from staging) | Destination | Notes |
+| `.deploy/` path | VPS destination | Notes |
 |--------|------------|-------|
-| `.deploy/docker-compose.yml` | `<INSTALL_DIR>/docker-compose.yml` | Pre-generated from `.hbs` template |
-| `.deploy/claws/<name>/openclaw.json` | `<INSTALL_DIR>/instances/<name>/.openclaw/openclaw.json` | Per-claw config (runtime `$VAR` resolved by entrypoint) |
-| `deploy/host/build-openclaw.sh` | `<INSTALL_DIR>/host/build-openclaw.sh` | |
-| `deploy/openclaw-stack/entrypoint.sh` | `<INSTALL_DIR>/openclaw-stack/entrypoint.sh` | |
-| `deploy/host/host-alert.sh` | `<INSTALL_DIR>/host/host-alert.sh` | |
-| `deploy/host/host-maintenance-check.sh` | `<INSTALL_DIR>/host/host-maintenance-check.sh` | |
-| `deploy/host/openclaw-wrapper.sh` | `/usr/local/bin/openclaw` | Installed by `setup-infra.sh` |
-| `deploy/host/logrotate-openclaw` | `/etc/logrotate.d/openclaw` | |
-| `deploy/openclaw-stack/plugins/*` | `<INSTALL_DIR>/openclaw-stack/plugins/` | Owned by uid 1000 |
-| `.deploy/openclaw-stack/sandbox-toolkit.yaml` | `<INSTALL_DIR>/openclaw-stack/` | Bind-mounted into container |
-| `deploy/openclaw-stack/parse-toolkit.mjs` | `<INSTALL_DIR>/openclaw-stack/` | Bind-mounted into container |
-| `deploy/openclaw-stack/rebuild-sandboxes.sh` | `<INSTALL_DIR>/openclaw-stack/` | Bind-mounted into container |
-| `deploy/openclaw-stack/dashboard/*` | `<INSTALL_DIR>/openclaw-stack/dashboard/` | Bind-mounted into container |
+| `docker-compose.yml` | `<INSTALL_DIR>/docker-compose.yml` | Pre-generated from `.hbs` template |
+| `instances/<name>/.openclaw/openclaw.json` | `<INSTALL_DIR>/instances/<name>/.openclaw/openclaw.json` | Per-claw config (runtime `$VAR` resolved by entrypoint) |
+| `host/build-openclaw.sh` | `<INSTALL_DIR>/host/build-openclaw.sh` | |
+| `openclaw-stack/entrypoint.sh` | `<INSTALL_DIR>/openclaw-stack/entrypoint.sh` | |
+| `host/host-alert.sh` | `<INSTALL_DIR>/host/host-alert.sh` | |
+| `host/host-maintenance-check.sh` | `<INSTALL_DIR>/host/host-maintenance-check.sh` | |
+| `host/openclaw-wrapper.sh` | `/usr/local/bin/openclaw` | Installed by `setup-infra.sh` |
+| `host/logrotate-openclaw` | `/etc/logrotate.d/openclaw` | |
+| `openclaw-stack/plugins/*` | `<INSTALL_DIR>/openclaw-stack/plugins/` | Owned by uid 1000 |
+| `openclaw-stack/sandbox-toolkit.yaml` | `<INSTALL_DIR>/openclaw-stack/` | Bind-mounted into container |
+| `openclaw-stack/parse-toolkit.mjs` | `<INSTALL_DIR>/openclaw-stack/` | Bind-mounted into container |
+| `openclaw-stack/rebuild-sandboxes.sh` | `<INSTALL_DIR>/openclaw-stack/` | Bind-mounted into container |
+| `openclaw-stack/dashboard/*` | `<INSTALL_DIR>/openclaw-stack/dashboard/` | Bind-mounted into container |
 
 ### Template resolution
 
@@ -127,28 +122,7 @@ Template variables in `openclaw.jsonc` use `$VAR` syntax and are resolved at con
 
 > **`controlUi.allowedOrigins` is required.** When the gateway binds to `lan` (non-loopback), which is always the case for Docker/Tunnel deployments, `controlUi.allowedOrigins` must be set in `openclaw.json`. Without it, the gateway crashes on startup with a security check error. This is handled automatically — `pre-deploy.ts` derives `ALLOWED_ORIGIN` from the claw's `domain` in `stack.yml`. Every claw must have a domain configured.
 
-### Step 1: Copy artifacts into place
-
-The staging directory (from §4.2 Step 1) already has all pre-built artifacts. Copy them to final locations:
-
-```bash
-ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
-  "sudo -u openclaw bash -c '
-    # Copy docker-compose.yml
-    cp ${INSTALL_DIR}/.deploy-staging/docker-compose.yml ${INSTALL_DIR}/docker-compose.yml
-
-    # Copy per-claw openclaw.json files
-    for claw_dir in ${INSTALL_DIR}/.deploy-staging/claws/*/; do
-      CLAW_NAME=\$(basename \"\$claw_dir\")
-      mkdir -p ${INSTALL_DIR}/instances/\${CLAW_NAME}/.openclaw
-      cp \"\${claw_dir}openclaw.json\" ${INSTALL_DIR}/instances/\${CLAW_NAME}/.openclaw/openclaw.json
-    done
-
-    # Copy deploy scripts and static files to their tier directories
-    cp -r ${INSTALL_DIR}/.deploy-staging/host/* ${INSTALL_DIR}/host/ 2>/dev/null || true
-    cp -r ${INSTALL_DIR}/.deploy-staging/openclaw-stack/* ${INSTALL_DIR}/openclaw-stack/ 2>/dev/null || true
-  '"
-```
+All artifacts were placed at their final locations by `scripts/sync-deploy.sh` in §4.2 Step 1 — no manual copying needed.
 
 **Cron generation rules:**
 
@@ -189,7 +163,7 @@ Builds the Docker image and starts containers. Multi-claw deployments start only
 
 ```bash
 ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
-  "bash ${INSTALL_DIR}/.deploy-staging/setup/start-claws.sh"
+  "bash ${INSTALL_DIR}/setup/start-claws.sh"
 ```
 
 Captures `FIRST_CLAW=openclaw-<name>`, `CLAW_COUNT=N`, and `START_CLAWS_OK` from stdout.
@@ -262,7 +236,7 @@ Runs all verification checks across every running claw: sandbox images, binaries
 
 ```bash
 ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
-  "bash ${INSTALL_DIR}/.deploy-staging/setup/verify-deployment.sh"
+  "bash ${INSTALL_DIR}/setup/verify-deployment.sh"
 ```
 
 Expects `VERIFY_DEPLOYMENT_OK` on stdout. Detailed per-claw results go to stderr.
@@ -291,7 +265,7 @@ Register the Daily VPS Health Check cron job on all claws. The script is self-co
 
 ```bash
 ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
-  "bash ${INSTALL_DIR}/.deploy-staging/setup/register-cron-jobs.sh"
+  "bash ${INSTALL_DIR}/setup/register-cron-jobs.sh"
 ```
 
 The script is idempotent — it skips registration on any claw where the job already exists.
@@ -313,7 +287,7 @@ Run the verification script to check all claws (sandbox images, binaries, permis
 
 ```bash
 env OPENCLAW_DOMAIN_PATH='${OPENCLAW_DOMAIN_PATH}' \
-  bash ${INSTALL_DIR}/.deploy-staging/setup/verify-deployment.sh
+  bash ${INSTALL_DIR}/setup/verify-deployment.sh
 ```
 
 Or for quick manual checks:
@@ -339,17 +313,6 @@ done
 # Check Vector is running (part of main compose when stack.logging.vector: true)
 # Container name is <project>-vector (e.g., muxxibot-vector)
 sudo docker ps --format '{{.Names}}' | grep vector
-```
-
----
-
-## 4.6 Clean Up Staging
-
-Staging contains deploy artifacts and scripts. Remove it now that all steps are complete.
-
-```bash
-ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
-  "sudo rm -rf ${INSTALL_DIR}/.deploy-staging"
 ```
 
 ---

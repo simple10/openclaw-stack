@@ -472,16 +472,8 @@ async function main() {
   // 7. Create .deploy/ directory
   info("Building .deploy/ directory...");
 
-  // Preserve .git if it exists (deploy repo)
-  const deployGitDir = join(DEPLOY_DIR, ".git");
-  const hadGit = existsSync(deployGitDir);
-
-  // Clean .deploy/ but preserve .git
   if (existsSync(DEPLOY_DIR)) {
-    for (const entry of readdirSync(DEPLOY_DIR)) {
-      if (entry === ".git") continue;
-      rmSync(join(DEPLOY_DIR, entry), { recursive: true, force: true });
-    }
+    rmSync(DEPLOY_DIR, { recursive: true, force: true });
   }
   mkdirSync(DEPLOY_DIR, { recursive: true });
 
@@ -538,7 +530,8 @@ async function main() {
     }
   }
 
-  // 7g. Process openclaw.jsonc for each claw → .deploy/openclaw/<name>/openclaw.json
+  // 7g. Process openclaw.jsonc for each claw → .deploy/instances/<name>/.openclaw/openclaw.json
+  // Output mirrors VPS layout so sync-deploy.sh can rsync directly.
   for (const [name, claw] of Object.entries(claws)) {
     const templateFile = claw.openclaw_json || "openclaw/default/openclaw.jsonc";
     info(`Processing openclaw config for ${name} (from ${templateFile})...`);
@@ -548,10 +541,10 @@ async function main() {
     const parsed = parseJsoncFile(raw, templateFile);
     const cleanJson = JSON.stringify(parsed, null, 2);
 
-    const outDir = join(DEPLOY_DIR, "openclaw", name);
+    const outDir = join(DEPLOY_DIR, "instances", name, ".openclaw");
     mkdirSync(outDir, { recursive: true });
     writeFileSync(join(outDir, "openclaw.json"), cleanJson + "\n");
-    success(`Wrote openclaw/${name}/openclaw.json`);
+    success(`Wrote instances/${name}/.openclaw/openclaw.json`);
   }
 
   // Summary
@@ -559,10 +552,7 @@ async function main() {
   console.log(`  Output:   ${DEPLOY_DIR}`);
   console.log(`  Claws:    ${Object.keys(claws).join(", ")}`);
   console.log(`  Template: ${templatePath}`);
-  if (hadGit) {
-    console.log(`  Deploy repo: .git preserved — run 'cd .deploy && git diff' to review`);
-  }
-  console.log(`\n  Next: cd .deploy && git add -A && git commit && git push\n`);
+  console.log(`\n  Next: scripts/sync-deploy.sh [--all]\n`);
 }
 
 main().catch((e) => {
