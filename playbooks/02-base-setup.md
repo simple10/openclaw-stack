@@ -390,7 +390,7 @@ Configures in one pass:
 ```bash
 # SOURCE: deploy/system-hardening.sh
 sudo tee /tmp/system-hardening.sh << 'EOF'
-# <<< deploy/system-hardening.sh >>>
+# <<< deploy/setup/system-hardening.sh >>>
 EOF
 
 sudo SSH_PORT=<SSH_PORT> bash /tmp/system-hardening.sh

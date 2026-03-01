@@ -19,9 +19,9 @@ deploy/
     host-maintenance-check.sh  OS update/reboot checker
     session-prune.sh    Session transcript cleanup
     build-openclaw.sh   Build gateway image with auto-patching
-    system-hardening.sh SSH/UFW/fail2ban hardening
     logrotate-openclaw  Logrotate config
   setup/              ← Deploy-time scripts (tier 3) — run once during setup
+    system-hardening.sh SSH/UFW/fail2ban hardening
     setup-infra.sh      Create directories, clone repo
     start-claws.sh      Build image and start containers
     verify-deployment.sh Verify sandbox images, binaries, health
