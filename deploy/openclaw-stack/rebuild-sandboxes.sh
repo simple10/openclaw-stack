@@ -361,19 +361,32 @@ build_packages() {
   # Build from /tmp/sandbox-build to avoid /app/.env permission issue (Sysbox maps
   # .env to nobody:600, Docker can't read it when scanning build context).
   # The Dockerfile has no COPY instructions so the context dir doesn't matter.
+  rm -rf /tmp/sandbox-build
   mkdir -p /tmp/sandbox-build
   ln -sf /app/Dockerfile.sandbox-common /tmp/sandbox-build/Dockerfile.sandbox-common
-  # Only pass PACKAGES when toolkit config provides them; otherwise let
-  # upstream sandbox-common-setup.sh use its own built-in default list.
-  local pkg_env=()
+  # Determine PACKAGES for upstream build script.
+  # When toolkit config provides packages, use those directly.
+  # When no toolkit config exists, read upstream's default PACKAGES from
+  # Dockerfile.sandbox-common and strip 'npm' — NodeSource's nodejs package
+  # bundles npm, so installing Debian's standalone npm package causes a conflict.
+  local packages_val=""
   if [ -n "$toolkit_packages" ]; then
-    pkg_env=(PACKAGES="$toolkit_packages")
+    packages_val="$toolkit_packages"
+  else
+    local upstream_defaults
+    upstream_defaults=$(grep '^ARG PACKAGES=' /app/Dockerfile.sandbox-common 2>/dev/null \
+      | sed 's/^ARG PACKAGES="//;s/"$//')
+    if [ -n "$upstream_defaults" ]; then
+      packages_val=$(echo "$upstream_defaults" | tr ' ' '\n' | grep -v '^npm$' | tr '\n' ' ' | sed 's/ $//')
+    fi
   fi
+  # Export as env vars — bash can't use parameter-expanded VAR=value as
+  # inline assignments, so we export explicitly for the subshell.
   (cd /tmp/sandbox-build && \
-    BASE_IMAGE=openclaw-sandbox-base-root:bookworm-slim \
-    TARGET_IMAGE=openclaw-sandbox-packages:bookworm-slim \
-    "${pkg_env[@]+"${pkg_env[@]}"}" \
-    /app/scripts/sandbox-common-setup.sh) || true
+    export BASE_IMAGE=openclaw-sandbox-base-root:bookworm-slim \
+    && export TARGET_IMAGE=openclaw-sandbox-packages:bookworm-slim \
+    && { [ -n "$packages_val" ] && export PACKAGES="$packages_val"; true; } \
+    && /app/scripts/sandbox-common-setup.sh) || true
 
   # Cleanup intermediate image
   docker rmi openclaw-sandbox-base-root:bookworm-slim > /dev/null 2>&1 || true
