@@ -10,7 +10,7 @@
  *   npm run pre-deploy:dry      # Dry run (show what would be generated)
  */
 
-import { readFileSync, writeFileSync, mkdirSync, cpSync, existsSync, rmSync, readdirSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync, cpSync, existsSync, rmSync, readdirSync, statSync } from "fs";
 import { join, resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { spawn } from "child_process";
@@ -502,12 +502,19 @@ async function main() {
     }
   }
 
-  // 7d-post. Resolve {{INSTALL_DIR}} in host/ files (logrotate config needs literal paths)
+  // 7d-post. Resolve {{INSTALL_DIR}} in host/ files (cron configs, logrotate)
   const installDir = String(stack.install_dir || "/home/openclaw");
-  const logrotateFile = join(DEPLOY_DIR, "host", "logrotate-openclaw");
-  if (existsSync(logrotateFile)) {
-    const content = readFileSync(logrotateFile, "utf-8");
-    writeFileSync(logrotateFile, content.replaceAll("{{INSTALL_DIR}}", installDir));
+  const hostDir = join(DEPLOY_DIR, "host");
+  if (existsSync(hostDir)) {
+    for (const file of readdirSync(hostDir)) {
+      const filePath = join(hostDir, file);
+      const stat = statSync(filePath);
+      if (!stat.isFile()) continue;
+      const content = readFileSync(filePath, "utf-8");
+      if (content.includes("{{INSTALL_DIR}}")) {
+        writeFileSync(filePath, content.replaceAll("{{INSTALL_DIR}}", installDir));
+      }
+    }
   }
 
   // 7e. Copy sandbox toolkit into openclaw-stack/ (only if configured in stack.yml)

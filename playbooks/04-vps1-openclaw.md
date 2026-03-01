@@ -36,27 +36,9 @@ Config values are read from `.env` and `stack.yml` (resolved by `npm run pre-dep
 
 ## 4.2 Infrastructure Setup
 
-> **Pre-deploy + rsync + setup script.** Run `npm run pre-deploy` locally to build `.deploy/` artifacts, rsync them directly to the VPS, then run `setup-infra.sh` which creates directories and clones the repo.
+> **Setup script.** Deploy artifacts were already built and synced to the VPS (step 2 in the deployment plan — `npm run pre-deploy` + `scripts/sync-deploy.sh --fresh`). This step runs `setup-infra.sh` which creates directories and clones the repo.
 
-### Step 0: Build deployment artifacts locally
-
-```bash
-npm run pre-deploy
-```
-
-This builds `.deploy/` from `.env` + `stack.yml` + `docker-compose.yml.hbs`, resolving all templates and generating the final `docker-compose.yml`, per-claw `openclaw.json` files, and `stack.json`.
-
-### Step 1: Sync deploy artifacts to VPS
-
-**Run from LOCAL machine:**
-
-```bash
-scripts/sync-deploy.sh --fresh
-```
-
-This rsyncs `.deploy/` directly into `<INSTALL_DIR>/` on the VPS, placing files at their final locations (no staging directory needed). The `--fresh` flag includes all instance configs and prints post-sync next steps.
-
-### Step 2: Run setup-infra.sh
+### Step 1: Run setup-infra.sh
 
 Discover claw names from the pre-built `.deploy/stack.json`:
 
@@ -96,7 +78,7 @@ Expects `SETUP_INFRA_OK` on stdout (all other output goes to stderr).
 
 ## 4.3 Deploy Configuration
 
-> **Pre-built artifacts.** All configuration is resolved locally by `npm run pre-deploy` (run in §4.2 Step 0). The `.deploy/` directory mirrors the VPS `<INSTALL_DIR>/` layout and is synced directly via `scripts/sync-deploy.sh`. Files are placed at their final locations — no staging or manual copying needed.
+> **Pre-built artifacts.** All configuration is resolved locally by `npm run pre-deploy` (step 2 in the deployment plan). The `.deploy/` directory mirrors the VPS `<INSTALL_DIR>/` layout and is synced directly via `scripts/sync-deploy.sh`. Files are placed at their final locations — no staging or manual copying needed.
 
 ### File manifest
 
@@ -124,17 +106,7 @@ Template variables in `openclaw.jsonc` use `$VAR` syntax and are resolved at con
 
 All artifacts were placed at their final locations by `scripts/sync-deploy.sh` in §4.2 Step 1 — no manual copying needed.
 
-**Cron generation rules:**
-
-- **Cron runs in the server's local timezone**, not necessarily UTC. Before converting `HOSTALERT_DAILY_REPORT_TIME` to cron fields, check the server timezone: `timedatectl show -p Timezone --value` (or `cat /etc/timezone` as fallback). Convert the user's specified time to the server's local timezone, then write the cron minute/hour fields in that timezone. Include the server timezone and original user time in the cron comment for clarity.
-- If `HOSTALERT_DAILY_REPORT_TIME` is not set, default to `9:30 AM PST` — still convert to the server's local timezone.
-- Only include the daily report cron line (`--report`) if both `HOSTALERT_TELEGRAM_BOT_TOKEN` and `HOSTALERT_TELEGRAM_CHAT_ID` are set in `.env`. If Telegram is not configured, write only the alerter line (the script exits silently without Telegram credentials, but there's no point scheduling the report).
-
-**Maintenance cron generation rules:**
-
-- Schedule 30 minutes before the daily report time. If the daily report runs at `9:00 AM`, the maintenance checker runs at `8:30 AM` (same timezone conversion rules as the report cron).
-- If `HOSTALERT_DAILY_REPORT_TIME` is not set, default to 30 minutes before `9:00 AM UTC` (i.e., `8:30 AM UTC`).
-- The maintenance cron **always** runs, even without Telegram — OpenClaw agents read the JSON independently.
+Host cron jobs (backup, session-prune, alerts, maintenance) and logrotate are installed by `register-cron-jobs.sh` in §4.5.
 
 **Current plugins:**
 
@@ -259,25 +231,31 @@ connections yet, the output will show an empty device list — that's normal.
 
 ---
 
-## 4.5 Deploy OpenClaw Cron Jobs
+## 4.5 Deploy Cron Jobs, Logrotate, and OpenClaw CLI Crons
 
-Register the Daily VPS Health Check cron job on all claws. The script is self-contained — it sources `stack.env` for claw IDs, schedule, timezone, and Telegram delivery config. Schedule and timezone are pre-resolved from `host.host_alerter.daily_report` in `stack.yml` by `npm run pre-deploy`.
+Install all host-level scheduled tasks and logrotate config. The script handles:
+- **Static crons:** backup (`cron-openclaw-backup`), session-prune (`cron-openclaw-session-prune`) → `/etc/cron.d/`
+- **Dynamic crons:** alerts (15-min health check + daily report), maintenance (30 min before report) → `/etc/cron.d/`
+- **Logrotate:** `logrotate-openclaw` → `/etc/logrotate.d/openclaw`
+- **OpenClaw CLI crons:** Daily VPS Health Check registered on each claw via `openclaw cron add`
+
+Schedule and timezone are pre-resolved from `host.host_alerter.daily_report` in `stack.yml` by `npm run pre-deploy`.
 
 ```bash
 ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
-  "bash ${INSTALL_DIR}/host/register-cron-jobs.sh"
+  "sudo bash ${INSTALL_DIR}/host/register-cron-jobs.sh"
 ```
 
-The script is idempotent — it skips registration on any claw where the job already exists.
+The script is idempotent — it overwrites `/etc/cron.d/` files and skips CLI cron registration on any claw where the job already exists. If containers aren't running yet, host crons and logrotate are still installed and CLI cron registration is deferred with a message to re-run later.
 
 **Verify:**
 
 ```bash
 ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
-  "openclaw cron list"
+  "cat /etc/cron.d/openclaw-* && cat /etc/logrotate.d/openclaw && openclaw cron list"
 ```
 
-**Expected:** Shows "Daily VPS Health Check" with status `ok` and the correct schedule on each claw.
+**Expected:** All four cron files in `/etc/cron.d/`, logrotate config in `/etc/logrotate.d/`, and "Daily VPS Health Check" with status `ok` on each claw.
 
 ---
 

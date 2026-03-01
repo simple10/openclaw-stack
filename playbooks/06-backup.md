@@ -23,36 +23,26 @@ No external variables required.
 
 ---
 
-## 6.1 Verify Backup Script
+## 6.1 Verify Cron Jobs Installed
 
-The backup script (`deploy/host/backup.sh`) is already deployed to `<INSTALL_DIR>/host/backup.sh` via the SCP pipeline in §4.3. No manual transfer needed.
-
-IMPORTANT: Backup must run as root because `.openclaw` is owned by uid 1000 (container's node user), not the host's `openclaw` user.
+Backup and session-prune cron jobs are installed by `register-cron-jobs.sh` in playbook 04 §4.5. Verify they're in place:
 
 ```bash
-# Verify script is in place and executable
+# Verify cron files are installed
+cat /etc/cron.d/openclaw-backup
+cat /etc/cron.d/openclaw-session-prune
+
+# Verify backup script is in place and executable
 ls -la <INSTALL_DIR>/host/backup.sh
 ```
 
+IMPORTANT: Backup must run as root because `.openclaw` is owned by uid 1000 (container's node user), not the host's `openclaw` user.
+
 ---
 
-## 6.2 Schedule Cron Job
+## 6.2 Backup Cron Job
 
-```bash
-#!/bin/bash
-# IMPORTANT: Use /etc/cron.d instead of user crontab because backup runs as root
-# This avoids permission issues with uid 1000 owned directories
-sudo tee /etc/cron.d/openclaw-backup << 'EOF'
-# OpenClaw daily backup - runs as root to access uid 1000 owned directories
-0 3 * * * root <INSTALL_DIR>/host/backup.sh >> <INSTALL_DIR>/logs/backup.log 2>&1
-EOF
-
-sudo chmod 644 /etc/cron.d/openclaw-backup
-
-# Ensure shared log directory exists (host-level, not per-instance)
-sudo mkdir -p <INSTALL_DIR>/logs
-sudo chown openclaw:openclaw <INSTALL_DIR>/logs
-```
+Installed by `register-cron-jobs.sh` in playbook 04 §4.5. Source file: `deploy/host/cron-openclaw-backup`. Runs daily at 3:00 AM as root, logs to `<INSTALL_DIR>/logs/backup.log`.
 
 ---
 
@@ -94,18 +84,7 @@ sudo tar -tzf "${FIRST_INST}.openclaw/backups"/openclaw_backup_*.tar.gz | head -
 
 Session transcripts (`instances/<name>/.openclaw/agents/<agentId>/sessions/*.jsonl`) accumulate indefinitely. This cron job deletes session files and stale log files older than 30 days.
 
-The prune script (`deploy/host/session-prune.sh`) is already deployed to `<INSTALL_DIR>/host/session-prune.sh` via the SCP pipeline in §4.3. No manual transfer needed.
-
-### Schedule Cron Job
-
-```bash
-sudo tee /etc/cron.d/openclaw-session-prune << 'EOF'
-# OpenClaw session & log pruning — runs as root (uid 1000 owned directories)
-30 3 * * * root <INSTALL_DIR>/host/session-prune.sh >> <INSTALL_DIR>/logs/session-prune.log 2>&1
-EOF
-
-sudo chmod 644 /etc/cron.d/openclaw-session-prune
-```
+The prune script (`deploy/host/session-prune.sh`) is deployed to `<INSTALL_DIR>/host/session-prune.sh` via `scripts/sync-deploy.sh`. The cron job (`cron-openclaw-session-prune`) is installed by `register-cron-jobs.sh` in playbook 04 §4.5. Runs daily at 3:30 AM as root.
 
 ### Test Manually
 

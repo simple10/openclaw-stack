@@ -20,8 +20,10 @@ deploy/
     session-prune.sh    Session transcript cleanup
     build-openclaw.sh   Build gateway image with auto-patching
     start-claws.sh      Build image and start containers
-    register-cron-jobs.sh Register cron jobs via openclaw CLI
-    logrotate-openclaw  Logrotate config
+    register-cron-jobs.sh Install all crons + logrotate + OpenClaw CLI crons
+    logrotate-openclaw  Logrotate config ({{INSTALL_DIR}} resolved by pre-deploy)
+    cron-openclaw-backup  Daily backup cron ({{INSTALL_DIR}} resolved by pre-deploy)
+    cron-openclaw-session-prune  Session pruning cron ({{INSTALL_DIR}} resolved by pre-deploy)
   setup/              ← Deploy-time scripts (tier 3) — run once during setup
     system-hardening.sh SSH/UFW/fail2ban hardening
     setup-infra.sh      Create directories, clone repo

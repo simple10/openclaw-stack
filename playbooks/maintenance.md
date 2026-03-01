@@ -56,7 +56,7 @@ echo "$NEW_TOKEN" | npx wrangler secret put AUTH_TOKEN
 
 # 3. Update AI_GATEWAY_TOKEN in local .env, rebuild and push artifacts
 npm run pre-deploy
-# Push updated artifacts to VPS (via .deploy/ or SCP)
+scripts/sync-deploy.sh
 
 # 4. Recreate all claws to pick up new env values
 sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d'
@@ -78,7 +78,7 @@ echo "$NEW_TOKEN" | npx wrangler secret put AUTH_TOKEN
 
 # 3. Update LOG_WORKER_TOKEN in local .env, rebuild and push artifacts
 npm run pre-deploy
-# Push updated artifacts to VPS (via .deploy/ or SCP)
+scripts/sync-deploy.sh
 
 # 4. Recreate Vector to pick up new env values (see CLAUDE.md: restart vs up -d)
 sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d vector'
@@ -169,22 +169,18 @@ No container restart needed — builds happen inside the running container's nes
 
 ### Bind-Mounted Deploy Files
 
-Several deploy files are bind-mounted read-only into claw containers. These can be updated without a full image rebuild — just SCP the file and restart the claws.
+Several deploy files are bind-mounted read-only into claw containers. These can be updated without a full image rebuild — rebuild artifacts, sync, and restart.
 
 **Bind-mounted files:** `dashboard/`, `entrypoint.sh`, `rebuild-sandboxes.sh`, `parse-toolkit.mjs`, `sandbox-toolkit.yaml`, `plugins/`
 
 ```bash
-# From local machine — copy to VPS (use -r for directories like dashboard/ or plugins/)
-scp -i <SSH_KEY> -P <SSH_PORT> [-r] deploy/openclaw-stack/<path> adminclaw@<VPS_IP>:/tmp/deploy-update
+# From local machine — rebuild and sync
+npm run pre-deploy
+scripts/sync-deploy.sh
 
-# Move into place, fix ownership, and restart all claws (single SSH session)
-ssh -i <SSH_KEY> -p <SSH_PORT> adminclaw@<VPS_IP> "
-  sudo rm -rf <INSTALL_DIR>/openclaw-stack/<path>
-  sudo cp -r /tmp/deploy-update <INSTALL_DIR>/openclaw-stack/<path>
-  sudo chown -R 1000:1000 <INSTALL_DIR>/openclaw-stack/<path>
-  rm -rf /tmp/deploy-update
-  sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose restart'
-"
+# Restart all claws to pick up changes (restart is fine for bind-mounted file changes)
+ssh -i <SSH_KEY> -p <SSH_PORT> adminclaw@<VPS_IP> \
+  "sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose restart'"
 ```
 
 > To restart only a specific claw: `docker compose restart openclaw-<CLAW_NAME>`
