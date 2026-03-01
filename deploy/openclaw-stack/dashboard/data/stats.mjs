@@ -698,8 +698,10 @@ function buildAlerts(costToday, crons, sessions, gw) {
     alerts.push({ type: 'info', icon: '💵', message: `Daily cost above $${COST_WARN}: $${costToday.toFixed(2)}`, severity: 'medium' })
 
   for (const c of crons) {
-    if (c.lastStatus === 'error')
-      alerts.push({ type: 'error', icon: '❌', message: `Cron failed: ${c.name}`, severity: 'high' })
+    if (c.lastStatus === 'error') {
+      const detail = c.lastError ? ` — ${c.lastError}` : ''
+      alerts.push({ type: 'error', icon: '❌', message: `Cron failed: ${c.name}${detail}`, severity: 'high' })
+    }
   }
 
   for (const s of sessions) {
