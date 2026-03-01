@@ -39,8 +39,7 @@ cleanup() {
 trap cleanup EXIT
 
 # ── 1. Resolve version ───────────────────────────────────────────────
-# TODO: switch fallback to "stable" not "latest"
-OPENCLAW_VERSION="${STACK__STACK__OPENCLAW__VERSION:-latest}"
+OPENCLAW_VERSION="${STACK__STACK__OPENCLAW__VERSION:-stable}"
 echo "[build] OPENCLAW_VERSION=${STACK__STACK__OPENCLAW__VERSION}"
 
 case "$OPENCLAW_VERSION" in
