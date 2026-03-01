@@ -4,13 +4,13 @@ Optional configuration steps to run after the automated deployment.
 
 ## AI Gateway Proxy Worker
 
-### Configure Provider API Keys
+### Configure Provider Credentials
 
-Provider API keys are configured during post-deploy (`08a-configure-llm-proxy.md`). The automated deployment only sets up the worker infrastructure (`AUTH_TOKEN`).
+Provider credentials are configured during post-deploy (`08a-configure-llm-proxy.md`) via the self-service config UI at `https://<AI_GATEWAY_WORKER_URL>/config`.
 
-The worker supports two modes:
+The worker supports two upstream routing modes:
 
-- **Direct API (default):** Add provider API keys as Worker secrets — requests go directly to Anthropic/OpenAI
+- **Direct API (default):** Add provider credentials via the config UI — requests go directly to Anthropic/OpenAI
 - **Cloudflare AI Gateway (optional):** Route through CF AI Gateway for analytics/caching — requires additional setup
 
 See [`docs/AI-GATEWAY-CONFIG.md`](AI-GATEWAY-CONFIG.md) for the full configuration guide covering both modes.

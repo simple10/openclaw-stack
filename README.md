@@ -260,15 +260,13 @@ You can prepopulate the config files or claude will ask for any missing required
 
 ### Configuring LLM API keys
 
-After deployment, add your LLM provider API keys to the Cloudflare Worker (not the VPS):
+After deployment, add your LLM provider credentials via the self-service config UI:
 
-```bash
-cd workers/ai-gateway
-npx wrangler secret put ANTHROPIC_API_KEY
-npx wrangler secret put OPENAI_API_KEY    # if using OpenAI models
+```
+https://<AI_GATEWAY_WORKER_URL>/config
 ```
 
-These keys are stored only in Cloudflare and never touch the VPS. See [docs/POST-DEPLOY.md](docs/POST-DEPLOY.md) for details.
+Authenticate with your gateway token, then add your Anthropic/OpenAI API keys or OAuth credentials. Keys are stored in Cloudflare KV and never touch the VPS. See [docs/POST-DEPLOY.md](docs/POST-DEPLOY.md) for details.
 
 ---
 

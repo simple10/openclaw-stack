@@ -152,7 +152,7 @@ curl -s https://<AI_GATEWAY_WORKER_URL>/health
 
 **Expected:** Returns `{"status":"ok"}`.
 
-> **Note:** The health check passing confirms the worker is deployed and reachable. It does NOT verify that provider API keys (e.g., `ANTHROPIC_API_KEY`) are configured — that is tested during post-deploy (`08a-configure-llm-proxy.md`). On a fresh deploy, the worker is healthy but won't proxy LLM requests until keys are added.
+> **Note:** The health check passing confirms the worker is deployed and reachable. It does NOT verify that provider credentials are configured — those are managed via the self-service config UI (`/config`). On a fresh deploy, the worker is healthy but won't proxy LLM requests until credentials are added via `08a-configure-llm-proxy.md`.
 
 **If either worker health check fails:**
 

@@ -30,7 +30,7 @@ Config variables (read from `.env`):
 
 The AI Gateway Worker proxies LLM API requests to providers (Anthropic, OpenAI), keeping real API keys off the VPS. It routes directly to provider APIs by default, or optionally through Cloudflare AI Gateway for analytics/caching when configured.
 
-> **Note:** During deployment, only `AUTH_TOKEN` is set. Provider API keys (e.g., `ANTHROPIC_API_KEY`) and optional CF AI Gateway configuration are added post-deploy — see `08a-configure-llm-proxy.md` and [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md).
+Auth and provider credentials are stored in Cloudflare KV (multi-user). During deployment, an admin token and the first user are created. Provider API keys are configured post-deploy via the self-service `/config` UI — see `08a-configure-llm-proxy.md`.
 
 ### Setup AI Gateway Worker
 
@@ -60,24 +60,28 @@ curl -s https://<AI_GATEWAY_WORKER_URL>/health
 - **If healthy (`{"status":"ok"}`):** The worker is already deployed. During a **fresh deploy** (called from `00-fresh-deploy-setup.md`), proceed without pausing — secrets will be re-set. Outside of a fresh deploy, warn the user that re-deploying will overwrite secrets and ask to confirm.
 - **If unhealthy or URL is a placeholder:** Proceed with fresh deployment.
 
-### Configure AI Gateway Worker Secrets
+### Create AUTH_KV Namespace
 
-#### 1. AUTH_TOKEN
-
-If `AI_GATEWAY_TOKEN` in `.env` is still empty or contains a placeholder, auto-generate a random token:
+The worker uses a Cloudflare KV namespace for user tokens and credentials. Create it if it doesn't exist:
 
 ```bash
-openssl rand -hex 32
+npx wrangler kv namespace create AUTH_KV
 ```
 
-Set the secret and update the config file:
+Copy the returned `id` into `wrangler.jsonc` under `kv_namespaces[0].id`.
+
+### Configure Secrets
+
+#### 1. ADMIN_AUTH_TOKEN
+
+Generate a random admin token to protect `/admin/*` management endpoints:
 
 ```bash
-echo "<generated-token>" | npx wrangler secret put AUTH_TOKEN
-# Update AI_GATEWAY_TOKEN in .env with the generated value
+ADMIN_TOKEN=$(openssl rand -hex 32)
+echo "$ADMIN_TOKEN" | npx wrangler secret put ADMIN_AUTH_TOKEN
 ```
 
-If `AI_GATEWAY_TOKEN` already has a real value, use that value instead.
+Save `ADMIN_TOKEN` — it's needed for user management and the deploy report.
 
 ### Deploy AI Gateway Worker
 
@@ -94,7 +98,21 @@ curl -s https://<worker-url>/health
 # Expected: {"status":"ok"}
 ```
 
-> **What about provider API keys?** The worker is now deployed and healthy, but won't proxy LLM requests until provider API keys are added. This is configured during post-deploy (`08a-configure-llm-proxy.md`) so the VPS deployment can proceed uninterrupted.
+### Create Gateway User
+
+Create the first user and get a gateway token for the VPS:
+
+```bash
+curl -s -X POST https://<worker-url>/admin/users \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"openclaw-vps1"}' | jq .
+# Returns: { "userId": "usr_...", "token": "<gateway-token>" }
+```
+
+Update `AI_GATEWAY_TOKEN` in `.env` with the returned `token` value.
+
+> **What about provider API keys?** The worker is now deployed and healthy, but won't proxy LLM requests until provider credentials are added. This is configured during post-deploy via the self-service `/config` UI — see `08a-configure-llm-proxy.md`.
 
 ---
 

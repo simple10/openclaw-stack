@@ -11,9 +11,10 @@ All secrets should be rotated on a regular cadence. If a token is suspected comp
 | Token | Location | Rotation Cadence |
 |-------|----------|-----------------|
 | Gateway token (per-claw) | VPS `<INSTALL_DIR>/instances/<name>/.openclaw/openclaw.json` | 90 days |
-| `AI_GATEWAY_AUTH_TOKEN` | Local `.env` + AI Gateway Worker secret | 90 days |
+| `AI_GATEWAY_TOKEN` (user token) | Local `.env` + AI Gateway KV (`token:*`) | 90 days |
+| `ADMIN_AUTH_TOKEN` | AI Gateway Worker secret | 90 days |
 | `LOG_WORKER_TOKEN` | Local `.env` + Log Receiver Worker secret | 90 days |
-| Provider API keys (Anthropic, OpenAI, etc.) | AI Gateway Worker secrets (Cloudflare Dashboard) | Per provider policy |
+| Provider API keys (Anthropic, OpenAI, etc.) | AI Gateway KV (`creds:*`) — managed via `/config` UI | Per provider policy |
 | `HOSTALERT_TELEGRAM_BOT_TOKEN` | Local `.env` (deployed via `npm run pre-deploy`) | As needed |
 | SSH keys (`~/.ssh/vps1_openclaw_ed25519`) | Local machine + VPS `authorized_keys` | Annual |
 
@@ -44,25 +45,38 @@ sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d openclaw-<CLA
 
 > **Verify:** Run § 7.1 — each rotated claw's health endpoint responds. Re-pair devices per `08b-pair-devices.md`.
 
-#### AI Gateway Auth Token
+#### AI Gateway User Token
+
+The user token (`AI_GATEWAY_TOKEN`) is stored in KV and can be rotated via the self-service endpoint. The old token remains valid for 1 hour after rotation.
 
 ```bash
-# 1. Generate new token
-NEW_TOKEN=$(openssl rand -hex 32)
+# 1. Rotate token (from local machine)
+curl -s -X POST https://<AI_GATEWAY_WORKER_URL>/auth/rotate \
+  -H "Authorization: Bearer <AI_GATEWAY_TOKEN>" | jq .
+# Returns: { "token": "<new-token>", "oldTokensExpireAt": "..." }
 
-# 2. Update Worker secret (from local machine)
-cd workers/ai-gateway
-echo "$NEW_TOKEN" | npx wrangler secret put AUTH_TOKEN
-
-# 3. Update AI_GATEWAY_TOKEN in local .env, rebuild and push artifacts
+# 2. Update AI_GATEWAY_TOKEN in local .env with the new token, rebuild and push artifacts
 npm run pre-deploy
 scripts/sync-deploy.sh
 
-# 4. Recreate all claws to pick up new env values
+# 3. Recreate all claws to pick up new env values
 sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d'
 ```
 
+> **Note:** Old tokens expire after 1 hour (KV native TTL). Complete the VPS update within that window.
+
 > **Verify:** Run § 7.3 — AI Gateway Worker health check returns `{"status":"ok"}`.
+
+#### AI Gateway Admin Token
+
+The `ADMIN_AUTH_TOKEN` protects `/admin/*` endpoints. Rotate it via wrangler:
+
+```bash
+cd workers/ai-gateway
+echo "$(openssl rand -hex 32)" | npx wrangler secret put ADMIN_AUTH_TOKEN
+```
+
+Save the new token — it's needed for user management. No VPS update needed (admin token is not used by claws).
 
 #### Log Worker Token
 
@@ -88,24 +102,23 @@ sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d vector'
 
 #### Provider API Keys
 
-Provider API keys are stored as Cloudflare Worker secrets in the AI Gateway Worker. They never touch the VPS.
+Provider credentials are stored in Cloudflare KV (per-user). Rotate them via the self-service config UI:
 
-**Direct API mode** (default):
+1. Visit `https://<AI_GATEWAY_WORKER_URL>/config`
+2. Authenticate with the user's gateway token
+3. Update the relevant credential fields
+4. Save
 
-```bash
-# From local machine
-cd workers/ai-gateway
-echo "new-key-value" | npx wrangler secret put ANTHROPIC_API_KEY
-echo "new-key-value" | npx wrangler secret put OPENAI_API_KEY
-```
+No VPS restart needed — credential changes take effect immediately.
 
 **CF AI Gateway mode** (optional): If using Cloudflare AI Gateway, also rotate the gateway token:
 
 ```bash
+cd workers/ai-gateway
 echo "new-token" | npx wrangler secret put CF_AI_GATEWAY_TOKEN
 ```
 
-See [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md) for details on both modes.
+See [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md) for details.
 
 > **Verify:** Run § 7.3 — AI Gateway Worker health check. Full LLM routing verified during § 7.7 (E2E test).
 

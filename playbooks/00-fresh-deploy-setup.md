@@ -305,7 +305,7 @@ Deployment Plan:
 
 Domain and Cloudflare Access have been verified.
 
-> **Note:** AI proxy provider API keys (e.g., `ANTHROPIC_API_KEY`) are configured during post-deploy (step 6, `08a-configure-llm-proxy.md`), not during worker deployment (step 1). Worker deployment only sets up the infrastructure (`AUTH_TOKEN`).
+> **Note:** AI proxy provider credentials are configured during post-deploy (step 6, `08a-configure-llm-proxy.md`) via the self-service `/config` UI, not during worker deployment (step 1). Worker deployment sets up the infrastructure (`ADMIN_AUTH_TOKEN`, KV namespace, and the first gateway user).
 
 Ask the user to confirm before proceeding with the deployment.
 

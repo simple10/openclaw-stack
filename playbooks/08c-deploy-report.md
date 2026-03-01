@@ -35,19 +35,19 @@ Collect the following values and present them in a single, neatly formatted repo
 
 ## AI proxy status
 
-Include the appropriate callout in the report based on `08a-configure-llm-proxy.md` outcome:
+Include the config URL and credential status in the report:
 
-**If configured and working (Step 3 returned 200):**
+> **AI Proxy Config:** `https://<AI_GATEWAY_WORKER_URL>/config`
+>
+> Provider credentials can be added or updated at any time via the config UI using the gateway token.
 
-> **AI Proxy:** Configured and verified.
+**If the user added credentials during `08a`:**
 
-**If configured but test failed (Step 3 returned an error):**
+> **AI Proxy:** Provider credentials configured.
 
-> **AI Proxy:** Anthropic API key is set but the test request failed. Check the key and provider billing. See [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md) for troubleshooting.
+**If skipped:**
 
-**If skipped (user chose to skip in Step 2):**
-
-> **AI Proxy:** Not configured. See [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md) to add provider API keys.
+> **AI Proxy:** Deployed but no provider credentials configured yet. Visit the config URL above to add API keys.
 
 ## Report format
 
@@ -100,7 +100,14 @@ All URLs are protected by Cloudflare Access.
 | Worker | URL |
 |--------|-----|
 | AI Gateway Proxy | `<AI_GATEWAY_WORKER_URL>` |
+| AI Gateway Config | `<AI_GATEWAY_WORKER_URL>/config` |
 | Log Receiver | `<LOG_WORKER_URL>` |
+
+| Secret | Value |
+|--------|-------|
+| AI Gateway Admin Token | `<ADMIN_AUTH_TOKEN>` |
+
+> **Keep the admin token safe** — it controls user creation, deletion, and credential access for the AI Gateway.
 
 ---
 
@@ -143,7 +150,7 @@ Read `HOSTALERT_TELEGRAM_BOT_TOKEN` and `HOSTALERT_TELEGRAM_CHAT_ID` from `.env`
 | Update Sandboxes | `claude "update ffmpeg in the sandbox toolkit"` |
 ```
 
-> For additional AI provider configuration (OpenAI, Cloudflare AI Gateway, Claude Code subscription), see [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md).
+> To add or update provider API keys, visit the AI Gateway Config URL above. For advanced configuration (Cloudflare AI Gateway, Claude Code subscription), see [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md).
 
 > **Note:** If user passwords are no longer in the conversation context, they can be reset via VNC/console access on the VPS.
 
