@@ -91,6 +91,16 @@ do_rsync --delete \
   "${VPS}:${INSTALL_DIR}/setup/"
 success "setup/"
 
+# egress-proxy/ — deploy-managed, single file
+if [ -d "${DEPLOY_DIR}/egress-proxy" ]; then
+  info "Syncing egress-proxy/..."
+  ${SSH_CMD} "${VPS}" "sudo mkdir -p ${INSTALL_DIR}/egress-proxy"
+  do_rsync --delete \
+    "${DEPLOY_DIR}/egress-proxy/" \
+    "${VPS}:${INSTALL_DIR}/egress-proxy/"
+  success "egress-proxy/"
+fi
+
 # vector/vector.yaml — single file, protect vector/data/
 if [ -f "${DEPLOY_DIR}/vector/vector.yaml" ]; then
   info "Syncing vector/vector.yaml..."
@@ -113,6 +123,9 @@ ${SSH_CMD} "${VPS}" "sudo chown -R openclaw:openclaw \
 
 if [ -f "${DEPLOY_DIR}/vector/vector.yaml" ]; then
   ${SSH_CMD} "${VPS}" "sudo chown openclaw:openclaw ${INSTALL_DIR}/vector/vector.yaml"
+fi
+if [ -d "${DEPLOY_DIR}/egress-proxy" ]; then
+  ${SSH_CMD} "${VPS}" "sudo chown -R openclaw:openclaw ${INSTALL_DIR}/egress-proxy"
 fi
 success "Ownership fixed"
 

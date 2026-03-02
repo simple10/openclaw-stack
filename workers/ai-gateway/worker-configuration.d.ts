@@ -14,6 +14,10 @@ declare namespace Cloudflare {
 		LLEMTRY_ENABLED: string;
 		LLEMTRY_ENDPOINT: string;
 		LLEMTRY_AUTH_TOKEN: string;
+		EGRESS_PROXY_URL: string;
+		EGRESS_PROXY_AUTH_TOKEN: string;
+		CF_ACCESS_CLIENT_ID: string;
+		CF_ACCESS_CLIENT_SECRET: string;
 		// KV namespace for multi-user auth & credential storage (bound via wrangler.jsonc)
 		AUTH_KV: KVNamespace;
 	}

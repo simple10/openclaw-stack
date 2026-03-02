@@ -10,17 +10,33 @@ export async function proxyOpenAI(
   log: Log,
   preReadBody?: string
 ): Promise<Response> {
-  const url = `${config.baseUrl}/${path}`
+  const targetUrl = `${config.baseUrl}/${path}`
 
   const headers = new Headers(request.headers)
 
   // Replace auth token with OpenAI API key
   headers.set('Authorization', `Bearer ${apiKey}`)
 
-  // Set provider-config headers (e.g. cf-aig-authorization for gateway mode)
+  // Set provider-config headers (e.g. cf-aig-authorization for gateway mode,
+  // X-Proxy-Auth for egress proxy)
   if (config.headers) {
     for (const [key, value] of Object.entries(config.headers)) {
       headers.set(key, value)
+    }
+  }
+
+  // When egress proxy is configured, wrap the target URL in the proxy URL
+  // and strip CF-injected headers that shouldn't reach the upstream
+  const url = config.egressProxyUrl
+    ? `${config.egressProxyUrl}?_proxyUpstreamURL_=${encodeURIComponent(targetUrl)}`
+    : targetUrl
+
+  if (config.egressProxyUrl) {
+    for (const h of [
+      'host', 'cf-connecting-ip', 'cf-ipcountry', 'cf-ray', 'cf-visitor',
+      'x-real-ip', 'x-forwarded-proto', 'x-forwarded-for',
+    ]) {
+      headers.delete(h)
     }
   }
 

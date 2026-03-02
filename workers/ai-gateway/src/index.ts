@@ -1,5 +1,5 @@
 import { authenticateRequest, validateAdminToken } from './auth'
-import { PROVIDER_CONFIG } from './config'
+import { getProviderConfig } from './config'
 import { handlePreflight, addCorsHeaders } from './cors'
 import { jsonError } from './errors'
 import { isLlemtryEnabled, isLlmRoute, reportGeneration } from './llemtry'
@@ -100,7 +100,7 @@ export default {
       logInboundRequest(log, request, route, apiKey)
     }
 
-    const providerConfig = PROVIDER_CONFIG[route.provider]
+    const providerConfig = getProviderConfig(route.provider)
 
     // CF AI Gateway uses a different path format (strips /v1/, adds provider prefix)
     const isGateway = providerConfig.baseUrl.includes('gateway.ai.cloudflare.com')
@@ -136,7 +136,7 @@ export default {
         return addCorsHeaders(jsonError(
           `Upstream ${host} blocked this request (403). ` +
           `chatgpt.com blocks requests from Cloudflare Workers. ` +
-          `Configure the openai-codex provider baseUrl to connect directly, bypassing this worker.`,
+          `Set EGRESS_PROXY_URL to route through the VPS egress proxy sidecar.`,
           502
         ))
       }

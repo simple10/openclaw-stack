@@ -538,7 +538,18 @@ async function main() {
     }
   }
 
-  // 7g. Process openclaw.jsonc for each claw → .deploy/instances/<name>/.openclaw/openclaw.json
+  // 7g. Copy egress-proxy if configured
+  if (stack.egress_proxy) {
+    const egressSrc = join(ROOT, "egress-proxy");
+    if (existsSync(egressSrc)) {
+      cpSync(egressSrc, join(DEPLOY_DIR, "egress-proxy"), { recursive: true });
+      success("Copied egress-proxy/");
+    } else {
+      fatal("stack.egress_proxy is configured but egress-proxy/ directory not found");
+    }
+  }
+
+  // 7h. Process openclaw.jsonc for each claw → .deploy/instances/<name>/.openclaw/openclaw.json
   // Output mirrors VPS layout so sync-deploy.sh can rsync directly.
   for (const [name, claw] of Object.entries(claws)) {
     const templateFile = claw.openclaw_json || "openclaw/default/openclaw.jsonc";

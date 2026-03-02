@@ -103,6 +103,27 @@ services:
           cpus: "0.5"
           memory: 128M
 
+{{#if stack.egress_proxy}}
+  # ── Egress Proxy (bypasses WAF blocks on CF Worker IPs) ──────
+  egress-proxy:
+    image: node:22-alpine
+    container_name: {{stack.project_name}}-egress-proxy
+    restart: unless-stopped
+    command: ["node", "/app/proxy.mjs"]
+    volumes:
+      - ./egress-proxy/proxy.mjs:/app/proxy.mjs:ro
+    environment:
+      - PORT={{stack.egress_proxy.port}}
+      - PROXY_AUTH_TOKEN={{stack.egress_proxy.auth_token}}
+      - LOG_LEVEL={{stack.egress_proxy.log_level}}
+    networks: [openclaw-net]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 64M
+
+{{/if}}
 {{#if stack.vector}}
   # ── Vector Log Shipper ────────────────────────────────────────
   vector:

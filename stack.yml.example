@@ -42,6 +42,15 @@ stack:
     events: true
     llemtry: true
 
+  # Egress proxy sidecar — routes requests through VPS IP to bypass WAF blocks
+  # on Cloudflare Worker IPs (e.g. chatgpt.com blocking openai-codex requests).
+  # Runs behind the Cloudflare Tunnel — no public host ports exposed.
+  # Requires a tunnel route: hostname → http://<project_name>-egress-proxy:8787
+  egress_proxy:
+    port: 8787
+    auth_token: ${EGRESS_PROXY_AUTH_TOKEN}
+    log_level: info                       # info | debug (debug logs outbound headers)
+
   # Total VPS resource budget for this stack
   # Percentages are resolved against actual VPS capacity via SSH during pre-deploy.
   # Integers are used as-is (absolute values).

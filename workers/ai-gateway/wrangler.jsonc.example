@@ -43,6 +43,13 @@
     // Per-user provider credentials are stored in AUTH_KV (managed via /admin/users endpoints).
     //
     //
+    // ---- Egress Proxy (optional) ----
+    // Routes requests through a VPS sidecar to bypass upstream WAF blocks
+    // (e.g. chatgpt.com blocking Cloudflare Worker IPs for openai-codex).
+    // EGRESS_PROXY_URL        — e.g. https://egress-proxy.yourdomain.com (set via `wrangler secret put ...`)
+    // EGRESS_PROXY_AUTH_TOKEN — shared secret with the VPS egress proxy (set via `wrangler secret put ...`)
+    //
+    //
     // ---- CF AI Gateway ID (optional) ----
     // (see docs/AI-GATEWAY-CONFIG.md)
     // This worker will route upstream provider requests through the Cloudflare AI Gateway when
