@@ -91,14 +91,15 @@ Multiple stacks can run on the same VPS. Each stack can contain multiple claws.
   |  |    -> browser container  (noVNC)          |    |
   |  +-------------------------------------------+    |
   |  +-- openclaw-* (optional) ------------------+    |
-  |  |  Configure & run any number of additional |    |
+  |  |  Run any number of additional             |    |
   |  |  claws via stack.yml                      |    |
   |  +-------------------------------------------+    |
   |                                                   |
   |  cloudflared        tunnel connector              |
+  |  host-alert.sh      cron monitoring               |
   |  egress-proxy       WAF bypass (optional)         |
   |  vector             docker log shipper (optional) |
-  |  host-alert.sh      cron monitoring               |
+  |  sandbox-registry   local docker hub (optional)   |
   +---------------------------------------------------+
 ```
 
@@ -107,6 +108,7 @@ Multiple stacks can run on the same VPS. Each stack can contain multiple claws.
 - No ports are exposed to the public internet.
 - All traffic flows through the Cloudflare Tunnel (outbound-only). SSH is the only open firewall port.
 - LLM provider API keys are stored as Cloudflare KV secrets and injected at the edge.
+- Optional sandbox-registry shares base sandbox images to speed up per-claw build time.
 
 ## Configuration
 

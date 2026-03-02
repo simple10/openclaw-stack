@@ -27,6 +27,9 @@ logs/
 # Vector runtime state
 vector/data/
 
+# Sandbox registry runtime data
+sandbox-registry/data/
+
 # OS / editor
 .DS_Store
 *.swp

@@ -61,6 +61,35 @@ done
 
 log() { echo "[sandbox-builder] $*"; }
 
+# ── Registry helpers ───────────────────────────────────────────────────
+
+REGISTRY_URL="${SANDBOX_REGISTRY_URL:-}"
+
+registry_pull() {
+  [ -n "$REGISTRY_URL" ] || return 1
+  local img="$1"
+  local remote="${REGISTRY_URL}/${img}"
+  if docker pull "$remote" 2>/dev/null; then
+    docker tag "$remote" "$img"
+    docker rmi "$remote" 2>/dev/null || true
+    log "Pulled $img from registry"
+    return 0
+  fi
+  return 1
+}
+
+registry_push() {
+  [ -n "$REGISTRY_URL" ] || return 0
+  local img="$1"
+  local remote="${REGISTRY_URL}/${img}"
+  if docker tag "$img" "$remote" && docker push "$remote" 2>/dev/null; then
+    log "Pushed $img to registry"
+    docker rmi "$remote" 2>/dev/null || true
+  else
+    log "WARNING: Failed to push $img to registry (non-fatal)"
+  fi
+}
+
 # ── Helpers ────────────────────────────────────────────────────────────
 
 image_exists() {
@@ -609,6 +638,15 @@ fi
 PACKAGES_HASH=$(get_packages_hash "$TOOLKIT_JSON")
 TOOLS_HASH=$(get_tools_hash "$TOOLKIT_JSON")
 
+# Pull from registry before building (existing label-based detection skips builds if images match)
+if [ -n "$REGISTRY_URL" ]; then
+  log "Checking sandbox registry for cached images..."
+  registry_pull "openclaw-sandbox:bookworm-slim" || true
+  registry_pull "openclaw-sandbox-packages:bookworm-slim" || true
+  registry_pull "openclaw-sandbox-toolkit:bookworm-slim" || true
+  registry_pull "openclaw-sandbox-browser:bookworm-slim" || true
+fi
+
 # Build images
 FAILED=0
 
@@ -616,6 +654,15 @@ build_base || FAILED=1
 build_packages "$TOOLKIT_JSON" "$PACKAGES_HASH" || FAILED=1
 build_toolkit "$TOOLKIT_JSON" "$TOOLS_HASH" || FAILED=1
 build_browser || FAILED=1
+
+# Push to registry after successful builds
+if [ -n "$REGISTRY_URL" ] && [ "$FAILED" -eq 0 ] && [ "$DRY_RUN" = false ]; then
+  log "Pushing sandbox images to registry..."
+  registry_push "openclaw-sandbox:bookworm-slim"
+  registry_push "openclaw-sandbox-packages:bookworm-slim"
+  registry_push "openclaw-sandbox-toolkit:bookworm-slim"
+  registry_push "openclaw-sandbox-browser:bookworm-slim"
+fi
 
 # Save digests after all builds complete
 if [ "$DRY_RUN" = false ]; then

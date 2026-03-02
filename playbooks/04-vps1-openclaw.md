@@ -194,7 +194,7 @@ Print the result as a status update to the user (e.g., `[entrypoint] Building to
 
 > **Note:** Check for the "Executing as node" log line, not the health endpoint — health responds before sandbox builds complete.
 
-### Step 3: Sync images + start remaining claws (multi-claw only)
+### Step 3: Start remaining claws (multi-claw only)
 
 If `CLAW_COUNT > 1`, start all remaining claws after the first claw finishes sandbox builds. Each additional claw builds its own sandbox images (~15-25 min each) since sandbox images live inside each claw's nested Docker (Sysbox isolation).
 
@@ -204,6 +204,8 @@ ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
 ```
 
 > **Single-claw:** Skip this step — all services were already started in Step 1.
+
+> **With sandbox registry:** When `sandbox_registry` is configured in `stack.yml`, `start-claws.sh` starts all claws simultaneously — no staggering needed. The first claw to build pushes images to the registry; other claws pull (~30s) instead of rebuilding (~15-25 min). This step can still be run safely but all claws will already be running.
 
 ### Step 4: Verify deployment
 

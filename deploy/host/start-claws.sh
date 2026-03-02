@@ -35,12 +35,14 @@ sudo -u openclaw INSTALL_DIR="${STACK__STACK__INSTALL_DIR}" "${OPENCLAW_HOME}/ho
 
 # Start containers (Vector is included in the main compose when enabled)
 COMPOSE_DIR="${OPENCLAW_HOME}"
-if [ "$CLAW_COUNT" -gt 1 ]; then
-  echo "Multi-claw: starting openclaw-${FIRST_CLAW} first for sandbox builds..." >&2
+if [ "$CLAW_COUNT" -gt 1 ] && [ -z "${STACK__STACK__SANDBOX_REGISTRY__PORT:-}" ] && [ -z "${STACK__STACK__SANDBOX_REGISTRY__URL:-}" ]; then
+  # No registry: stagger startup so first claw builds sandbox images before others start
+  echo "Multi-claw (no registry): starting openclaw-${FIRST_CLAW} first for sandbox builds..." >&2
   sudo -u openclaw bash -c \
     "cd ${COMPOSE_DIR} && docker compose up -d openclaw-${FIRST_CLAW}"
 else
-  echo "Single-claw: starting all services..." >&2
+  # Single-claw, or registry available (all claws pull simultaneously)
+  echo "Starting all services..." >&2
   sudo -u openclaw bash -c \
     "cd ${COMPOSE_DIR} && docker compose up -d"
 fi

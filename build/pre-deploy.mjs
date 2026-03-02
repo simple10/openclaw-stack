@@ -13,7 +13,7 @@
 import { readFileSync, writeFileSync, mkdirSync, cpSync, existsSync, rmSync, readdirSync, statSync } from "fs";
 import { join, resolve, dirname } from "path";
 import { fileURLToPath } from "url";
-import { spawn } from "child_process";
+import { spawn, spawnSync } from "child_process";
 import { randomUUID } from "crypto";
 import * as yaml from "js-yaml";
 import * as dotenv from "dotenv";
@@ -51,6 +51,33 @@ function readRoot(path) {
   const full = join(ROOT, path);
   if (!existsSync(full)) fatal(`File not found: ${path}`);
   return readFileSync(full, "utf-8");
+}
+
+/** Load previous .deploy/stack.json for caching auto-generated values across builds. */
+function loadPreviousDeploy() {
+  const prev = join(DEPLOY_DIR, "stack.json");
+  if (!existsSync(prev)) return null;
+  try {
+    return JSON.parse(readFileSync(prev, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve an auto-generated token: explicit value > cached from previous build > new random.
+ * Tokens resolved this way persist in stack.json between builds, so they remain stable
+ * across `npm run pre-deploy` runs without requiring the user to set them in .env.
+ */
+function resolveAutoToken(value, cachePath, previousDeploy) {
+  if (value) return value;
+  // Walk dot-separated path into previous deploy config
+  let cached = previousDeploy;
+  for (const key of cachePath.split(".")) {
+    cached = cached?.[key];
+  }
+  if (cached) return cached;
+  return randomUUID().replace(/-/g, "") + randomUUID().replace(/-/g, "");
 }
 
 // ── Step 1: Read .env ────────────────────────────────────────────────────────
@@ -234,12 +261,27 @@ function validateClaw(name, claw) {
 // Pre-computes all values the Handlebars template needs so the template
 // is a pure data projection with no inline logic.
 
-function computeDerivedValues(claws, stack, host) {
+function computeDerivedValues(claws, stack, host, previousDeploy) {
   const logUrl = stack.logging?.worker_url || "";
   const logToken = stack.logging?.worker_token || "";
 
   // Stack-level derived values
   stack.vector = !!stack.logging?.vector;
+
+  if (stack.sandbox_registry) {
+    const sr = stack.sandbox_registry;
+    // Auto-generate token if not explicitly set (cached in stack.json between builds)
+    sr.token = resolveAutoToken(sr.token, "stack.sandbox_registry.token", previousDeploy);
+    if (sr.port && !sr.url) {
+      stack.sandbox_registry_container = true;
+      stack.sandbox_registry_port = sr.port;
+      stack.sandbox_registry_url = "";  // Computed at runtime in entrypoint
+    } else if (sr.url) {
+      stack.sandbox_registry_container = false;
+      stack.sandbox_registry_port = "";
+      stack.sandbox_registry_url = sr.url;
+    }
+  }
 
   for (const claw of Object.values(claws)) {
     const gwUrl = claw.ai_gateway?.url || stack.ai_gateway.url;
@@ -374,6 +416,10 @@ function generateStackEnv(env, config, claws) {
   if (stack.sandbox_toolkit) {
     lines.push(`STACK__STACK__SANDBOX_TOOLKIT=${formatEnvValue(stack.sandbox_toolkit)}`);
   }
+  if (stack.sandbox_registry) {
+    lines.push(`STACK__STACK__SANDBOX_REGISTRY__PORT=${stack.sandbox_registry_port || ""}`);
+    lines.push(`STACK__STACK__SANDBOX_REGISTRY__URL=${stack.sandbox_registry_url || ""}`);
+  }
   lines.push("");
 
   // Derived
@@ -448,7 +494,8 @@ async function main() {
 
   // 5. Compute derived values for template
   info("Computing derived values...");
-  computeDerivedValues(claws, stack, host);
+  const previousDeploy = loadPreviousDeploy();
+  computeDerivedValues(claws, stack, host, previousDeploy);
   success("Derived values computed");
 
   // 6. Compile and render Handlebars template
@@ -547,6 +594,28 @@ async function main() {
     } else {
       fatal("stack.egress_proxy is configured but egress-proxy/ directory not found");
     }
+  }
+
+  // 7g-2. Generate sandbox-registry htpasswd if running own registry
+  if (stack.sandbox_registry_container) {
+    const token = stack.sandbox_registry.token;  // Always set (auto-generated if needed)
+    const htpasswdDir = join(DEPLOY_DIR, "sandbox-registry");
+    mkdirSync(htpasswdDir, { recursive: true });
+    let htpasswdLine;
+    // Use spawnSync with argv array to avoid shell injection from token value
+    let result = spawnSync("htpasswd", ["-nbB", "openclaw", token], { encoding: "utf8" });
+    if (result.status === 0) {
+      htpasswdLine = result.stdout.trim();
+    } else {
+      result = spawnSync("docker", ["run", "--rm", "httpd:2", "htpasswd", "-nbB", "openclaw", token], { encoding: "utf8" });
+      if (result.status === 0) {
+        htpasswdLine = result.stdout.trim();
+      } else {
+        fatal("Cannot generate htpasswd. Install apache2-utils or ensure Docker is running.");
+      }
+    }
+    writeFileSync(join(htpasswdDir, "htpasswd"), htpasswdLine + "\n");
+    success("Generated sandbox-registry/htpasswd");
   }
 
   // 7h. Process openclaw.jsonc for each claw → .deploy/instances/<name>/.openclaw/openclaw.json

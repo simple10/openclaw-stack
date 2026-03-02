@@ -155,14 +155,26 @@ fi
 # rebuild-sandboxes.sh handles: config change detection (auto-rebuild when
 # sandbox-toolkit.yaml changes), integrity verification (digest comparison),
 # and staleness warnings (>30 days).
+
+# Compute sandbox registry URL (used by dockerd --insecure-registry and rebuild-sandboxes.sh)
+REGISTRY_URL=""
+if [ -n "${SANDBOX_REGISTRY_URL:-}" ]; then
+  REGISTRY_URL="$SANDBOX_REGISTRY_URL"
+elif [ -n "${SANDBOX_REGISTRY_PORT:-}" ]; then
+  HOST_GW=$(ip route | awk '/default/ {print $3}')
+  REGISTRY_URL="${HOST_GW}:${SANDBOX_REGISTRY_PORT}"
+fi
+
 if command -v dockerd > /dev/null 2>&1; then
   if ! docker info > /dev/null 2>&1; then
     echo "[entrypoint] Starting nested Docker daemon..."
-    dockerd --host=unix:///var/run/docker.sock \
-            --storage-driver=overlay2 \
-            --log-level=warn \
-            --group="$(getent group docker | cut -d: -f3)" \
-            > /var/log/dockerd.log 2>&1 &
+    DOCKERD_ARGS="--host=unix:///var/run/docker.sock --storage-driver=overlay2 --log-level=warn"
+    DOCKERD_ARGS="$DOCKERD_ARGS --group=$(getent group docker | cut -d: -f3)"
+    if [ -n "$REGISTRY_URL" ]; then
+      DOCKERD_ARGS="$DOCKERD_ARGS --insecure-registry=$REGISTRY_URL"
+      echo "[entrypoint] Sandbox registry: ${REGISTRY_URL} (--insecure-registry)"
+    fi
+    dockerd $DOCKERD_ARGS > /var/log/dockerd.log 2>&1 &
 
     # Wait for Docker daemon to be ready
     echo "[entrypoint] Waiting for nested Docker daemon..."
@@ -182,6 +194,17 @@ if command -v dockerd > /dev/null 2>&1; then
 
   if docker info > /dev/null 2>&1; then
     echo "[entrypoint] Nested Docker daemon ready (took ${elapsed:-0}s)"
+
+    # ── 2a-pre. Login to sandbox registry ──────────────────────────
+    if [ -n "$REGISTRY_URL" ] && [ -n "${SANDBOX_REGISTRY_TOKEN:-}" ]; then
+      echo "[entrypoint] Logging into sandbox registry at ${REGISTRY_URL}..."
+      echo "$SANDBOX_REGISTRY_TOKEN" | docker login "$REGISTRY_URL" \
+        -u "${SANDBOX_REGISTRY_USER:-openclaw}" --password-stdin 2>/dev/null || \
+        echo "[entrypoint] WARNING: Registry login failed (registry may not be ready yet)"
+    fi
+
+    # Export registry URL for rebuild-sandboxes.sh
+    export SANDBOX_REGISTRY_URL="$REGISTRY_URL"
 
     # ── 2a. Load pre-built sandbox images from archive ──────────────
     # Optional optimization: pre-built sandbox images can be saved as a tar

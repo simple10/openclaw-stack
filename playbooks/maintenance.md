@@ -18,6 +18,7 @@ All secrets should be rotated on a regular cadence. If a token is suspected comp
 | `EGRESS_PROXY_AUTH_TOKEN` | Local `.env` + AI Gateway Worker secret + VPS egress proxy container | 90 days |
 | `EGRESS_PROXY_URL` | AI Gateway Worker secret | Only if hostname changes |
 | `HOSTALERT_TELEGRAM_BOT_TOKEN` | Local `.env` (deployed via `npm run pre-deploy`) | As needed |
+| `SANDBOX_REGISTRY_TOKEN` | Local `.env` + VPS `sandbox-registry/htpasswd` | 90 days |
 | SSH keys (`~/.ssh/vps1_openclaw_ed25519`) | Local machine + VPS `authorized_keys` | Annual |
 
 ### Rotation Procedures
@@ -148,6 +149,32 @@ sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d egress-proxy'
 
 > **Verify:** Run § 7.2a — egress proxy health check. Test a codex request end-to-end if possible.
 
+#### Sandbox Registry Token
+
+> **Skip** if `stack.sandbox_registry` is not configured in `stack.yml`.
+
+```bash
+# 1. Generate new token
+NEW_TOKEN=$(openssl rand -hex 32)
+
+# 2. Update SANDBOX_REGISTRY_TOKEN in local .env, rebuild and push artifacts
+# (regenerates htpasswd with bcrypt)
+npm run pre-deploy
+scripts/sync-deploy.sh
+
+# 3. Restart the registry container to reload the new htpasswd
+# (bind-mounted read-only — restart picks up new file from disk)
+sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose restart sandbox-registry'
+
+# 4. Recreate all claws to pass the new token into containers
+# (env vars are baked at container creation — restart won't reload them)
+sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d'
+```
+
+> **Note:** Steps 3 and 4 must happen in order — the registry needs the new htpasswd before claws attempt to login with the new token.
+
+> **Verify:** Check entrypoint logs for "Logging into sandbox registry" without a WARNING line.
+
 #### SSH Keys
 
 ```bash
@@ -198,11 +225,20 @@ scripts/update-sandboxes.sh --dry-run
 
 No container restart needed — builds happen inside the running container's nested Docker. New sandbox containers launched by agents automatically use the rebuilt images.
 
+**With sandbox registry:** When `sandbox_registry` is configured, `update-sandboxes.sh` on one claw builds and pushes updated images to the registry. Other claws pull the updated images on their next restart, avoiding redundant builds.
+
 **When to run:**
 
 - Monthly, for security patches (apt package updates)
 - When entrypoint logs a staleness warning (images > 30 days old)
 - After editing `sandbox-toolkit.yaml` — auto-detected on next container restart, but `update-sandboxes.sh` applies immediately without restart
+
+**Registry garbage collection:** Old image layers accumulate in the registry. Reclaim disk space periodically:
+
+```bash
+# Run GC on the sandbox registry container
+sudo docker exec <PROJECT_NAME>-sandbox-registry bin/registry garbage-collect /etc/docker/registry/config.yml
+```
 
 > **Verify:** Run § 7.1a — all sandbox toolkit binaries operational in sandbox container.
 

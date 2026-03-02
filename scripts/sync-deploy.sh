@@ -109,6 +109,16 @@ if [ -d "${DEPLOY_DIR}/egress-proxy" ]; then
   success "egress-proxy/"
 fi
 
+# sandbox-registry/ — htpasswd auth file
+if [ -d "${DEPLOY_DIR}/sandbox-registry" ]; then
+  info "Syncing sandbox-registry/..."
+  ${SSH_CMD} "${VPS}" "sudo mkdir -p ${INSTALL_DIR}/sandbox-registry/data"
+  do_rsync --delete \
+    "${DEPLOY_DIR}/sandbox-registry/" \
+    "${VPS}:${INSTALL_DIR}/sandbox-registry/"
+  success "sandbox-registry/"
+fi
+
 # vector/vector.yaml — single file, protect vector/data/
 if [ -f "${DEPLOY_DIR}/vector/vector.yaml" ]; then
   info "Syncing vector/vector.yaml..."
@@ -135,6 +145,9 @@ if [ -f "${DEPLOY_DIR}/vector/vector.yaml" ]; then
 fi
 if [ -d "${DEPLOY_DIR}/egress-proxy" ]; then
   ${SSH_CMD} "${VPS}" "sudo chown -R openclaw:openclaw ${INSTALL_DIR}/egress-proxy"
+fi
+if [ -d "${DEPLOY_DIR}/sandbox-registry" ]; then
+  ${SSH_CMD} "${VPS}" "sudo chown -R openclaw:openclaw ${INSTALL_DIR}/sandbox-registry"
 fi
 success "Ownership fixed"
 

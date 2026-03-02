@@ -71,6 +71,17 @@ services:
       - LLEMTRY_URL={{this.llemtry_url}}
       - ENABLE_EVENTS_LOGGING={{this.enable_events_logging}}
       - ENABLE_LLEMTRY_LOGGING={{this.enable_llemtry_logging}}
+{{#if ../stack.sandbox_registry}}
+      # ── Sandbox Registry ──
+{{#if ../stack.sandbox_registry_port}}
+      - SANDBOX_REGISTRY_PORT={{../stack.sandbox_registry_port}}
+{{/if}}
+{{#if ../stack.sandbox_registry_url}}
+      - SANDBOX_REGISTRY_URL={{../stack.sandbox_registry_url}}
+{{/if}}
+      - SANDBOX_REGISTRY_USER=openclaw
+      - SANDBOX_REGISTRY_TOKEN={{../stack.sandbox_registry.token}}
+{{/if}}
     deploy:
       resources:
         limits:
@@ -117,6 +128,35 @@ services:
       - PROXY_AUTH_TOKEN={{stack.egress_proxy.auth_token}}
       - LOG_LEVEL={{stack.egress_proxy.log_level}}
     networks: [openclaw-net]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 64M
+
+{{/if}}
+{{#if stack.sandbox_registry_container}}
+  # ── Sandbox Image Registry ──────────────────────────────────
+  sandbox-registry:
+    image: registry:2
+    container_name: {{stack.project_name}}-sandbox-registry
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:{{stack.sandbox_registry.port}}:5000"
+    volumes:
+      - {{stack.install_dir}}/sandbox-registry/data:/var/lib/registry
+      - {{stack.install_dir}}/sandbox-registry/htpasswd:/auth/htpasswd:ro
+    environment:
+      - REGISTRY_AUTH=htpasswd
+      - REGISTRY_AUTH_HTPASSWD_REALM=openclaw-sandbox
+      - REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd
+      - REGISTRY_STORAGE_DELETE_ENABLED=true
+    networks: [openclaw-net]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5000/v2/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     deploy:
       resources:
         limits:

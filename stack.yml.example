@@ -42,6 +42,14 @@ stack:
     events: true
     llemtry: true
 
+  # Local Docker registry for sharing sandbox images between claws.
+  # First claw to build pushes images; others pull (~30s vs ~15min build).
+  sandbox_registry:
+    token: ${SANDBOX_REGISTRY_TOKEN}         # htpasswd basic auth; pre-deploy script auto generates token if empty
+    port: 5100                               # host port (own registry)
+    # OR: use another stack's registry (no container in this stack):
+    # url: "10.0.0.1:5100"                   # set url instead of port
+
   # Egress proxy sidecar — routes requests through VPS IP to bypass WAF blocks
   # on Cloudflare Worker IPs (e.g. chatgpt.com blocking openai-codex requests).
   # Runs behind the Cloudflare Tunnel — no public host ports exposed.
