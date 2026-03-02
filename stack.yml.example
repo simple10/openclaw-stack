@@ -61,7 +61,7 @@ stack:
 # ── Claw Defaults ─────────────────────────────────────────────
 # All claws inherit these. Per-claw settings override via deep merge.
 defaults:
-  allow_updates: false
+  allow_updates: true
   domain_path: ""
   dashboard_path: /dashboard
   telegram:
@@ -85,6 +85,7 @@ claws:
 
   # work-claw:
   #   domain: openclaw-work.${ROOT_DOMAIN}
+  #   allow_updates: false # Prevent work-claw from auto updating
   #   gateway_port: 18790
   #   dashboard_port: 6091
   #   telegram:
