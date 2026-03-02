@@ -31,7 +31,7 @@ Handles everything mechanical before Claude takes over. Reuses SSH setup logic f
  7. Prompt: Root username (default: ubuntu) → sed into .env
  8. Prompt: Passwordless SSH already set up?
     YES → list ~/.ssh/*.pub, try connecting with each → find working key → sed SSH_KEY into .env
-    NO  → ssh-keygen -t ed25519 -f ~/.ssh/openclaw_ed25519 -N ""
+    NO  → ssh-keygen -t ed25519 -f ~/.ssh/vps1_openclaw_ed25519 -N ""
         → ssh-copy-id (or print pubkey if password auth disabled)
         → verify connectivity
         → sed SSH_KEY into .env

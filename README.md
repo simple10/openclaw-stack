@@ -18,14 +18,14 @@ in an isolated container with its own resources and config.
 ```bash
 # Interactive bash script clones the repo & sets up SSH access
 # Then runs `claude "onboard"`
-bash <(curl -fsSL https://raw.githubusercontent.com/simple10/claudiusmaximus/main/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/simple10/openclaw-stack/main/install.sh)
 ```
 
 **Option B: Manual**
 
 ```bash
-git clone git@github.com:simple10/openclaude.git openclaw-vps
-cd openclaw-vps
+git clone git@github.com:simple10/openclaw-stack.git openclaw-stack
+cd openclaw-stack
 cp .env.example .env && cp stack.yml.example stack.yml
 # Edit .env and stack.yml with your values, then:
 claude "start"

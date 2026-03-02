@@ -48,7 +48,7 @@
 > Once all the required env vars have been collected, it's time to prepare for deploy.
 >
 > 1. Check to see if git is intalled, if not `brew install git` if user is on a mac
-> 2. Clone this repo from github to a openclaw-vps dir and cd into it
+> 2. Clone this repo from github to a openclaw-stack dir and cd into it
 > 3. Copy openclaw-config.env.example from the cloned repo to openclaw-config.env
 > 4. Populate the env vars you already collected into the openclaw-config.env
 >

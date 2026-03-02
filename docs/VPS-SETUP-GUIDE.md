@@ -167,7 +167,7 @@ Expected output:
 Return to the repo root and start Claude:
 
 ```bash
-cd openclaw-vps
+cd openclaw-stack
 claude "start"
 ```
 

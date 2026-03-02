@@ -3,18 +3,18 @@
 # Handles the mechanical setup before Claude takes over for interactive configuration.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/simple10/claudiusmaximus/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/simple10/openclaw-stack/main/install.sh | bash
 #   — or —
-#   git clone <repo> && cd openclaw-vps && bash install.sh
+#   git clone <repo> && cd openclaw-stack && bash install.sh
 #
 # Idempotent — safe to re-run. Skips steps that are already done.
 
 set -euo pipefail
 
-REPO_URL="https://github.com/simple10/claudiusmaximus.git"
-REPO_DIR="openclaw-vps"
+REPO_URL="https://github.com/simple10/openclaw-stack.git"
+REPO_DIR="openclaw-stack"
 DEFAULT_SSH_USER="ubuntu"
-DEFAULT_SSH_KEY_PATH="$HOME/.ssh/openclaw_ed25519"
+DEFAULT_SSH_KEY_PATH="$HOME/.ssh/vps1_openclaw_ed25519"
 
 # ── Helpers ──────────────────────────────────────────────────────
 
@@ -214,7 +214,7 @@ else
     SSH_KEY="$DEFAULT_SSH_KEY_PATH"
   else
     info "Generating SSH key..."
-    ssh-keygen -t ed25519 -f "$DEFAULT_SSH_KEY_PATH" -C "openclaw-vps" -N ""
+    ssh-keygen -t ed25519 -f "$DEFAULT_SSH_KEY_PATH" -C "openclaw-stack" -N ""
     SSH_KEY="$DEFAULT_SSH_KEY_PATH"
     ok "Key created: $SSH_KEY"
   fi

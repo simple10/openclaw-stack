@@ -123,7 +123,7 @@ Create the first user and get a gateway token for the VPS:
 curl -s -X POST https://<worker-url>/admin/users \
   -H "Authorization: Bearer $AI_WORKER_ADMIN_AUTH_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name":"openclaw-vps1"}' | jq .
+  -d '{"name":"openclaw-stack"}' | jq .
 # Returns: { "userId": "usr_...", "token": "<gateway-token>" }
 ```
 
