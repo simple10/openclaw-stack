@@ -16,6 +16,7 @@ All deployment steps are in modular playbooks under `playbooks/`:
 
 | Playbook | Description |
 |----------|-------------|
+| `00-onboarding.md` | Interactive first-time stack configuration |
 | `00-fresh-deploy-setup.md` | Fresh deploy validation & overview |
 | `00-analysis-mode.md` | Analyze existing deployment |
 | `01-workers.md` | Cloudflare Workers deployment (AI Gateway + Log Receiver) |
@@ -67,6 +68,8 @@ SSH_USER and SSH_PORT in `.env` start as provider defaults (e.g., `ubuntu`/`22`)
 ## Setup Question Flow
 
 **ALWAYS start this flow when the user's intent is ambiguous or general** (e.g., "hi", "start", "let's go", "help me"). Also start when the user explicitly requests deployment or mentions VPS work. This is the default entry point.
+
+**If user says "onboard":** Follow [00-onboarding.md](playbooks/00-onboarding.md) for guided first-time configuration. This is for new users who ran `install.sh` and need to configure their stack.
 
 1. Check `.env` exists. If missing, offer to `cp .env.example .env && cp stack.yml.example stack.yml`.
 2. Ask: **New deployment** (fresh VPS) or **Existing deployment** (already configured)?

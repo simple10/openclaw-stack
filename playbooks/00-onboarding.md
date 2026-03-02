@@ -1,0 +1,289 @@
+# 00-onboarding.md — Guided First-Time Configuration
+
+Triggered when the user says **"onboard"**. Walk through each configuration decision interactively — one question at a time. Use the Edit tool to write values directly to `.env` and `stack.yml` as you go.
+
+**Tone:** Conversational, one question at a time. Don't dump everything at once. Validate each answer before moving on.
+
+---
+
+## § 0. Prerequisites Check
+
+Before starting, verify that `install.sh` was run:
+
+1. Check `.env` exists and has `VPS_IP`, `SSH_USER`, `SSH_KEY` populated (non-empty values)
+2. Check `stack.yml` exists
+3. Verify SSH connectivity:
+
+```bash
+ssh -i <SSH_KEY> -o BatchMode=yes -o ConnectTimeout=5 -p <SSH_PORT:22> <SSH_USER>@<VPS_IP> echo "ok"
+```
+
+**If `.env` is missing or VPS fields are empty:** Tell the user to run `bash install.sh` first and stop here.
+
+**If SSH fails:** Help debug (wrong IP, key not authorized, etc.) before continuing.
+
+---
+
+## § 1. Domain & Cloudflare
+
+### 1.1 Root Domain
+
+Ask:
+
+> What **root domain** will you use for OpenClaw? (e.g., `example.com`)
+> Your OpenClaw instance will be at a subdomain like `openclaw.example.com`.
+
+Write the answer to `.env` as `ROOT_DOMAIN`.
+
+### 1.2 Cloudflare Setup
+
+Ask:
+
+> How is your Cloudflare Tunnel set up?
+>
+> 1. **I have a Cloudflare API token** (recommended) — Claude will auto-create the tunnel, DNS, and Access rules during deployment
+> 2. **I already configured a tunnel manually** — I have a tunnel token ready
+> 3. **I need help** — Point me to the docs
+
+#### Option 1: API Token
+
+Walk them through creating a token at `dash.cloudflare.com/profile/api-tokens`:
+
+> Create a **Custom Token** with these permissions:
+>
+> | Scope | Permission | Level |
+> |-------|-----------|-------|
+> | Account | Account Settings | Read |
+> | Account | Cloudflare Tunnel | Edit |
+> | Zone | DNS | Edit |
+>
+> Scope the Zone permissions to your specific zone (domain).
+
+Ask them to paste the token. Write to `.env` as `CLOUDFLARE_API_TOKEN`.
+
+> During deployment, `scripts/cf-tunnel-setup.sh` will automatically create the tunnel, DNS records, and Cloudflare Access rules.
+
+#### Option 2: Already Configured
+
+Ask for the tunnel token (the long `ey...` string from the tunnel install command).
+
+Write to `.env` as `CLOUDFLARE_TUNNEL_TOKEN`.
+
+> Make sure you've also set up Cloudflare Access to protect your domain. See `docs/CLOUDFLARE-TUNNEL.md` if you haven't done this yet.
+
+#### Option 3: Need Help
+
+> See `docs/CLOUDFLARE-TUNNEL.md` for a full walkthrough of both manual and automated setup. Come back and say "onboard" again once you're ready.
+
+Stop here — don't continue until they have either an API token or tunnel token.
+
+---
+
+## § 2. Egress Proxy (Codex)
+
+Ask:
+
+> Do you plan to use a **ChatGPT Codex subscription** with OpenClaw?
+>
+> The egress proxy routes requests through your VPS IP to bypass WAF blocks on Cloudflare Worker IPs (e.g., chatgpt.com blocking openai-codex requests). If you're not using Codex, you can disable it.
+
+#### Yes
+
+Leave the `egress_proxy:` section in `stack.yml` as-is (already enabled by default).
+
+Generate a random auth token:
+
+```bash
+openssl rand -hex 32
+```
+
+Write to `.env` as `EGRESS_PROXY_AUTH_TOKEN`.
+
+> Egress proxy enabled. The AI gateway worker will route Codex requests through your VPS.
+
+#### No
+
+Comment out the entire `egress_proxy:` block in `stack.yml`:
+
+```yaml
+  # egress_proxy:
+  #   port: 8787
+  #   auth_token: ${EGRESS_PROXY_AUTH_TOKEN}
+  #   log_level: info
+```
+
+> Egress proxy disabled. You can re-enable it later by uncommenting the block in `stack.yml`.
+
+---
+
+## § 3. Claw Setup
+
+### 3.1 How Many Claws
+
+Ask:
+
+> Do you want **one** OpenClaw instance or **multiple**?
+>
+> - **One** (default) — A single claw named `personal-claw`. Good for most users.
+> - **Multiple** — Separate claws for different contexts (e.g., personal + work). Each gets its own container, Telegram bot, and subdomain.
+>
+> You can always add more later.
+
+#### One Claw
+
+Keep the default `personal-claw` entry in `stack.yml`. Skip to § 3.2.
+
+#### Multiple Claws
+
+For each additional claw beyond `personal-claw`:
+
+1. Ask for a name (lowercase, hyphens ok, e.g., `work-claw`)
+2. Auto-assign ports:
+   - Gateway: 18789, 18790, 18791, ...
+   - Dashboard: 6090, 6091, 6092, ...
+3. Uncomment or add the entry in `stack.yml` under `claws:`:
+
+```yaml
+  <name>:
+    domain: openclaw-<shortname>.${ROOT_DOMAIN}
+    gateway_port: <next_port>
+    dashboard_port: <next_port>
+    telegram:
+      bot_token: ${<UPPER_NAME>_TELEGRAM_BOT_TOKEN}
+```
+
+4. Add the corresponding env var to `.env`: `<UPPER_NAME>_TELEGRAM_BOT_TOKEN=`
+
+### 3.2 Telegram Bot(s)
+
+For **each claw**, walk through bot creation:
+
+> Let's set up the Telegram bot for **<claw-name>**.
+>
+> 1. Open Telegram and message [@BotFather](https://t.me/BotFather)
+> 2. Send `/newbot`
+> 3. Choose a name and username (must end in `bot`)
+> 4. BotFather replies with a token like `123456789:ABCdefGHI...`
+>
+> Paste the bot token:
+
+Validate format: `<digits>:<alphanumeric>` (one colon, digits before it).
+
+Write to `.env` as the claw's bot token variable (e.g., `PERSONAL_CLAW_TELEGRAM_BOT_TOKEN`).
+
+> Each claw **must** have a unique bot token — sharing tokens causes polling conflicts.
+
+### 3.3 Admin Telegram ID
+
+Ask:
+
+> Now we need your Telegram user ID so OpenClaw knows who you are.
+>
+> 1. Send any message to [@userinfobot](https://t.me/userinfobot) in Telegram
+> 2. It replies with your numeric user ID (e.g., `123456789`)
+>
+> Paste your Telegram user ID:
+
+Validate: positive integer.
+
+Write to `.env` as `ADMIN_TELEGRAM_ID`.
+
+---
+
+## § 4. Host Alerts
+
+Ask:
+
+> Do you want **VPS monitoring alerts** via Telegram?
+>
+> This checks disk, memory, and CPU every 15 minutes and sends you alerts when thresholds are crossed. It also sends a daily health summary.
+>
+> - **Yes** (recommended) — Set up a Telegram bot for alerts
+> - **Skip for now** — Disable host alerter
+
+#### Yes
+
+Ask:
+
+> Do you want to **create a separate bot** for alerts, or **reuse** one of your claw bots?
+>
+> - **Separate bot** (recommended) — Alerts arrive in their own chat, separate from agent conversations
+> - **Reuse** — Use the same bot. Alerts and agent messages share a chat.
+
+If separate: walk through @BotFather again. Write token to `.env` as `HOSTALERT_TELEGRAM_BOT_TOKEN`.
+
+If reuse: copy the claw's bot token to `HOSTALERT_TELEGRAM_BOT_TOKEN`.
+
+Then get the chat ID:
+
+> Send any message to your alerts bot in Telegram (just say "hi"), then tell me when you've done that.
+
+After they confirm:
+
+```bash
+curl -s "https://api.telegram.org/bot<HOSTALERT_TELEGRAM_BOT_TOKEN>/getUpdates" | python3 -m json.tool
+```
+
+Extract `result[0].message.chat.id` and write to `.env` as `HOSTALERT_TELEGRAM_CHAT_ID`.
+
+If the result is empty, tell them to message the bot first and retry.
+
+#### Skip
+
+Comment out the `host_alerter:` block in `stack.yml`:
+
+```yaml
+  # host_alerter:
+  #   telegram_bot_token: ${HOSTALERT_TELEGRAM_BOT_TOKEN}
+  #   telegram_chat_id: ${HOSTALERT_TELEGRAM_CHAT_ID}
+  #   daily_report: "9:30 AM PST"
+```
+
+---
+
+## § 5. Resource Allocation
+
+Ask:
+
+> How should OpenClaw use your VPS resources?
+>
+> - **Maximize** (recommended) — Use 90% of CPU and memory for OpenClaw. Best if this VPS is dedicated to OpenClaw.
+> - **Reserve some** — Reserve capacity for other services running on the same VPS.
+
+#### Maximize
+
+Keep defaults (`max_cpu: 90%`, `max_mem: 90%` in `stack.yml`). Nothing to change.
+
+#### Reserve
+
+Ask what percentage to use (e.g., "70%"). Update `stack.yml`:
+
+```yaml
+  resources:
+    max_cpu: <percentage>%
+    max_mem: <percentage>%
+```
+
+---
+
+## § 6. Summary & Handoff
+
+Print a summary of all choices:
+
+> **Onboarding complete!** Here's your configuration:
+>
+> | Setting | Value |
+> |---------|-------|
+> | Domain | `<ROOT_DOMAIN>` |
+> | Cloudflare | API token / Manual tunnel |
+> | Egress proxy | Enabled / Disabled |
+> | Claws | `<claw-names>` |
+> | Telegram bots | Configured for each claw |
+> | Host alerts | Enabled (separate bot / shared) / Disabled |
+> | Resources | `<cpu>%` CPU, `<mem>%` memory |
+>
+> **Next step:** Say **"start"** to begin deployment.
+>
+> This will validate your configuration and run through the full deployment sequence — base setup, Docker, Sysbox, OpenClaw containers, and Cloudflare Workers.
+
+The user saying "start" enters the existing **Setup Question Flow** in CLAUDE.md → "New deployment" → `00-fresh-deploy-setup.md`.
