@@ -1,6 +1,9 @@
 # OpenClaw Single-VPS Deployment
 
-Automated deployment of [OpenClaw](https://docs.openclaw.ai) on a single VPS, orchestrated by Claude Code. Cloudflare Workers handle LLM proxying and log aggregation. Sysbox provides secure Docker-in-Docker sandboxing.
+Automated deployment of [OpenClaw](https://docs.openclaw.ai) stacks on a single VPS, orchestrated by Claude Code. Cloudflare Workers handle LLM proxying and log aggregation.
+
+All provider API keys are kept safely off of the VPS and out of OpenClaw's reach. Each claw runs
+in it's own isolated container with its own resources and config.
 
 ## What's Included
 
@@ -33,41 +36,75 @@ claude "start"
 
 ## Requirements
 
-- **[Claude Code](https://docs.anthropic.com/en/docs/build-with-claude/claude-code/overview)** CLI
+- **[Claude Code](https://docs.anthropic.com/en/docs/build-with-claude/claude-code/overview)** Pro/Max subscription
 - **VPS** — Ubuntu 24.04+, kernel 5.12+, minimum 4 GB RAM / 2 vCPUs (8 GB+ / 4+ recommended)
 - **[Cloudflare account](https://dash.cloudflare.com/sign-up)** (free tier) with a domain managed in Cloudflare DNS
-- **Cloudflare Tunnel** — either a manual `CF_TUNNEL_TOKEN` or a `CF_API_TOKEN` for automated setup
 
 ## Architecture
 
-```
-                    Cloudflare
-                        |
-        +---------------+---------------+
-        |               |               |
-   Tunnel           AI Gateway     Log Receiver
-   (HTTPS)          Worker         Worker
-        |           (LLM proxy)    (log capture)
-        v               ^               ^
-  +-------------------------------------+--------+
-  |  VPS                                         |
-  |                                              |
-  |  +-- openclaw-claw (Sysbox) -------------+   |
-  |  |  Gateway process (Node.js)            |   |
-  |  |  Nested Docker daemon                 |   |
-  |  |    -> sandbox containers (per agent)  |   |
-  |  |    -> browser container (noVNC)       |   |
-  |  +---------------------------------------+   |
-  |                                              |
-  |  Vector (log shipper)                        |
-  |  cloudflared (tunnel connector)              |
-  |  host-alert.sh (cron monitoring)             |
-  +----------------------------------------------+
+This project deploys OpenClaw stacks to a VPS or dedicated server.
+
+Multiple stacks can run on the same VPS. Each stack can contain multiple claws.
+
+```text
+                       Cloudflare
+                           |
+          +----------------+----------------+
+          |                |                |
+      Tunnel          AI Gateway       Log Receiver
+      (HTTPS)         Worker           Worker
+          |           (LLM proxy)      (log ingest)
+          v               ^                ^
+  +---------------------------------------------------+
+  |  VPS — OpenClaw Stack (docker compose)            |
+  |                                                   |
+  |  +-- openclaw-claw (Sysbox) -----------------+    |
+  |  |  Gateway process           :18789         |    |
+  |  |  Dashboard                 :6090          |    |
+  |  |  Nested Docker daemon                     |    |
+  |  |    -> sandbox containers (per agent)      |    |
+  |  |    -> browser container  (noVNC)          |    |
+  |  +-------------------------------------------+    |
+  |  +-- openclaw-* (optional) ------------------+    |
+  |  |  Configure & run any number of additional |    |
+  |  |  claws via stack.yml                      |    |
+  |  +-------------------------------------------+    |
+  |                                                   |
+  |  cloudflared        tunnel connector              |
+  |  egress-proxy       WAF bypass (optional)         |
+  |  vector             docker log shipper (optional) |
+  |  host-alert.sh      cron monitoring               |
+  +---------------------------------------------------+
 ```
 
-No ports are exposed to the public internet. The Cloudflare Tunnel uses outbound-only connections. SSH is the only open firewall port.
+All claws in the stack are isolated from each other. OpenClaw runs inside a docker container.
+
+Sysbox is used to manage permissions & enable OpenClaw to efficiently spawn agent sandbox containers.
+
+No ports are exposed to the public internet. All traffic flows through the Cloudflare Tunnel (outbound-only). SSH is the only open firewall port.
 
 LLM provider API keys are stored as Cloudflare KV secrets and injected at the edge — they never touch the VPS. After deployment, manage credentials via the self-service config UI at `https://<AI_GATEWAY_WORKER_URL>/config`.
+
+## Features
+
+- **Multi-claw stacks** — Run multiple OpenClaw instances on one VPS, each in its own Sysbox container with dedicated resources, Telegram bot, and subdomain
+- **Mission Control dashboard** — Built-in web UI with agent browser sessions (noVNC), cost tracking, media downloads, and real-time gateway stats
+- **AI Gateway proxy** — Cloudflare Worker proxies LLM requests to Anthropic/OpenAI with per-user KV credentials. API keys never touch the VPS. Self-service `/config` UI for credential management
+- **Host Alerter** — Telegram notifications for disk, memory, and CPU thresholds every 15 minutes, plus a daily health summary report
+- **LLM observability** — Structured logging via Vector to Cloudflare Workers, with optional Langfuse tracing for cost and latency analysis
+- **Egress proxy** — Optional sidecar that routes requests through the VPS IP to bypass WAF blocks on Cloudflare Worker IPs (e.g., ChatGPT Codex)
+- **Zero exposed ports** — All traffic through Cloudflare Tunnel with Access authentication. SSH is the only open firewall port
+- **Claude-driven deployment** — Modular playbooks that Claude Code executes step-by-step. First deploy ~30 minutes, mostly hands-off
+
+<p align="center">
+  <img src="docs/assets/screenshot-mission-control.png" alt="Mission Control Dashboard" width="700">
+</p>
+<p align="center"><em>Mission Control — agent browsers, cost tracking, and gateway stats</em></p>
+
+<p align="center">
+  <img src="docs/assets/telegram-host-alerter-report.png" alt="Host Alerter Telegram Report" width="400">
+</p>
+<p align="center"><em>Host Alerter — daily health summary and real-time alerts via Telegram</em></p>
 
 ## Configuration
 
