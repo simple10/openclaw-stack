@@ -186,6 +186,7 @@ Tools available inside agent sandboxes are defined in `openclaw/default/sandbox-
 | [Sandbox Toolkit](docs/SANDBOX-TOOLKIT.md) | Adding and managing sandbox tools |
 | [Telegram](docs/TELEGRAM.md) | Telegram bot setup for chat and host alerts |
 | [Claude Subscription](docs/CLAUDE-SUBSCRIPTION.md) | Using Claude Code subscription tokens with OpenClaw |
+| [Codex Subscription](docs/CODEX-SUBSCRIPTION.md) | Using OpenAI Codex subscription tokens with OpenClaw |
 | [Security](docs/SECURITY.md) | Full security model: network, auth, device pairing, containers |
 | [Testing](docs/TESTING.md) | End-to-end verification (SSH + browser via DevTools MCP) |
 
