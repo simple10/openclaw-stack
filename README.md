@@ -1,4 +1,4 @@
-# OpenClaw Single-VPS Deployment
+# OpenClaw VPS Stack
 
 Automated deployment of [OpenClaw](https://docs.openclaw.ai) stacks on a single VPS, orchestrated by Claude Code. Cloudflare Workers handle LLM proxying and log aggregation.
 
@@ -124,8 +124,11 @@ claude
 ```
 
 > Update OpenClaw to the latest version
+>
 > Run the verification tests
+>
 > Show me the gateway logs
+>
 > Help me pair a new browser with the gateway
 
 ### Helper Scripts
