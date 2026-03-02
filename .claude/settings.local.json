@@ -29,7 +29,8 @@
       "mcp__chrome-devtools__wait_for",
       "Bash(git check-ignore:*)",
       "Bash(scripts/sync-deploy.sh:*)",
-      "Bash(scripts/restart-gateway.sh:*)"
+      "Bash(scripts/restart-gateway.sh:*)",
+      "Bash(bash:*)"
     ]
   }
 }

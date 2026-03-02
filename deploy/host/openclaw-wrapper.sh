@@ -7,9 +7,13 @@
 #   2. Auto-detect: single running container = use it, multiple = interactive picker
 
 # Resolve project name from stack.env (for container name prefix)
+# When installed to /usr/local/bin, SCRIPT_DIR won't have source-config.sh,
+# so also check the known install dir ({{INSTALL_DIR}} resolved at build time).
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 if [ -f "${SCRIPT_DIR}/source-config.sh" ]; then
   source "${SCRIPT_DIR}/source-config.sh"
+elif [ -f "{{INSTALL_DIR}}/host/source-config.sh" ]; then
+  source "{{INSTALL_DIR}}/host/source-config.sh"
 fi
 PROJECT_NAME="${STACK__STACK__PROJECT_NAME:-openclaw-stack}"
 
