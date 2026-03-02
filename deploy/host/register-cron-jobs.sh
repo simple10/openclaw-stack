@@ -161,8 +161,8 @@ for CLAW in "${CLAWS[@]}"; do
     ${DELIVERY_FLAGS} \
     --message "Read the VPS health report files and analyze them:
 
-1. Read host-status/health.json (resource metrics)
-2. Read host-status/maintenance.json (OS maintenance)
+1. Read /workspace/host-status/health.json (resource metrics)
+2. Read /workspace/host-status/maintenance.json (OS maintenance)
 
 Analyze for issues that need human attention:
 
