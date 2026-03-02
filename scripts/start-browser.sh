@@ -16,14 +16,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="$SCRIPT_DIR/../openclaw-config.env"
-
-if [[ ! -f "$CONFIG_FILE" ]]; then
-  echo "Error: openclaw-config.env not found at $CONFIG_FILE" >&2
-  exit 1
-fi
-
-source "$CONFIG_FILE"
+source "$SCRIPT_DIR/lib/source-config.sh"
 source "$SCRIPT_DIR/lib/resolve-gateway.sh"
 
 # Extract --instance before positional args
@@ -42,13 +35,13 @@ MAX_WAIT=90  # seconds to wait for browser container
 
 # Helper: run a command inside the gateway container as node
 gw_exec() {
-  TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+  TERM=xterm-256color ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
     "sudo docker exec --user node $GATEWAY $*"
 }
 
 # Helper: run a command inside the gateway container as root (for nested docker)
 gw_exec_root() {
-  TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+  TERM=xterm-256color ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
     "sudo docker exec $GATEWAY $*"
 }
 
@@ -128,7 +121,7 @@ if [[ -z "$BROWSER_CONTAINER" ]]; then
   printf '\033[33mNo existing browser container. Sending agent message to trigger creation...\033[0m\n'
 
   # Send a message that reliably triggers the browser tool
-  TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+  TERM=xterm-256color ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
     "sudo docker exec --user node $GATEWAY openclaw agent --agent $AGENT \
       --message 'Use the browser tool to navigate to about:blank. Do nothing else after that.' \
       --timeout 90" >/dev/null 2>&1 &
@@ -198,9 +191,17 @@ done
 
 # ── Print dashboard URL ─────────────────────────────────────────────
 
-DASHBOARD_BASE="https://${OPENCLAW_DASHBOARD_DOMAIN}${OPENCLAW_DASHBOARD_DOMAIN_PATH:-}"
+# Derive per-claw domain vars from the gateway container name
+INSTANCE_NAME="${GATEWAY#openclaw-}"
+CLAW_KEY=$(echo "$INSTANCE_NAME" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
+DOMAIN_VAR="STACK__CLAWS__${CLAW_KEY}__DOMAIN"
+DASHBOARD_PATH_VAR="STACK__CLAWS__${CLAW_KEY}__DASHBOARD_PATH"
+CLAW_DOMAIN="${!DOMAIN_VAR}"
+CLAW_DASHBOARD_PATH="${!DASHBOARD_PATH_VAR}"
+
+DASHBOARD_BASE="https://${CLAW_DOMAIN}${CLAW_DASHBOARD_PATH:-}"
 # WebSocket path is relative (no leading /)
-WS_PREFIX="${OPENCLAW_DASHBOARD_DOMAIN_PATH:-}"
+WS_PREFIX="${CLAW_DASHBOARD_PATH:-}"
 WS_PREFIX="${WS_PREFIX#/}"  # strip leading /
 
 VNC_URL="${DASHBOARD_BASE}/browser/${AGENT}/vnc.html?path=${WS_PREFIX:+${WS_PREFIX}/}browser/${AGENT}/websockify"

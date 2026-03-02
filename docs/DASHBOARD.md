@@ -10,7 +10,7 @@ User browser → Cloudflare Edge → Tunnel → cloudflared (VPS host)
     → reads browsers.json → 127.0.0.1:<noVncPort> (browser container)
 ```
 
-Browser sandbox containers run inside the gateway's nested Docker (Sysbox DinD). Each browser container serves noVNC on port 6080, Docker-mapped to a random host port inside the gateway container. The dashboard server (`deploy/dashboard.mjs`) runs inside the gateway and routes requests to the correct browser container based on dynamic port mappings.
+Browser sandbox containers run inside the gateway's nested Docker (Sysbox DinD). Each browser container serves noVNC on port 6080, Docker-mapped to a random host port inside the gateway container. The dashboard server (`deploy/openclaw-stack/dashboard/server.mjs`) runs inside the gateway and routes requests to the correct browser container based on dynamic port mappings.
 
 ### How Port Discovery Works
 
@@ -39,7 +39,7 @@ The proxy reads this file on every request (no caching needed — the file is ti
 
 ## URL Configuration
 
-The dashboard URL is configured via two variables in `openclaw-config.env`:
+The dashboard URL is configured per-claw in `stack.yml` under `claws.<name>.domain` and `claws.<name>.dashboard_path`:
 
 | Variable | Purpose | Example |
 |----------|---------|---------|
@@ -76,7 +76,7 @@ The `?path=` query parameter tells the noVNC client where to connect the WebSock
 
 ## Components
 
-### `deploy/dashboard.mjs`
+### `deploy/openclaw-stack/dashboard/server.mjs`
 
 Node.js dashboard server (zero dependencies — built-in `http` module only). Reads `DASHBOARD_BASE_PATH` env var for subpath-aware routing. Handles:
 
@@ -85,22 +85,9 @@ Node.js dashboard server (zero dependencies — built-in `http` module only). Re
 - **Health checking**: TCP probes each container's noVNC port before proxying; shows friendly HTML error page if the container is down (avoids Cloudflare intercepting 502 errors)
 - **Index page**: lists all registered sessions with live up/down status indicators, auto-refreshes every 10 seconds
 
-### `deploy/entrypoint-gateway.sh` (Phase 2b)
+### `deploy/openclaw-stack/entrypoint.sh`
 
-Starts the dashboard server as a background process before gosu drops privileges:
-
-```bash
-DASHBOARD_SERVER="/app/deploy/dashboard.mjs"
-if [ -f "$DASHBOARD_SERVER" ]; then
-  node "$DASHBOARD_SERVER" &
-fi
-```
-
-### `deploy/docker-compose.override.yml`
-
-- Port mapping: `127.0.0.1:6090:6090` (localhost-only for tunnel access)
-- Volume: `./deploy/dashboard.mjs:/app/deploy/dashboard.mjs:ro`
-- Environment: `DASHBOARD_BASE_PATH=${DASHBOARD_BASE_PATH:-}` (set from `OPENCLAW_DASHBOARD_DOMAIN_PATH`)
+The entrypoint starts the dashboard server as a background process. The dashboard is exposed on port 6090 (localhost-only via Docker port mapping) for tunnel access.
 
 ### Cloudflare Tunnel Route
 
@@ -180,7 +167,7 @@ This avoids the concurrency problems of a shared browser sidecar approach.
 
 - Gateway deployed with Sysbox (Docker-in-Docker)
 - Cloudflare Tunnel connected
-- `deploy/dashboard.mjs` bind-mounted into the gateway container
+- `deploy/openclaw-stack/dashboard/server.mjs` bind-mounted into the gateway container
 
 ### Adding the Tunnel Route
 
@@ -188,21 +175,21 @@ This avoids the concurrency problems of a shared browser sidecar approach.
 2. Click your tunnel → **Configure** → **Public Hostname** tab
 3. Add a new public hostname pointing to `http://localhost:6090` (see "Cloudflare Tunnel Route" above for subdomain vs subpath options)
 4. Add a Cloudflare Access policy to restrict who can view browser sessions
-5. Set `OPENCLAW_DASHBOARD_DOMAIN` and `OPENCLAW_DASHBOARD_DOMAIN_PATH` in `openclaw-config.env` to match your chosen URL
+5. Set the domain and dashboard path in `stack.yml` under `claws.<name>` to match your chosen URL
 
 ### Verification
 
 ```bash
 # Dashboard is listening (use base path if configured)
-sudo docker exec openclaw-main-claw curl -s http://127.0.0.1:6090/
+sudo docker exec openclaw-stack-openclaw-main-claw curl -s http://127.0.0.1:6090/
 # Or with base path:
-sudo docker exec openclaw-main-claw curl -s http://127.0.0.1:6090/dashboard/
+sudo docker exec openclaw-stack-openclaw-main-claw curl -s http://127.0.0.1:6090/dashboard/
 
 # Check startup log for base path
-sudo docker logs openclaw-main-claw 2>&1 | grep 'dashboard'
+sudo docker logs openclaw-stack-openclaw-main-claw 2>&1 | grep 'dashboard'
 
 # After a browser task runs, check session routing
-sudo docker exec openclaw-main-claw curl -s http://127.0.0.1:6090/dashboard/browser/main/vnc.html
+sudo docker exec openclaw-stack-openclaw-main-claw curl -s http://127.0.0.1:6090/dashboard/browser/main/vnc.html
 
 # External access via tunnel
 curl -s https://<OPENCLAW_DASHBOARD_DOMAIN><OPENCLAW_DASHBOARD_DOMAIN_PATH>/
@@ -223,14 +210,14 @@ The noVNC WebSocket path is wrong. Ensure the URL includes `?path=browser/<agent
 The dashboard server is returning a 5xx status. Check gateway logs:
 
 ```bash
-sudo docker logs openclaw-main-claw 2>&1 | grep dashboard
+sudo docker logs openclaw-stack-openclaw-main-claw 2>&1 | grep dashboard
 ```
 
 ### Dashboard not starting
 
-Check that `dashboard.mjs` is bind-mounted and the entrypoint reached Phase 2b:
+Check that the dashboard is bind-mounted and the entrypoint reached Phase 2b:
 
 ```bash
-sudo docker exec openclaw-main-claw ls -la /app/deploy/dashboard.mjs
-sudo docker logs openclaw-main-claw 2>&1 | grep "Dashboard server"
+sudo docker exec openclaw-stack-openclaw-main-claw ls -la /app/openclaw-stack/dashboard/server.mjs
+sudo docker logs openclaw-stack-openclaw-main-claw 2>&1 | grep "Dashboard server"
 ```

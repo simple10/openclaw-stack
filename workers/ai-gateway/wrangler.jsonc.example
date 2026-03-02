@@ -6,6 +6,13 @@
 
   "compatibility_date": "2026-02-06",
 
+  // Multi-user auth & credential storage
+  // Create namespace: wrangler kv namespace create AUTH_KV
+  // Then paste the returned ID below.
+  "kv_namespaces": [
+    { "binding": "AUTH_KV", "id": "" }
+  ],
+
   // Workers Logs: enables console.log in the worker
   "observability": {
     "enabled": true
@@ -17,9 +24,9 @@
   },
 
   "vars": {
-    // ---- Worker Client Auth ----
-    //   (Set during deployment via `wrangler put secret ...`)
-    //   AUTH_TOKEN — token clients use to authenticate to this worker
+    // ---- Admin Auth ----
+    //   ADMIN_AUTH_TOKEN — protects /admin/* endpoints (set via `wrangler secret put ...`)
+    //   User tokens are stored in AUTH_KV and managed via admin endpoints.
     //
     //
     // ---- Console Logging ----
@@ -33,10 +40,14 @@
     //
     //
     // ---- Provider API keys ----
-    // (see docs/AI-GATEWAY-CONFIG.md):
-    //   OPENAI_API_KEY        — forwarded to OpenAI (required for OpenAI models)
-    //   ANTHROPIC_API_KEY     — forwarded to Anthropic (required for Anthropic models)
-    //   CLAUDE_CODE_OAUTH_TOKEN  — Claude Code subscription token (sk-ant-oat-*)
+    // Per-user provider credentials are stored in AUTH_KV (managed via /admin/users endpoints).
+    //
+    //
+    // ---- Egress Proxy (optional) ----
+    // Routes requests through a VPS sidecar to bypass upstream WAF blocks
+    // (e.g. chatgpt.com blocking Cloudflare Worker IPs for openai-codex).
+    // EGRESS_PROXY_URL        — e.g. https://egress-proxy.yourdomain.com (set via `wrangler secret put ...`)
+    // EGRESS_PROXY_AUTH_TOKEN — shared secret with the VPS egress proxy (set via `wrangler secret put ...`)
     //
     //
     // ---- CF AI Gateway ID (optional) ----

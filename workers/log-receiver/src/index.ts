@@ -78,8 +78,8 @@ export default {
       return addCorsHeaders(await handleLlemtry(request, env, ctx))
     }
 
-    // POST /events — receive batched telemetry events for D1 storage
-    if (request.method === 'POST' && pathname === '/events') {
+    // POST /openclaw/events — receive batched telemetry events for D1 storage
+    if (request.method === 'POST' && pathname === '/openclaw/events') {
       if (!env.DB) {
         console.error('[events] D1 database binding "DB" not configured')
         return addCorsHeaders(

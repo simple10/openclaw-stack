@@ -17,37 +17,37 @@ Collect the following values and present them in a single, neatly formatted repo
 
 ## Values to collect
 
-1. **User passwords** — these were generated and displayed during `02-base-setup.md` section 2.2. If you no longer have them in context (e.g., context was compressed), check the `# DEPLOYED:` lines in `openclaw-config.env` first (`grep 'DEPLOYED.*PASSWORD' openclaw-config.env`). If those are also empty, inform the user the passwords were displayed during base setup and can be reset via VNC/console access.
+1. **User passwords** — source `scripts/lib/source-config.sh` to get `ADMINCLAW_PASSWORD` and `OPENCLAW_PASSWORD`. These are auto-generated and persisted in `.env.local`.
 
-2. **Per-claw gateway tokens** — read from VPS:
+2. **Per-claw gateway tokens** — read from container env var (NOT openclaw.json):
 
    ```bash
-   CLAWS=$(ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
-     "sudo docker ps --format '{{.Names}}' --filter 'name=^openclaw-' | grep -v '^openclaw-cli$' | grep -v '^openclaw-sbx-' | sort")
+   CLAWS=$(ssh -i <SSH_KEY> -p <SSH_PORT> <SSH_USER>@<VPS_IP> \
+     "sudo docker ps --format '{{.Names}}' --filter 'name=-openclaw-' | sort")
    for CLAW in $CLAWS; do
-     TOKEN=$(ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
-       "sudo docker exec --user node $CLAW node -e \"console.log(require('/home/node/.openclaw/openclaw.json').gateway.auth.token)\"")
+     TOKEN=$(ssh -i <SSH_KEY> -p <SSH_PORT> <SSH_USER>@<VPS_IP> \
+       "sudo docker exec --user node $CLAW printenv OPENCLAW_GATEWAY_TOKEN")
      echo "$CLAW: $TOKEN"
    done
    ```
 
-3. **Domain and URLs** — from `openclaw-config.env` and per-claw tunnel routes.
+3. **Domain and URLs** — read from `.deploy/stack.json` (`claws.<name>.domain`, `claws.<name>.domain_path`) for the resolved values as actually deployed.
 
 ## AI proxy status
 
-Include the appropriate callout in the report based on `08a-configure-llm-proxy.md` outcome:
+Include the config URL and credential status in the report:
 
-**If configured and working (Step 3 returned 200):**
+> **AI Proxy Config:** `https://<AI_GATEWAY_WORKER_URL>/config`
+>
+> Provider credentials can be added or updated at any time via the config UI using the gateway token.
 
-> **AI Proxy:** Configured and verified.
+**If the user added credentials during `08a`:**
 
-**If configured but test failed (Step 3 returned an error):**
+> **AI Proxy:** Provider credentials configured.
 
-> **AI Proxy:** Anthropic API key is set but the test request failed. Check the key and provider billing. See [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md) for troubleshooting.
+**If skipped:**
 
-**If skipped (user chose to skip in Step 2):**
-
-> **AI Proxy:** Not configured. See [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md) to add provider API keys.
+> **AI Proxy:** Deployed but no provider credentials configured yet. Visit the config URL above to add API keys.
 
 ## Report format
 
@@ -57,7 +57,7 @@ Output the report using exactly this structure:
 ## OpenClaw Deployment Report
 
 **Date:** <current date>
-**VPS IP:** <VPS1_IP>
+**VPS IP:** <VPS_IP>
 **Domain:** <OPENCLAW_DOMAIN>
 
 ---
@@ -66,7 +66,7 @@ Output the report using exactly this structure:
 
 | User | Password | Purpose |
 |------|----------|---------|
-| `adminclaw` | `<password>` | SSH admin, passwordless sudo |
+| `adminclaw` | `<password>` | SSH admin, passwordless sudo, use for emergency KVM login |
 | `openclaw` | `<password>` | App runtime, no SSH, no sudo |
 
 > These passwords are for emergency VNC/console access only. Normal access is via SSH key.
@@ -76,7 +76,7 @@ Output the report using exactly this structure:
 ### SSH Access
 
 \`\`\`bash
-ssh -i <SSH_KEY_PATH> -p <SSH_PORT> adminclaw@<VPS1_IP>
+ssh -i <SSH_KEY> -p <SSH_PORT> adminclaw@<VPS_IP>
 \`\`\`
 
 ---
@@ -89,7 +89,7 @@ ssh -i <SSH_KEY_PATH> -p <SSH_PORT> adminclaw@<VPS1_IP>
 
 | Service | URL |
 |---------|-----|
-| **Dashboard** | `https://<OPENCLAW_DASHBOARD_DOMAIN><OPENCLAW_DASHBOARD_DOMAIN_PATH>/` |
+| **Dashboard** | `https://<CLAW_DOMAIN><DASHBOARD_BASE_PATH>/` |
 
 All URLs are protected by Cloudflare Access.
 
@@ -100,7 +100,15 @@ All URLs are protected by Cloudflare Access.
 | Worker | URL |
 |--------|-----|
 | AI Gateway Proxy | `<AI_GATEWAY_WORKER_URL>` |
-| Log Receiver | `<LOG_WORKER_URL without /logs suffix>` |
+| AI Gateway Config | `<AI_GATEWAY_WORKER_URL>/config` |
+| Log Receiver | `<LOG_WORKER_URL>` |
+| Egress Proxy | `<EGRESS_PROXY_URL>` (if configured) |
+
+| Secret | Value |
+|--------|-------|
+| AI Gateway Admin Token | `<AI_WORKER_ADMIN_AUTH_TOKEN>` |
+
+> **Keep the admin token safe** — it controls user creation, deletion, and credential access for the AI Gateway.
 
 ---
 
@@ -114,7 +122,7 @@ All URLs are protected by Cloudflare Access.
 | Maintenance checker | Daily (30 min before daily report) | Active |
 ```
 
-Check `HOSTALERT_TELEGRAM_BOT_TOKEN` and `HOSTALERT_TELEGRAM_CHAT_ID` in `openclaw-config.env`.
+Read `HOSTALERT_TELEGRAM_BOT_TOKEN` and `HOSTALERT_TELEGRAM_CHAT_ID` from `.env`.
 
 **If both are set:** Host alerter and daily report are active. Show status as `Active` in both rows. For the daily report schedule, use the value of `HOSTALERT_DAILY_REPORT_TIME` (default: `9:00 AM UTC`).
 
@@ -134,7 +142,7 @@ Check `HOSTALERT_TELEGRAM_BOT_TOKEN` and `HOSTALERT_TELEGRAM_CHAT_ID` in `opencl
 | Task | Command |
 |------|---------|
 | SSH to VPS | `./scripts/ssh-vps.sh` |
-| SSH to claw | `./scripts/ssh-gateway.sh` |
+| SSH to claw container | `./scripts/ssh-openclaw.sh` |
 | Claw logs | `./scripts/logs-openclaw.sh` |
 | Health Checks | `./scripts/health-check.sh` |
 | OpenClaw CLI | `./scripts/openclaw.sh [command]` or SSH to claw `openclaw` |
@@ -143,9 +151,9 @@ Check `HOSTALERT_TELEGRAM_BOT_TOKEN` and `HOSTALERT_TELEGRAM_CHAT_ID` in `opencl
 | Update Sandboxes | `claude "update ffmpeg in the sandbox toolkit"` |
 ```
 
-> For additional AI provider configuration (OpenAI, Cloudflare AI Gateway, Claude Code subscription), see [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md).
+> To add or update provider API keys, visit the AI Gateway Config URL above. For advanced configuration (Cloudflare AI Gateway, Claude Code subscription), see [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md).
 
-> **Note:** If user passwords are no longer in the conversation context, check `openclaw-config.env` for `# DEPLOYED:` lines first (`grep 'DEPLOYED' openclaw-config.env`). These are written automatically during deployment as a safety net. If those are also empty, the passwords can be reset via VNC/console access.
+> **Note:** User passwords and the AI Gateway admin token are always available via `source scripts/lib/source-config.sh` (stored in `.env.local`).
 
 ## Save and display
 

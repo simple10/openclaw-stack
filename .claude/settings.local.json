@@ -2,13 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(ssh:*)",
-      "Bash(scp:*)",
       "Bash(curl:*)",
       "Bash(nc:*)",
       "Bash(npm:*)",
-      "Bash(npx:*)",
-      "Bash(python3:*)",
-      "Bash(bash scripts/:*)",
       "Bash(tree:*)",
       "Bash(find:*)",
       "Bash(ls:*)",
@@ -17,7 +13,8 @@
       "Bash(echo:*)",
       "Bash(test:*)",
       "Bash(source:*)",
-      "Bash(openssl rand:*)",
+      "Bash(head:*)",
+      "Bash(shellcheck:*)",
       "WebFetch(domain:docs.openclaw.ai)",
       "mcp__plugin_claude-mem_mcp-search__search",
       "mcp__plugin_claude-mem_mcp-search__save_memory",
@@ -31,9 +28,9 @@
       "mcp__plugin_claude-mem_mcp-search__get_observations",
       "mcp__chrome-devtools__wait_for",
       "Bash(git check-ignore:*)",
-      "Bash(head:*)",
-      "Bash(shellcheck:*)",
-      "Bash(git add:*)"
+      "Bash(scripts/sync-deploy.sh:*)",
+      "Bash(scripts/restart-gateway.sh:*)",
+      "Bash(bash:*)"
     ]
   }
 }

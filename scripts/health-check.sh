@@ -9,14 +9,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="$SCRIPT_DIR/../openclaw-config.env"
-
-if [[ ! -f "$CONFIG_FILE" ]]; then
-  echo "Error: openclaw-config.env not found at $CONFIG_FILE" >&2
-  exit 1
-fi
-
-source "$CONFIG_FILE"
+source "$SCRIPT_DIR/lib/source-config.sh"
 source "$SCRIPT_DIR/lib/resolve-gateway.sh"
 
 QUIET=false
@@ -48,7 +41,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 export TERM=xterm-256color
-SSH_CMD="ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP}"
+SSH_CMD="ssh -i ${ENV__SSH_KEY} -p ${ENV__SSH_PORT} ${ENV__SSH_USER}@${ENV__VPS_IP}"
 FAILURES=0
 
 log() {
@@ -74,7 +67,7 @@ warn() {
 log ""
 log "Checking VPS connectivity..."
 if ! $SSH_CMD "true" 2>/dev/null; then
-  fail "Cannot reach VPS at ${VPS1_IP}:${SSH_PORT}"
+  fail "Cannot reach VPS at ${ENV__VPS_IP}:${ENV__SSH_PORT}"
   log ""
   log "$(printf '\033[31m%s check(s) failed.\033[0m')" "$FAILURES"
   exit 1
@@ -87,7 +80,7 @@ log "Checking Docker containers..."
 
 GATEWAY=$(resolve_gateway ${INSTANCE_ARGS[@]+"${INSTANCE_ARGS[@]}"}) || exit 1
 CONTAINERS="$GATEWAY"
-if [ "${ENABLE_VECTOR_LOG_SHIPPING:-true}" = "true" ]; then
+if [ "${STACK__STACK__LOGGING__VECTOR:-true}" = "true" ]; then
   CONTAINERS="$CONTAINERS vector"
 fi
 for CONTAINER in $CONTAINERS; do

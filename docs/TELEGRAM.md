@@ -21,11 +21,12 @@ Send any message to [@userinfobot](https://t.me/userinfobot) — it replies with
 
 ## 3. Configure
 
-Add both values to `openclaw-config.env`:
+Add both values to `stack.yml` under your claw config, and the bot token to `.env`:
 
-```bash
-YOUR_TELEGRAM_ID=123456789
-OPENCLAW_TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz
+```yaml
+# stack.yml — under claws.<name>
+telegram_bot_token: "123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+your_telegram_id: "123456789"
 ```
 
 - `YOUR_TELEGRAM_ID` gates elevated mode — only this Telegram user can activate `/elevated` commands
@@ -64,7 +65,7 @@ The host alerter sends disk/memory/CPU alerts via Telegram. You can reuse the sa
 ### Save the Config
 
 ```bash
-# openclaw-config.env
+# .env
 HOSTALERT_TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz
 HOSTALERT_TELEGRAM_CHAT_ID=123456789
 ```
@@ -96,7 +97,7 @@ Alerts are only sent on **state changes** — you won't get repeated messages fo
 
 ## Updating Configs
 
-See [deploy/host-alert.sh](../deploy/host-alert.sh) for threshold configs.
+See [deploy/host/host-alert.sh](../deploy/host/host-alert.sh) for threshold configs.
 
 Ask claude to `redeploy host alert` after you've made any changes to host-alert.sh
-or the Telegram settings in openclaw-config.env.
+or the Telegram settings in `.env`.

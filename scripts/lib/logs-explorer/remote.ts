@@ -1,9 +1,9 @@
 /**
  * SSH command execution and data layer.
- * Loads config from openclaw-config.env, runs commands on VPS via SSH.
+ * Loads config from .deploy/stack.json + .deploy/stack.env, runs commands on VPS via SSH.
  */
 
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { resolve, dirname } from 'path'
 
 export interface SessionInfo {
@@ -55,35 +55,53 @@ function expandHome(p: string): string {
   return p.startsWith('~/') ? `${process.env.HOME}${p.slice(1)}` : p
 }
 
+function findRepoRoot(): string {
+  let dir = dirname(Bun.main)
+  for (let i = 0; i < 10; i++) {
+    if (existsSync(resolve(dir, '.env')) && existsSync(resolve(dir, '.deploy'))) {
+      return dir
+    }
+    const parent = resolve(dir, '..')
+    if (parent === dir) break
+    dir = parent
+  }
+  throw new Error('Could not find repo root (looking for .env + .deploy/)')
+}
+
 export function loadConfig(): Config {
   const scriptDir = dirname(Bun.main)
-  const envPath = resolve(scriptDir, '../../../openclaw-config.env')
-  const content = readFileSync(envPath, 'utf-8')
-  const env: Record<string, string> = {}
+  const repoRoot = findRepoRoot()
+  const stackJsonPath = resolve(repoRoot, '.deploy/stack.json')
 
-  for (const line of content.split('\n')) {
-    const t = line.trim()
-    if (!t || t.startsWith('#')) continue
-    const eq = t.indexOf('=')
-    if (eq < 0) continue
-    let v = t.slice(eq + 1)
-    if ((v[0] === '"' && v.at(-1) === '"') || (v[0] === "'" && v.at(-1) === "'")) v = v.slice(1, -1)
-    else {
-      // Strip inline comments (only for unquoted values)
-      const hashIdx = v.indexOf('#')
-      if (hashIdx >= 0) v = v.slice(0, hashIdx)
-      v = v.trim()
-    }
-    env[t.slice(0, eq)] = v
+  if (!existsSync(stackJsonPath)) {
+    throw new Error(`stack.json not found at ${stackJsonPath}. Run 'npm run pre-deploy' first.`)
   }
 
-  const installDir = env.INSTALL_DIR || '/home/openclaw'
+  const stackConfig = JSON.parse(readFileSync(stackJsonPath, 'utf-8'))
+  const stack = stackConfig.stack || {}
+  const installDir = String(stack.install_dir || '/home/openclaw')
+
+  // Read SSH config from stack.env (parsed by dotenv-style reading)
+  const stackEnvPath = resolve(repoRoot, '.deploy/stack.env')
+  const envVars: Record<string, string> = {}
+  if (existsSync(stackEnvPath)) {
+    for (const line of readFileSync(stackEnvPath, 'utf-8').split('\n')) {
+      const t = line.trim()
+      if (!t || t.startsWith('#')) continue
+      const eq = t.indexOf('=')
+      if (eq < 0) continue
+      let v = t.slice(eq + 1)
+      if ((v[0] === "'" && v.at(-1) === "'")) v = v.slice(1, -1)
+      else if ((v[0] === '"' && v.at(-1) === '"')) v = v.slice(1, -1)
+      envVars[t.slice(0, eq)] = v
+    }
+  }
 
   return {
-    host: env.VPS1_IP ?? '',
-    port: env.SSH_PORT ?? '222',
-    user: env.SSH_USER ?? 'adminclaw',
-    keyPath: expandHome(env.SSH_KEY_PATH ?? '~/.ssh/vps1_openclaw_ed25519'),
+    host: envVars.ENV__VPS_IP ?? '',
+    port: envVars.ENV__SSH_PORT ?? '222',
+    user: envVars.ENV__SSH_USER ?? 'adminclaw',
+    keyPath: expandHome(envVars.ENV__SSH_KEY ?? '~/.ssh/vps1_openclaw_ed25519'),
     pythonScript: resolve(scriptDir, 'debug-sessions.py'),
     baseDir: '', // resolved by resolveInstance()
     llmLogPath: '', // resolved by resolveInstance()

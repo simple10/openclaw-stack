@@ -15,18 +15,17 @@ Pair browser and Telegram devices with each claw's gateway.
 Discover running claws and read each claw's gateway token:
 
 ```bash
-# On VPS: list claws and their gateway tokens
-CLAWS=$(sudo docker ps --format '{{.Names}}' --filter 'name=^openclaw-' | grep -v '^openclaw-cli$' | grep -v '^openclaw-sbx-' | sort)
+# On VPS: list claws and their gateway tokens (from env var, not openclaw.json)
+CLAWS=$(sudo docker ps --format '{{.Names}}' --filter 'name=-openclaw-' | sort)
 for CLAW in $CLAWS; do
-  TOKEN=$(sudo docker exec --user node "$CLAW" \
-    node -e "console.log(require('/home/node/.openclaw/openclaw.json').gateway.auth.token)" 2>/dev/null || echo "UNKNOWN")
+  TOKEN=$(sudo docker exec --user node "$CLAW" printenv OPENCLAW_GATEWAY_TOKEN 2>/dev/null || echo "UNKNOWN")
   echo "$CLAW: token=$TOKEN"
 done
 ```
 
-> **Note:** If `OPENCLAW_DOMAIN_PATH` is empty in `openclaw-config.env`, the URL is simply `https://<CLAW_DOMAIN>/chat?token=<TOKEN>`.
+> **Note:** If the claw's `domain_path` is empty (in `.deploy/stack.json`), the URL is simply `https://<CLAW_DOMAIN>/chat?token=<TOKEN>`.
 
-Construct the URL for each claw using its domain (from the Cloudflare Tunnel route or per-claw `config.env`) and token:
+Construct the URL for each claw using its domain (from `.deploy/stack.json` per-claw config) and token:
 
 ```
 https://<CLAW_DOMAIN><OPENCLAW_DOMAIN_PATH>/chat?token=<TOKEN>
@@ -41,9 +40,9 @@ Ask the user to open each claw's URL in their browser, one at a time. Each claw 
 **If the page doesn't load at all (connection error or timeout):**
 
 1. Check the tunnel is running:
-   - `ssh ... "sudo systemctl status cloudflared"`
-2. Check the claw is running: `ssh ... "sudo docker ps --filter 'name=^openclaw-'"`
-3. Check claw logs: `ssh ... "sudo docker logs --tail 20 openclaw-<name>"`
+   - `ssh ... "sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose ps cloudflared'"`
+2. Check the claw is running: `ssh ... "sudo docker ps --filter 'name=-openclaw-'"`
+3. Check claw logs: `ssh ... "sudo docker logs --tail 20 <PROJECT_NAME>-openclaw-<name>"`
 4. Verify DNS is resolving to the correct destination
 
 Ask the user to confirm they can see the page (even with the pairing error) before proceeding.
@@ -66,7 +65,7 @@ The `openclaw` host wrapper runs via `docker exec` inside the container, where t
 
 ```bash
 # List pending device requests for a specific claw
-ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
+ssh -i <SSH_KEY> -p <SSH_PORT> <SSH_USER>@<VPS_IP> \
   "openclaw --instance <CLAW_NAME> devices list"
 ```
 
@@ -74,7 +73,7 @@ Find the `requestId` for the `openclaw-control-ui` client, then approve:
 
 ```bash
 # Approve the webchat device
-ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
+ssh -i <SSH_KEY> -p <SSH_PORT> <SSH_USER>@<VPS_IP> \
   "openclaw --instance <CLAW_NAME> devices approve <requestId>"
 ```
 
@@ -88,18 +87,17 @@ If `openclaw --instance <CLAW_NAME> devices list` fails with "pairing required",
 
 ```bash
 # Discover the claw's gateway port (each claw gets a unique port: 18789, 18790, ...)
-PORT=$(ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
-  "sudo docker port openclaw-<CLAW_NAME> | grep -oP '0\.0\.0\.0:\K\d+' | head -1")
+PORT=$(ssh -i <SSH_KEY> -p <SSH_PORT> <SSH_USER>@<VPS_IP> \
+  "sudo docker port <PROJECT_NAME>-openclaw-<CLAW_NAME> | grep -oP '0\.0\.0\.0:\K\d+' | head -1")
 echo "Claw port: $PORT"
 
-# Read token from the claw's openclaw.json
-TOKEN=$(ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
-  "sudo docker exec --user node openclaw-<CLAW_NAME> \
-    node -e \"console.log(require('/home/node/.openclaw/openclaw.json').gateway.auth.token)\"")
+# Read token from the claw's env var
+TOKEN=$(ssh -i <SSH_KEY> -p <SSH_PORT> <SSH_USER>@<VPS_IP> \
+  "sudo docker exec --user node <PROJECT_NAME>-openclaw-<CLAW_NAME> printenv OPENCLAW_GATEWAY_TOKEN")
 
 # Re-pair CLI with explicit token and port (loopback triggers auto-approval)
-ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
-  "sudo docker exec --user node openclaw-<CLAW_NAME> \
+ssh -i <SSH_KEY> -p <SSH_PORT> <SSH_USER>@<VPS_IP> \
+  "sudo docker exec --user node <PROJECT_NAME>-openclaw-<CLAW_NAME> \
     openclaw devices list --url ws://localhost:${PORT} --token $TOKEN"
 ```
 
@@ -120,7 +118,7 @@ This re-pairs the CLI via loopback auto-approval. Now retry Approach 1.
   approval. Look for WebSocket errors.
 - **File ownership issues:** If the CLI fails with permission errors, the `.openclaw`
   directory may be owned by root (created before gosu drops to node). Fix with:
-  `sudo docker exec openclaw-<CLAW_NAME> chown -R 1000:1000 /home/node/.openclaw`
+  `sudo docker exec <PROJECT_NAME>-openclaw-<CLAW_NAME> chown -R 1000:1000 /home/node/.openclaw`
 
 ---
 
@@ -135,11 +133,11 @@ After pairing all claws, ask the user to confirm for each:
 
 ```bash
 # Check claw logs for auth/pairing errors
-ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
-  "sudo docker logs --tail 30 openclaw-<CLAW_NAME>"
+ssh -i <SSH_KEY> -p <SSH_PORT> <SSH_USER>@<VPS_IP> \
+  "sudo docker logs --tail 30 <PROJECT_NAME>-openclaw-<CLAW_NAME>"
 
 # Re-list devices to confirm approval went through
-ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
+ssh -i <SSH_KEY> -p <SSH_PORT> <SSH_USER>@<VPS_IP> \
   "openclaw --instance <CLAW_NAME> devices list"
 ```
 
@@ -149,7 +147,7 @@ If the device shows as approved but the browser still can't connect, ask the use
 
 ## Telegram Pairing
 
-If `OPENCLAW_TELEGRAM_BOT_TOKEN` is set in `openclaw-config.env`, the claws are already connected to Telegram. Tell the user:
+If the claw's Telegram bot token is configured in `.env`, the claws are already connected to Telegram. Tell the user:
 
 > **Telegram:** Your bot is live. Open Telegram and send a message to your bot. If the claw prompts for device approval, run `openclaw --instance <CLAW_NAME> devices approve <requestId>` the same way you approved the browser. Repeat for each claw if needed.
 
@@ -166,7 +164,7 @@ If the bot token is empty, skip this step — Telegram was not configured.
 
 ### Token is rejected (401/403)
 
-- The token in the URL may not match the claw's gateway token in its `openclaw.json`.
+- The token in the URL may not match the claw's OPENCLAW_GATEWAY_TOKEN env var.
 - Re-read the per-claw token from VPS-1 and try again (see Open the Claw URLs above).
 
 ### No pending devices after opening URL
@@ -179,7 +177,7 @@ If the bot token is empty, skip this step — Telegram was not configured.
 
 - Hard-refresh the browser page.
 - Check claw logs for errors after the approval.
-- Verify the claw container hasn't restarted: `sudo docker ps --filter 'name=^openclaw-'`
+- Verify the claw container hasn't restarted: `sudo docker ps --filter 'name=-openclaw-'`
 
 ### Control UI shows "unauthorized" or "disconnected" (was working before)
 
@@ -197,9 +195,8 @@ https://<CLAW_DOMAIN><OPENCLAW_DOMAIN_PATH>/?token=<CLAW_TOKEN>
 Read the token from VPS if needed:
 
 ```bash
-ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
-  "sudo docker exec --user node openclaw-<CLAW_NAME> \
-    node -e \"console.log(require('/home/node/.openclaw/openclaw.json').gateway.auth.token)\""
+ssh -i <SSH_KEY> -p <SSH_PORT> <SSH_USER>@<VPS_IP> \
+  "sudo docker exec --user node <PROJECT_NAME>-openclaw-<CLAW_NAME> printenv OPENCLAW_GATEWAY_TOKEN"
 ```
 
 After the user clicks the URL:
@@ -209,7 +206,7 @@ After the user clicks the URL:
 2. Approve the pending request:
 
    ```bash
-   ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
+   ssh -i <SSH_KEY> -p <SSH_PORT> <SSH_USER>@<VPS_IP> \
      "openclaw --instance <CLAW_NAME> devices approve <requestId>"
    ```
 

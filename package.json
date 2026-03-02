@@ -1,0 +1,15 @@
+{
+  "name": "openclaw-stack",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "pre-deploy": "node build/pre-deploy.mjs",
+    "pre-deploy:dry": "node build/pre-deploy.mjs --dry-run"
+  },
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "handlebars": "^4.7.8",
+    "js-yaml": "^4.1.0",
+    "jsonc-parser": "^3.3.1"
+  }
+}

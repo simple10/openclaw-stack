@@ -9,16 +9,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="$SCRIPT_DIR/../openclaw-config.env"
-
-if [[ ! -f "$CONFIG_FILE" ]]; then
-  echo "Error: openclaw-config.env not found at $CONFIG_FILE" >&2
-  exit 1
-fi
-
-source "$CONFIG_FILE"
-
-INSTALL_DIR="${INSTALL_DIR:-/home/openclaw}"
+source "$SCRIPT_DIR/lib/source-config.sh"
 INSTANCE=""
 LOCAL_DIR=""
 
@@ -37,19 +28,19 @@ while [[ $# -gt 0 ]]; do
 done
 
 LOCAL_DIR="${LOCAL_DIR:-$SCRIPT_DIR/../media}"
-SSH_CMD="TERM=xterm-256color ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT}"
+SSH_CMD="TERM=xterm-256color ssh -i ${ENV__SSH_KEY} -p ${ENV__SSH_PORT}"
 
 sync_instance() {
   local name="$1"
   local dest="$2"
-  local remote="${INSTALL_DIR}/instances/${name}/.openclaw/media/"
+  local remote="${STACK__STACK__INSTALL_DIR}/instances/${name}/.openclaw/media/"
 
   mkdir -p "$dest"
   echo "Syncing ${name} → $dest ..."
   rsync -avz --progress \
     -e "$SSH_CMD" \
     --rsync-path="sudo rsync" \
-    "${SSH_USER}@${VPS1_IP}:${remote}" \
+    "${ENV__SSH_USER}@${ENV__VPS_IP}:${remote}" \
     "$dest/"
 }
 
@@ -58,15 +49,15 @@ if [[ -n "$INSTANCE" ]]; then
   sync_instance "$INSTANCE" "$LOCAL_DIR/$INSTANCE"
 else
   # Discover all instances and sync each
-  INSTANCES=$(ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" -o ConnectTimeout=10 -o BatchMode=yes \
-    "${SSH_USER}@${VPS1_IP}" \
-    "sudo ls -1 ${INSTALL_DIR}/instances/ 2>/dev/null | grep -v '^\\.'" 2>&1) || {
+  INSTANCES=$(ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" -o ConnectTimeout=10 -o BatchMode=yes \
+    "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+    "sudo ls -1 ${STACK__STACK__INSTALL_DIR}/instances/ 2>/dev/null | grep -v '^\\.'" 2>&1) || {
     echo "Error: Could not list instances on VPS" >&2
     exit 1
   }
 
   if [[ -z "$INSTANCES" ]]; then
-    echo "Error: No claw instances found in ${INSTALL_DIR}/instances/" >&2
+    echo "Error: No claw instances found in ${STACK__STACK__INSTALL_DIR}/instances/" >&2
     exit 1
   fi
 

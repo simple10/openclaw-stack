@@ -1,0 +1,199 @@
+{{!-- docker-compose.yml — OpenClaw stack template
+     Rendered by pre-deploy using stack.yml values.
+     Edit the anchor (&claw) to change all claws. Edit infra services directly.
+     Claw service blocks are auto-generated from stack.yml claws. --}}
+
+x-openclaw-claw: &claw
+  image: openclaw-{{stack.project_name}}:local
+  runtime: sysbox-runc
+  read_only: false
+  tmpfs:
+    - /tmp:size=1G,mode=1777
+    - /var/tmp:size=200M,mode=1777
+    - /run:size=100M,mode=755
+    - /var/log:size=100M,mode=755
+  user: "0:0"
+  security_opt: [no-new-privileges:true]
+  entrypoint: ["/app/openclaw-stack/entrypoint.sh"]
+  command: >-
+    sh -c 'node dist/index.js gateway
+    --allow-unconfigured --bind lan --port $$OPENCLAW_GATEWAY_PORT'
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "50m"
+      max-file: "5"
+  networks: [openclaw-net]
+
+services:
+  # ── Claws (auto-generated from stack.yml) ─────────────────────
+{{#each claws}}
+  {{../stack.project_name}}-openclaw-{{@key}}:
+    <<: *claw
+    container_name: {{../stack.project_name}}-openclaw-{{@key}}
+{{#if ../stack.sandbox_registry_container}}
+    depends_on:
+      sandbox-registry:
+        condition: service_started
+{{/if}}
+    ports:
+      - "127.0.0.1:{{this.gateway_port}}:{{this.gateway_port}}"
+      - "127.0.0.1:{{this.dashboard_port}}:6090"
+    volumes:
+      - ./openclaw-stack:/app/openclaw-stack:ro
+      - {{../stack.install_dir}}/instances/{{@key}}/docker:/var/lib/docker
+      - {{../stack.install_dir}}/instances/{{@key}}/.openclaw:/home/node/.openclaw
+    environment:
+      # ── Core ──
+      - NODE_ENV=production
+      - TZ=UTC
+      - OPENCLAW_GATEWAY_PORT={{this.gateway_port}}
+      - OPENCLAW_GATEWAY_TOKEN={{this.gateway_token}}
+      - OPENCLAW_MDNS_HOSTNAME={{@key}}
+      - ALLOW_OPENCLAW_UPDATES={{this.allow_updates}}
+      # ── AI Provider ──
+      - ANTHROPIC_API_KEY={{this.anthropic_api_key}}
+      - ANTHROPIC_BASE_URL={{this.anthropic_base_url}}
+      - OPENAI_API_KEY={{this.openai_api_key}}
+      - OPENAI_BASE_URL={{this.openai_base_url}}
+      - OPENAI_CODEX_BASE_URL={{this.openai_codex_base_url}}
+      # ── Telegram ──
+      - TELEGRAM_BOT_TOKEN={{this.telegram.bot_token}}
+      - ADMIN_TELEGRAM_ID={{this.telegram.allow_from}}
+      # ── Domain & UI ──
+      - OPENCLAW_DOMAIN={{this.domain}}
+      - OPENCLAW_DOMAIN_PATH={{this.domain_path}}
+      - DASHBOARD_BASE_PATH={{this.dashboard_path}}
+      - OPENCLAW_ALLOWED_ORIGIN={{this.allowed_origin}}
+      # ── Identity (used by openclaw.json at runtime via envsubst) ──
+      - OPENCLAW_INSTANCE_ID={{@key}}
+      - VPS_HOSTNAME={{this.vps_hostname}}
+      # ── Telemetry (used by openclaw.json at runtime via envsubst) ──
+      - LOG_WORKER_URL={{this.log_worker_url}}
+      - LOG_WORKER_TOKEN={{this.log_worker_token}}
+      - EVENTS_URL={{this.events_url}}
+      - LLEMTRY_URL={{this.llemtry_url}}
+      - ENABLE_EVENTS_LOGGING={{this.enable_events_logging}}
+      - ENABLE_LLEMTRY_LOGGING={{this.enable_llemtry_logging}}
+{{#if ../stack.sandbox_registry}}
+      # ── Sandbox Registry ──
+{{#if ../stack.sandbox_registry_port}}
+      - SANDBOX_REGISTRY_PORT={{../stack.sandbox_registry_port}}
+{{/if}}
+{{#if ../stack.sandbox_registry_url}}
+      - SANDBOX_REGISTRY_URL={{../stack.sandbox_registry_url}}
+{{/if}}
+      - SANDBOX_REGISTRY_USER=openclaw
+      - SANDBOX_REGISTRY_TOKEN={{../stack.sandbox_registry.token}}
+{{/if}}
+    deploy:
+      resources:
+        limits:
+          cpus: "{{this.resources.cpus}}"
+          memory: "{{this.resources.memory}}"
+          pids: 1024
+        reservations:
+          cpus: "2"
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:{{this.gateway_port}}/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 1800s
+
+{{/each}}
+  # ── Cloudflare Tunnel (per-stack sidecar) ─────────────────────
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: {{stack.project_name}}-cloudflared
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN={{stack.cloudflare.tunnel_token}}
+    networks: [openclaw-net]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+
+{{#if stack.egress_proxy}}
+  # ── Egress Proxy (bypasses WAF blocks on CF Worker IPs) ──────
+  egress-proxy:
+    image: node:22-alpine
+    container_name: {{stack.project_name}}-egress-proxy
+    restart: unless-stopped
+    command: ["node", "/app/proxy.mjs"]
+    volumes:
+      - ./egress-proxy/proxy.mjs:/app/proxy.mjs:ro
+    environment:
+      - PORT={{stack.egress_proxy.port}}
+      - PROXY_AUTH_TOKEN={{stack.egress_proxy.auth_token}}
+      - LOG_LEVEL={{stack.egress_proxy.log_level}}
+    networks: [openclaw-net]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 64M
+
+{{/if}}
+{{#if stack.sandbox_registry_container}}
+  # ── Sandbox Image Registry ──────────────────────────────────
+  sandbox-registry:
+    image: registry:2
+    container_name: {{stack.project_name}}-sandbox-registry
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:{{stack.sandbox_registry.port}}:5000"
+    volumes:
+      - {{stack.install_dir}}/sandbox-registry/data:/var/lib/registry
+      - {{stack.install_dir}}/sandbox-registry/htpasswd:/auth/htpasswd:ro
+    environment:
+      - REGISTRY_AUTH=htpasswd
+      - REGISTRY_AUTH_HTPASSWD_REALM=openclaw-sandbox
+      - REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd
+      - REGISTRY_STORAGE_DELETE_ENABLED=true
+      - REGISTRY_HTTP_SECRET={{stack.sandbox_registry.token}}
+      - REGISTRY_LOG_LEVEL={{stack.sandbox_registry.log_level}}
+      - REGISTRY_LOG_ACCESSLOG_DISABLED=true
+    networks: [openclaw-net]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://openclaw:{{stack.sandbox_registry.token}}@localhost:5000/v2/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 64M
+
+{{/if}}
+{{#if stack.vector}}
+  # ── Vector Log Shipper ────────────────────────────────────────
+  vector:
+    image: timberio/vector:0.43.1-alpine
+    container_name: {{stack.project_name}}-vector
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./vector/vector.yaml:/etc/vector/vector.yaml:ro
+      - {{stack.install_dir}}/vector/data:/var/lib/vector
+    environment:
+      - LOG_WORKER_URL={{stack.logging.worker_url}}
+      - LOG_WORKER_TOKEN={{stack.logging.worker_token}}
+      - VPS_IP={{env.VPS_IP}}
+    networks: [openclaw-net]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+
+{{/if}}
+networks:
+  openclaw-net:
+    driver: bridge

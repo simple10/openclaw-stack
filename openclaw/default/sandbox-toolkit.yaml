@@ -1,0 +1,165 @@
+# Sandbox Toolkit Configuration
+# Single source of truth for all sandbox capabilities.
+# Entrypoint reads this to: install apt packages, run custom tool installs,
+# and auto-generate gateway shims for all declared binaries.
+#
+# Adding a new tool = add entry here + rebuild sandbox images.
+
+# Apt packages installed in sandbox-packages image.
+# These are system-level dependencies — compilers, libraries, CLI tools.
+# NOTE: Debian bookworm apt packages are often significantly behind upstream.
+# Prefer brew or direct installs for tools where version matters.
+packages:
+  - curl
+  - wget
+  - jq
+  - coreutils
+  - grep
+  - git
+  - ca-certificates
+  - python3
+  - nodejs
+  - rustc
+  - cargo
+  - unzip
+  - pkg-config
+  - libasound2-dev
+  - build-essential
+  - file
+
+# Tools installed via custom scripts. Each tool needs at least `apt` or `install`:
+#   apt      — apt package name; all apt tools are batched into one layer.
+#              Debian bookworm apt repo is significantly behind the latest versions for most bins.
+#              Use apt if latest version is not needed, otherwise use install.
+#   install  — shell command run as root in sandbox-toolkit
+#   version  — substituted as ${VERSION} in install script (optional)
+#   bins     — binary names this tool provides (default: [tool name])
+#
+# Every binary listed in bins gets auto-shimmed on the gateway.
+tools:
+  golang:
+    # Install latest version of go
+    install: >-
+      GO_VER=$(curl -sL https://go.dev/VERSION?m=text | head -1) &&
+      curl -sfL https://go.dev/dl/$GO_VER.linux-amd64.tar.gz | tar xz -C /usr/local &&
+      ln -sf /usr/local/go/bin/go /usr/local/go/bin/gofmt ${BIN_DIR}/
+    bins: [go, gofmt]
+
+  gifgrep:
+    version: "0.2.1"
+    install: >-
+      curl -sfL https://github.com/steipete/gifgrep/releases/download/v${VERSION}/gifgrep_${VERSION}_linux_amd64.tar.gz
+      | tar xz -C ${BIN_DIR} gifgrep
+
+  claude-code:
+    install: npm install -g @anthropic-ai/claude-code
+    bins: [claude]
+
+  # --- Skills: apt tools ---
+
+  tmux:
+    apt: tmux
+    bins: [tmux]
+
+  ripgrep:
+    apt: ripgrep
+    bins: [rg]
+
+  # --- Skills: Go tools (use GOBIN to install to BIN_DIR) ---
+
+  blogwatcher:
+    install: GOBIN=${BIN_DIR} go install github.com/Hyaxia/blogwatcher/cmd/blogwatcher@latest
+
+  wacli:
+    install: GOBIN=${BIN_DIR} go install github.com/steipete/wacli/cmd/wacli@latest
+
+  ordercli:
+    install: GOBIN=${BIN_DIR} go install github.com/steipete/ordercli/cmd/ordercli@latest
+
+  # --- Skills: npm tools ---
+
+  clawhub:
+    install: npm install -g clawhub
+
+  oracle:
+    install: npm install -g @steipete/oracle
+
+  mcporter:
+    install: npm install -g mcporter
+
+  codex:
+    install: npm install -g @openai/codex
+
+  opencode:
+    install: npm install -g opencode-ai
+
+  amp:
+    install: npm install -g @sourcegraph/amp
+
+  # On-device search engine for markdown notes and docs
+  # https://github.com/tobi/qmd
+  qmd:
+    install: npm install -g @tobilu/qmd
+
+  # URL summarizer
+  # https://github.com/steipete/summarize
+  summarize:
+    install: npm i -g @steipete/summarize
+
+  # --- Skills: brew tools ---
+  # Just use `brew install <pkg>` — the build script (rebuild-sandboxes.sh) auto-wraps
+  # it to run as the linuxbrew user with HOMEBREW_NO_AUTO_UPDATE=1.
+  # /home/linuxbrew/.linuxbrew/bin is on PATH (set in openclaw.json sandbox env).
+
+  yt-dlp:
+    install: brew install yt-dlp
+
+  # apt has ffmpeg 5.1 (3 major versions behind) and imagemagick 6.9 (IM6, not IM7)
+  ffmpeg:
+    install: brew install ffmpeg
+    bins: [ffmpeg, ffprobe]
+
+  imagemagick:
+    install: brew install imagemagick
+    bins: [convert, identify, mogrify, magick]
+
+  gh:
+    install: brew install gh
+
+  himalaya:
+    install: brew install himalaya
+
+  gemini-cli:
+    install: brew install gemini-cli
+    bins: [gemini]
+
+  # TTS
+  # https://github.com/steipete/sag
+  sag:
+    install: brew install steipete/tap/sag
+
+  # Google Places CLI in Go
+  # https://github.com/steipete/goplaces
+  goplaces:
+    install: brew install steipete/tap/goplaces
+
+  # Google workspace CLI: Gmail, Calendar, Docs, etc.
+  gog:
+    install: brew install steipete/tap/gogcli
+
+  # Terminal screen recording — brew gives 3.x (Rust rewrite), apt has 2.2 (old Python version)
+  asciinema:
+    install: brew install asciinema
+
+  pandoc:
+    install: brew install pandoc
+
+  # --- Skills: uv + Python tools ---
+  # uv installed via brew; nano-pdf via uv tool install (must come after uv in this file).
+
+  uv:
+    install: brew install uv
+    bins: [uv, uvx]
+
+  nano-pdf:
+    install: UV_TOOL_BIN_DIR=${BIN_DIR} UV_TOOL_DIR=/opt/uv-tools uv tool install nano-pdf

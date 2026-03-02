@@ -25,12 +25,6 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="$SCRIPT_DIR/../openclaw-config.env"
-
-if [[ ! -f "$CONFIG_FILE" ]]; then
-  echo "Error: openclaw-config.env not found at $CONFIG_FILE" >&2
-  exit 1
-fi
 
 # ─── Extract --instance flag early (before TUI/direct mode split) ────────────
 
@@ -64,8 +58,8 @@ fi
 # ─── Help ─────────────────────────────────────────────────────────────────────
 
 if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
-  source "$CONFIG_FILE"
-  printf '\033[36mOpenClaw Session Debug Tool\033[0m (VPS: %s)\n\n' "$VPS1_IP"
+  source "$SCRIPT_DIR/lib/source-config.sh"
+  printf '\033[36mOpenClaw Session Debug Tool\033[0m (VPS: %s)\n\n' "$ENV__VPS_IP"
   echo "Interactive TUI (no args):"
   echo "  $0"
   echo ""
@@ -76,44 +70,34 @@ fi
 
 # ─── Direct mode: SCP + SSH ──────────────────────────────────────────────────
 
-source "$CONFIG_FILE"
-
-INSTALL_DIR="${INSTALL_DIR:-/home/openclaw}"
+source "$SCRIPT_DIR/lib/source-config.sh"
+source "$SCRIPT_DIR/lib/select-claw.sh"
 
 # Common SSH/SCP options (scp uses -P for port, ssh uses -p)
-SSH_COMMON=(-i "${SSH_KEY_PATH}" -o ConnectTimeout=10)
-SSH_OPTS=("${SSH_COMMON[@]}" -p "${SSH_PORT}")
-SCP_OPTS=("${SSH_COMMON[@]}" -P "${SSH_PORT}")
+SSH_COMMON=(-i "${ENV__SSH_KEY}" -o ConnectTimeout=10)
+SSH_OPTS=("${SSH_COMMON[@]}" -p "${ENV__SSH_PORT}")
+SCP_OPTS=("${SSH_COMMON[@]}" -P "${ENV__SSH_PORT}")
 
 # Resolve instance if not specified
 if [[ -z "$INSTANCE" ]]; then
   # adminclaw can't traverse /home/openclaw (750), so use sudo ls
   INSTANCES=$(ssh "${SSH_OPTS[@]}" -o BatchMode=yes \
-    "${SSH_USER}@${VPS1_IP}" \
-    "sudo ls -1 ${INSTALL_DIR}/instances/ 2>/dev/null | grep -v '^\\.'" 2>&1) || {
-    echo "Error: SSH connection failed. Check SSH_KEY_PATH, SSH_PORT, SSH_USER, VPS1_IP in openclaw-config.env" >&2
-    echo "  SSH_USER=${SSH_USER} SSH_PORT=${SSH_PORT} VPS1_IP=${VPS1_IP}" >&2
+    "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+    "sudo ls -1 ${STACK__STACK__INSTALL_DIR}/instances/ 2>/dev/null | grep -v '^\\.'" 2>&1) || {
+    echo "Error: SSH connection failed. Check ENV__SSH_KEY, ENV__SSH_PORT, ENV__SSH_USER, ENV__VPS_IP in stack.env" >&2
+    echo "  ENV__SSH_USER=${ENV__SSH_USER} ENV__SSH_PORT=${ENV__SSH_PORT} ENV__VPS_IP=${ENV__VPS_IP}" >&2
     exit 1
   }
 
-  COUNT=$(echo "$INSTANCES" | grep -c . || true)
-
-  if [[ "$COUNT" -eq 1 ]]; then
-    INSTANCE="$INSTANCES"
-    printf '\033[33mAuto-detected single claw: %s\033[0m\n' "$INSTANCE"
-  elif [[ "$COUNT" -eq 0 ]]; then
-    echo "Error: No claw instances found in ${INSTALL_DIR}/instances/" >&2
-    exit 1
-  else
-    echo "Error: Multiple claw instances found. Specify which one:" >&2
-    while IFS= read -r inst; do
-      echo "  --instance $inst" >&2
-    done <<< "$INSTANCES"
+  if [[ -z "$INSTANCES" ]]; then
+    echo "Error: No claw instances found in ${STACK__STACK__INSTALL_DIR}/instances/" >&2
     exit 1
   fi
+
+  INSTANCE=$(select_claw "$INSTANCES") || exit 1
 fi
 
-INSTANCE_DIR="${INSTALL_DIR}/instances/${INSTANCE}/.openclaw"
+INSTANCE_DIR="${STACK__STACK__INSTALL_DIR}/instances/${INSTANCE}/.openclaw"
 PYTHON_SCRIPT="$SCRIPT_DIR/lib/logs-explorer/debug-sessions.py"
 REMOTE_SCRIPT="/tmp/debug-sessions.py"
 BASE_DIR="${INSTANCE_DIR}/agents"
@@ -125,7 +109,7 @@ if [[ ! -f "$PYTHON_SCRIPT" ]]; then
 fi
 
 # Copy script to VPS
-if ! scp -q "${SCP_OPTS[@]}" "$PYTHON_SCRIPT" "${SSH_USER}@${VPS1_IP}:${REMOTE_SCRIPT}"; then
+if ! scp -q "${SCP_OPTS[@]}" "$PYTHON_SCRIPT" "${ENV__SSH_USER}@${ENV__VPS_IP}:${REMOTE_SCRIPT}"; then
   echo "Error: Failed to copy debug script to VPS" >&2
   exit 1
 fi
@@ -144,5 +128,5 @@ case "${1:-}" in
 esac
 
 # sudo: adminclaw can't read /home/openclaw directly
-TERM=xterm-256color ssh $SSH_TTY_FLAG "${SSH_OPTS[@]}" "${SSH_USER}@${VPS1_IP}" \
+TERM=xterm-256color ssh $SSH_TTY_FLAG "${SSH_OPTS[@]}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
   "sudo python3 ${REMOTE_SCRIPT} $* ${EXTRA_ARGS}"

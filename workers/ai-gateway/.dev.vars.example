@@ -3,13 +3,17 @@
 # Level of logs to console.log in the Cloudflare Worker
 LOG_LEVEL=debug
 
-# Token to authorize requests to the AI proxy
-AUTH_TOKEN=your-shared-auth-token
+# Admin token — protects /admin/* endpoints for user CRUD
+ADMIN_AUTH_TOKEN=your-admin-token
 
-# Provider API keys
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
-CLAUDE_CODE_OAUTH_TOKEN= # claude code setup token
+# User tokens and provider credentials are stored in AUTH_KV (Cloudflare KV).
+# Create namespace: wrangler kv namespace create AUTH_KV
+# Manage users via admin endpoints (see plan docs).
+
+# Egress proxy — routes requests through VPS IP to bypass upstream WAF blocks
+# Set these when chatgpt.com (openai-codex) blocks Cloudflare Worker IPs
+EGRESS_PROXY_URL=                     # e.g. https://egress-proxy.yourdomain.com
+EGRESS_PROXY_AUTH_TOKEN=              # Shared secret with the VPS egress proxy sidecar
 
 # Cloudflare AI Gateway integration (optional)
 # When configured, provider requests are sent to Cloudflare AI Gateway instead of directly to the provider

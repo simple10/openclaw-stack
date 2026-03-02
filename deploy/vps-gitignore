@@ -1,0 +1,36 @@
+# .gitignore for VPS INSTALL_DIR deploy tracking repo
+# Tracks deploy-managed config, ignores runtime data.
+#
+# What IS tracked: docker-compose.yml, stack.env, stack.json, .gitignore,
+# host/*, openclaw-stack/*, setup/*, egress-proxy/*, vector/vector.yaml,
+# instances/*/.openclaw/openclaw.json
+
+# OpenClaw source repo (has its own .git, managed separately)
+openclaw/
+
+# Per-instance: ignore all runtime data, whitelist only openclaw.json
+# Step 1: ignore everything inside each instance's .openclaw/
+instances/*/.openclaw/*
+# Step 2: but keep openclaw.json
+!instances/*/.openclaw/openclaw.json
+# Step 3: ignore everything else in each instance dir (docker/, etc.)
+instances/*/docker/
+# Step 4: ignore shared backups
+instances/.shared-backups/
+
+# Host alert runtime state
+.host-alert-state
+
+# Logs directory (runtime)
+logs/
+
+# Vector runtime state
+vector/data/
+
+# Sandbox registry runtime data
+sandbox-registry/data/
+
+# OS / editor
+.DS_Store
+*.swp
+*~

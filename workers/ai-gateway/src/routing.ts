@@ -1,4 +1,4 @@
-export type Provider = 'anthropic' | 'openai'
+export type Provider = 'anthropic' | 'openai' | 'openai-codex'
 
 export interface RouteMatch {
   provider: Provider
@@ -12,10 +12,25 @@ export interface RouteMatch {
 const ROUTES: Record<string, string> = {
   // Anthropic
   'anthropic/v1/messages': 'POST',
-  // OpenAI
+  // OpenAI (api.openai.com)
   'openai/v1/chat/completions': 'POST',
+  'openai/v1/responses': 'POST',
   'openai/v1/embeddings': 'POST',
   'openai/v1/models': 'GET',
+  // OpenAI Codex subscription (chatgpt.com/backend-api)
+  // OpenClaw sends codex requests on the openai base URL path (/openai/v1/codex/responses),
+  // but the upstream is chatgpt.com/backend-api (not api.openai.com). ROUTE_OVERRIDES
+  // remaps the provider and strips the /v1/ prefix for the correct upstream path.
+  // NOTE (2026-03-01): chatgpt.com WAF blocks CF Worker IPs — see config.ts for details.
+  'openai/v1/codex/responses': 'POST',
+}
+
+/**
+ * Routes where the provider/upstream differs from the path prefix.
+ * OpenClaw sends codex requests on the openai base URL, but the upstream is chatgpt.com/backend-api.
+ */
+const ROUTE_OVERRIDES: Record<string, { provider: Provider; directPath: string }> = {
+  'openai/v1/codex/responses': { provider: 'openai-codex', directPath: 'codex/responses' },
 }
 
 /** AI Gateway sub-path: strip /v1/ segment → provider/rest */
@@ -36,10 +51,11 @@ export function matchProviderRoute(method: string, pathname: string): RouteMatch
   const allowed = ROUTES[key]
   if (!allowed || allowed !== method) return null
 
-  const provider = key.split('/')[0] as Provider
+  const override = ROUTE_OVERRIDES[key]
+  const provider = override?.provider ?? key.split('/')[0] as Provider
   return {
     provider,
     gatewayPath: toGatewayPath(key),
-    directPath: toDirectPath(key),
+    directPath: override?.directPath ?? toDirectPath(key),
   }
 }

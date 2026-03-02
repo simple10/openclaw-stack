@@ -1,14 +1,16 @@
 # AI Gateway Proxy — Configuration Guide
 
-The AI Gateway Worker proxies LLM requests from the OpenClaw gateway to Anthropic and OpenAI. It supports two routing modes, auto-detected based on which secrets are configured.
+The AI Gateway Worker proxies LLM requests from the OpenClaw gateway to Anthropic and OpenAI. Provider credentials are stored per-user in Cloudflare KV and managed via the self-service `/config` UI.
 
-See also [Claude Subscription](CLAUDE-SUBSCRIPTION.md) for using OpenClaw with a claude code subscription.
+The worker supports two upstream routing modes, auto-detected based on which secrets are configured.
+
+See also [Claude Subscription](CLAUDE-SUBSCRIPTION.md) for using OpenClaw with a Claude Code subscription.
 
 ## Routing Modes
 
 ### Direct API (default)
 
-Requests go directly from the worker to provider APIs (`api.anthropic.com`, `api.openai.com`). This is the simplest setup — just add your provider API keys.
+Requests go directly from the worker to provider APIs (`api.anthropic.com`, `api.openai.com`). This is the simplest setup — just add your provider credentials via the config UI.
 
 ```
 OpenClaw Gateway → Worker → Anthropic / OpenAI
@@ -16,7 +18,7 @@ OpenClaw Gateway → Worker → Anthropic / OpenAI
 
 ### Cloudflare AI Gateway (optional)
 
-Requests route through [Cloudflare AI Gateway](https://developers.cloudflare.com/ai-gateway/) for analytics, caching, and rate limiting. Requires a CF AI Gateway instance and three additional secrets.
+Requests route through [Cloudflare AI Gateway](https://developers.cloudflare.com/ai-gateway/) for analytics, caching, and rate limiting. Requires a CF AI Gateway instance and additional secrets.
 
 ```
 OpenClaw Gateway → Worker → CF AI Gateway → Anthropic / OpenAI
@@ -26,21 +28,22 @@ The worker auto-detects which mode to use: if `CF_AI_GATEWAY_TOKEN`, `CF_AI_GATE
 
 ---
 
-## Direct API Setup
+## Adding Provider Credentials
 
-From your local machine:
+Visit the config UI at `https://<AI_GATEWAY_WORKER_URL>/config` and authenticate with your gateway token.
 
-```bash
-cd workers/ai-gateway
+The config page supports four credential types:
 
-# Add Anthropic API key (required for Claude models)
-echo "<your-key>" | npx wrangler secret put ANTHROPIC_API_KEY
+| Provider | Credential | Field | Notes |
+|----------|-----------|-------|-------|
+| Anthropic | API Key | `sk-ant-api-*` | Standard API key |
+| Anthropic | OAuth Token | `sk-ant-oat-*` | Claude Code subscription token (takes priority over API key) |
+| OpenAI | API Key | `sk-*` | Standard API key |
+| OpenAI | Codex OAuth | Paste `.codex/auth.json` | Codex subscription (takes priority over API key, auto-refreshes) |
 
-# Add OpenAI API key (required for GPT models)
-echo "<your-key>" | npx wrangler secret put OPENAI_API_KEY
-```
+Credentials are stored in Cloudflare KV — they never touch the VPS. Changes take effect immediately.
 
-Keys are stored as encrypted Cloudflare Worker secrets. They never touch the VPS.
+For each provider, OAuth/subscription credentials take priority over static API keys. You can have both configured as a fallback.
 
 ---
 
@@ -73,10 +76,6 @@ echo "<account-id>" | npx wrangler secret put CF_AI_GATEWAY_ACCOUNT_ID
 
 # AI Gateway authentication token (create in CF Dashboard -> AI -> AI Gateway -> Settings)
 echo "<token>" | npx wrangler secret put CF_AI_GATEWAY_TOKEN
-
-# Provider API keys (still required — CF AI Gateway forwards them upstream)
-echo "<your-key>" | npx wrangler secret put ANTHROPIC_API_KEY
-echo "<your-key>" | npx wrangler secret put OPENAI_API_KEY
 ```
 
 ### 4. Redeploy
@@ -100,7 +99,7 @@ curl -s https://<AI_GATEWAY_WORKER_URL>/health
 
 ```bash
 curl -s https://<AI_GATEWAY_WORKER_URL>/anthropic/v1/messages \
-  -H "Authorization: Bearer <AI_GATEWAY_AUTH_TOKEN>" \
+  -H "Authorization: Bearer <AI_GATEWAY_TOKEN>" \
   -H "Content-Type: application/json" \
   -H "anthropic-version: 2023-06-01" \
   -d '{"model":"claude-sonnet-4-20250514","max_tokens":10,"messages":[{"role":"user","content":"Say hi"}]}'
@@ -112,7 +111,7 @@ curl -s https://<AI_GATEWAY_WORKER_URL>/anthropic/v1/messages \
 
 ```bash
 curl -s https://<AI_GATEWAY_WORKER_URL>/openai/v1/chat/completions \
-  -H "Authorization: Bearer <AI_GATEWAY_AUTH_TOKEN>" \
+  -H "Authorization: Bearer <AI_GATEWAY_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{"model":"gpt-4o-mini","max_tokens":10,"messages":[{"role":"user","content":"Say hi"}]}'
 ```
@@ -147,15 +146,33 @@ No redeploy needed — secrets take effect immediately.
 
 ---
 
+## Admin Endpoints
+
+User and credential management is available via admin API endpoints protected by `ADMIN_AUTH_TOKEN`:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/admin/users` | Create user with optional creds |
+| `GET` | `/admin/users` | List all users |
+| `PUT` | `/admin/users/:id/creds` | Replace user credentials |
+| `DELETE` | `/admin/users/:id` | Delete user + tokens + creds |
+
+Self-service (authenticated by user's own token):
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/config` | Config UI (no auth — page handles it via JS) |
+| `GET` | `/auth/creds` | Get masked credentials |
+| `PUT` | `/auth/creds` | Merge-update credentials |
+| `POST` | `/auth/rotate` | Rotate token (old tokens expire in 1 hour) |
+
+---
+
 ## Troubleshooting
 
-### "Missing API key" error
+### "No API key configured" error
 
-The provider API key secret is not set. Add it:
-
-```bash
-echo "<key>" | npx wrangler secret put ANTHROPIC_API_KEY
-```
+The user has no provider credentials set for the requested provider. Visit `/config` to add them.
 
 ### CF AI Gateway analytics not showing
 
@@ -165,6 +182,6 @@ echo "<key>" | npx wrangler secret put ANTHROPIC_API_KEY
 
 ### 401/403 from provider
 
-- Double-check the API key value — it may have been entered incorrectly
+- Check credentials via the `/config` UI — ensure the correct key type is set
 - Verify the provider account is active and has billing configured
-- For Anthropic: key should start with `sk-ant-`
+- For Anthropic: API key should start with `sk-ant-api-`, OAuth token with `sk-ant-oat-`

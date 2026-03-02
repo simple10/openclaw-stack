@@ -69,13 +69,13 @@ cat ~/.ssh/vps1_openclaw_ed25519.pub
 
 If you setup a VPS that's smaller or larger than 6 cores + 12GB RAM, you'll likely want to adjust:
 
-1. Gateway container size in [docker-compoase.override.yml](../deploy/docker-compose.override.yml)
-2. Sandbox container resources in [openclaw.json](../deploy/openclaw.json)
+1. Gateway container resource limits in `stack.yml` under `defaults` or `claws.<name>`
+2. Sandbox container resources in `openclaw/default/openclaw.jsonc`
 
-Just ask claude to do adjust the sizing for you before deploying. The gateway container limits should
-nearly max out the limits of your VPS. It effectively shares resources with it's nested sandbox
-containers - the openclaw agent and browser containers. Besides the openclaw gateway, the VPS
-runs the vector container and normal Ubuntu system daemons.
+Just ask Claude to adjust the sizing for you before deploying. The gateway container limits should
+nearly max out the limits of your VPS. It effectively shares resources with its nested sandbox
+containers -- the agent and browser containers. Besides the gateway, the VPS
+runs Vector (if logging enabled) and normal Ubuntu system daemons.
 
 ---
 
@@ -92,17 +92,17 @@ OVHCloud typically provisions VPSs within 5-15 minutes. You'll receive:
 2. Go to **Bare Metal Cloud → VPS**
 3. Note the **IPv4 address** for your VPS
 
-Record it in openclaw-config.env:
+Record it in `.env`:
 
 ```bash
-# openclaw-config.env
+# .env
 
-VPS1_IP=x.x.x.x
+VPS_IP=x.x.x.x
 
 # SSH Configuration (required)
-SSH_KEY_PATH=~/.ssh/vps1_openclaw_ed25519 # Path to your ssh key generated in Step 2
-SSH_USER=ubuntu # This is the initial user created by OVH, it will get changed to admin claw during hardening
-SSH_PORT=22 # Initial SSH port, will get changed to 222 during hardening
+SSH_KEY=~/.ssh/vps1_openclaw_ed25519 # Path to your ssh key generated in Step 2
+SSH_USER=ubuntu # Initial user created by OVH, changed to adminclaw during hardening
+SSH_PORT=22 # Initial SSH port, changed to 222 during hardening
 ```
 
 ---
@@ -162,9 +162,16 @@ Expected output:
 
 ---
 
-### Step 7: Continue with Steps in [README.md](./README.md)
+### Step 7: Continue with Deployment
 
-Finish the setup steps in README.md and hand off to claude to implement.
+Return to the repo root and start Claude:
+
+```bash
+cd openclaw-stack
+claude "start"
+```
+
+Claude reads `CLAUDE.md` and walks you through the rest of the deployment.
 
 ---
 
@@ -205,7 +212,7 @@ ssh -i ~/.ssh/vps1_openclaw_ed25519 -p 222 adminclaw@<VPS-1-IP>
 - [ ] SSH access verified to VPS
 - [ ] Ubuntu 24.04 LTS installed
 - [ ] Kernel version is 6.x
-- [ ] Configuration file created (`~/openclaw-config.env`)
+- [ ] Configuration files created (`.env` + `stack.yml`)
 - [ ] (Optional) Domain DNS records created
 - [ ] (Optional) Messaging bot tokens ready
 

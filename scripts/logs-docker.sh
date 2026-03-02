@@ -9,16 +9,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="$SCRIPT_DIR/../openclaw-config.env"
+source "$SCRIPT_DIR/lib/source-config.sh"
 
-if [[ ! -f "$CONFIG_FILE" ]]; then
-  echo "Error: openclaw-config.env not found at $CONFIG_FILE" >&2
-  exit 1
-fi
-
-source "$CONFIG_FILE"
-
-COMPOSE_DIR="${INSTALL_DIR:-/home/openclaw}/openclaw"
+COMPOSE_DIR="${STACK__STACK__INSTALL_DIR}"
 COMPOSE_ARGS=("logs")
 
 if [[ "${1:-}" == "--no-follow" ]]; then
@@ -30,9 +23,9 @@ else
   COMPOSE_ARGS+=("--tail" "100" "-f")
 fi
 
-printf "\033[32mStreaming logs from all containers on VPS-1 (%s)\033[0m\n" "$VPS1_IP"
+printf "\033[32mStreaming logs from all containers on VPS-1 (%s)\033[0m\n" "$ENV__VPS_IP"
 
-TERM=xterm-256color ssh -t -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+TERM=xterm-256color ssh -t -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
   "sudo -u openclaw bash -c 'cd $COMPOSE_DIR && docker compose ${COMPOSE_ARGS[*]}'"
 
 # Alternate if multiple compose files:

@@ -20,15 +20,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$SCRIPT_DIR/.."
-CONFIG_FILE="$REPO_DIR/openclaw-config.env"
-
-if [[ ! -f "$CONFIG_FILE" ]]; then
-  echo "Error: openclaw-config.env not found at $CONFIG_FILE" >&2
-  exit 1
-fi
-
-source "$CONFIG_FILE"
+source "$SCRIPT_DIR/lib/source-config.sh"
 source "$SCRIPT_DIR/lib/resolve-gateway.sh"
 
 SYNC_ONLY=false
@@ -67,25 +59,31 @@ while [[ $# -gt 0 ]]; do
 done
 
 GATEWAY=$(resolve_gateway ${INSTANCE_ARGS[@]+"${INSTANCE_ARGS[@]}"}) || exit 1
-OPENCLAW_DIR="${INSTALL_DIR:-/home/openclaw}/openclaw"
+OPENCLAW_STACK_DIR="${STACK__STACK__INSTALL_DIR}/openclaw-stack"
 
 # Files to sync: local path -> VPS host path
-# These are bind-mounted into the container (docker-compose.override.yml lines 48-52)
+# These are bind-mounted into the container via docker-compose.yml volumes
+if [ -z "${STACK__STACK__SANDBOX_TOOLKIT:-}" ]; then
+  echo "Error: stack.sandbox_toolkit not configured in stack.yml" >&2
+  echo "Nothing to sync — sandbox toolkit is disabled for this stack." >&2
+  exit 1
+fi
+
 SYNC_LOCAL=(
-  "deploy/sandbox-toolkit.yaml"
-  "deploy/parse-toolkit.mjs"
-  "deploy/rebuild-sandboxes.sh"
+  "$STACK__STACK__SANDBOX_TOOLKIT"
+  "deploy/openclaw-stack/parse-toolkit.mjs"
+  "deploy/openclaw-stack/rebuild-sandboxes.sh"
 )
 SYNC_REMOTE=(
-  "$OPENCLAW_DIR/deploy/sandbox-toolkit.yaml"
-  "$OPENCLAW_DIR/deploy/parse-toolkit.mjs"
-  "$OPENCLAW_DIR/deploy/rebuild-sandboxes.sh"
+  "$OPENCLAW_STACK_DIR/sandbox-toolkit.yaml"
+  "$OPENCLAW_STACK_DIR/parse-toolkit.mjs"
+  "$OPENCLAW_STACK_DIR/rebuild-sandboxes.sh"
 )
 
-printf '\033[32mUpdating sandbox toolkit on %s...\033[0m\n' "$VPS1_IP"
+printf '\033[32mUpdating sandbox toolkit on %s...\033[0m\n' "$ENV__VPS_IP"
 
 # Check gateway container is running
-if ! ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+if ! ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
   "sudo docker inspect -f '{{.State.Running}}' $GATEWAY 2>/dev/null" | grep -q true; then
   echo "Error: $GATEWAY container is not running on VPS" >&2
   exit 1
@@ -102,7 +100,7 @@ fi
 printf '\033[33m[%d/%d] Syncing toolkit files...\033[0m\n' "$STEP" "$TOTAL_STEPS"
 for i in "${!SYNC_LOCAL[@]}"; do
   local_file="${SYNC_LOCAL[$i]}"
-  local_path="$REPO_DIR/$local_file"
+  local_path="$REPO_ROOT/$local_file"
   remote_path="${SYNC_REMOTE[$i]}"
 
   if [[ ! -f "$local_path" ]]; then
@@ -114,7 +112,7 @@ for i in "${!SYNC_LOCAL[@]}"; do
     echo "  [dry-run] Would sync $local_file -> $remote_path"
   else
     # Write as openclaw user directly — avoids temp files and permission issues
-    cat "$local_path" | ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+    cat "$local_path" | ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
       "sudo -u openclaw tee $remote_path > /dev/null"
     echo "  Synced $local_file"
   fi
@@ -125,44 +123,44 @@ done
 STEP=2
 printf '\033[33m[%d/%d] Regenerating gateway shims...\033[0m\n' "$STEP" "$TOTAL_STEPS"
 
-# Reuses the same shim logic from entrypoint-gateway.sh (lines 70-108).
-# Runs as root because /opt/skill-bins/ is root-owned.
+# Reuses the same shim logic from entrypoint-gateway.sh.
+# Shims are gateway-only (satisfy preflight checks). Real binaries live in sandbox images.
 # Only creates shims for binaries that don't already exist (idempotent).
 # Piped via heredoc to avoid quoting issues with sh -c through SSH + docker exec.
 
 if [ "$DRY_RUN" = true ]; then
   echo "  [dry-run] Would regenerate shims via docker exec --user root"
 else
-  TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+  TERM=xterm-256color ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
     "sudo docker exec -i --user root $GATEWAY sh" << 'SHIM_SCRIPT'
-TOOLKIT_CONFIG="/app/deploy/sandbox-toolkit.yaml"
-TOOLKIT_PARSER="/app/deploy/parse-toolkit.mjs"
+TOOLKIT_CONFIG="/app/openclaw-stack/sandbox-toolkit.yaml"
+TOOLKIT_PARSER="/app/openclaw-stack/parse-toolkit.mjs"
 if [ ! -f "$TOOLKIT_CONFIG" ] || [ ! -f "$TOOLKIT_PARSER" ]; then
   echo "  WARNING: toolkit files not found in container"
   exit 0
 fi
-mkdir -p /opt/skill-bins
+SKILL_BINS="/opt/skill-bins"
+mkdir -p "$SKILL_BINS"
 TOOLKIT_JSON=$(node "$TOOLKIT_PARSER" "$TOOLKIT_CONFIG")
 NEW_SHIMS=0
 for bin in $(echo "$TOOLKIT_JSON" | node -e "process.stdin.on('data',d=>console.log(JSON.parse(d).allBins.join(' ')))"); do
-  if [ ! -f "/opt/skill-bins/$bin" ]; then
-    cat > "/opt/skill-bins/$bin" << 'SHIM'
+  if [ ! -f "$SKILL_BINS/$bin" ]; then
+    cat > "$SKILL_BINS/$bin" << 'SHIM'
 #!/bin/sh
-# Auto-generated shim — pass through to real binary if available
-SELF_DIR=$(dirname "$(readlink -f "$0")")
-ORIG_PATH=$(echo "$PATH" | tr ':' '\n' | grep -v "$SELF_DIR" | tr '\n' ':' | sed 's/:$//')
-REAL=$(PATH="$ORIG_PATH" command -v "$(basename "$0")" 2>/dev/null)
-if [ -n "$REAL" ]; then
-  exec "$REAL" "$@"
-fi
-echo "ERROR: $(basename "$0") is a shim — run inside sandbox" >&2
+# Gateway shim — satisfies preflight check. Real binary is in sandbox image.
+echo "ERROR: $(basename "$0") is a gateway shim — run inside sandbox" >&2
 exit 1
 SHIM
-    chmod +x "/opt/skill-bins/$bin"
+    chmod +x "$SKILL_BINS/$bin"
     NEW_SHIMS=$((NEW_SHIMS + 1))
   fi
 done
-TOTAL=$(ls /opt/skill-bins | wc -l)
+TOTAL=$(ls "$SKILL_BINS" | wc -l)
+# Symlink into /usr/local/bin so they're on default PATH (docker exec, openclaw doctor)
+for shim in "$SKILL_BINS"/*; do
+  bin_name=$(basename "$shim")
+  [ ! -L "/usr/local/bin/$bin_name" ] && ln -sf "$shim" "/usr/local/bin/$bin_name"
+done
 echo "  $NEW_SHIMS new shims created ($TOTAL total)"
 SHIM_SCRIPT
 fi
@@ -191,11 +189,11 @@ if [ "$DRY_RUN" = true ]; then
 fi
 
 if [ "$DRY_RUN" = true ]; then
-  TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
-    "sudo docker exec $GATEWAY /app/deploy/rebuild-sandboxes.sh $REBUILD_FLAGS"
+  TERM=xterm-256color ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+    "sudo docker exec $GATEWAY /app/openclaw-stack/rebuild-sandboxes.sh $REBUILD_FLAGS"
 else
-  TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" -t "${SSH_USER}@${VPS1_IP}" \
-    "sudo docker exec $GATEWAY /app/deploy/rebuild-sandboxes.sh $REBUILD_FLAGS"
+  TERM=xterm-256color ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" -t "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+    "sudo docker exec $GATEWAY /app/openclaw-stack/rebuild-sandboxes.sh $REBUILD_FLAGS"
 fi
 
 echo ""

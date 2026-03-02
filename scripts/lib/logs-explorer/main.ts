@@ -823,7 +823,7 @@ async function main() {
     cfg = loadConfig()
   } catch (e: any) {
     console.error(`Failed to load config: ${e.message}`)
-    console.error("Ensure openclaw-config.env exists in the project root.")
+    console.error("Run 'npm run pre-deploy' to generate .deploy/stack.json and stack.env.")
     process.exit(1)
   }
 

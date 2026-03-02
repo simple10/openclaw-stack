@@ -16,7 +16,7 @@ This playbook verifies:
 
 | Tier | Purpose | Sections | When to run |
 |------|---------|----------|-------------|
-| **Tier 1: Critical** | Smoke test — deployment is functional | 7.1, 7.2, 7.3, 7.4, 7.6 | Every deployment, after reboots, after maintenance |
+| **Tier 1: Critical** | Smoke test — deployment is functional | 7.1, 7.2, 7.2a, 7.3, 7.4, 7.6 | Every deployment, after reboots, after maintenance |
 | **Tier 2: Extended** | Full validation — comprehensive checks | 7.1a, 7.5, 7.5a–c, 7.6a, 7.7 | Fresh deploys, major updates, periodic audits |
 
 > **Quick smoke test:** Run Tier 1 only (~5 min). If all pass, the deployment is operational. Run Tier 2 for full confidence on fresh deploys or after significant changes.
@@ -39,7 +39,7 @@ sudo reboot
 Wait 1-2 minutes for VPS-1 to come back online, then verify SSH access:
 
 ```bash
-ssh -i <SSH_KEY_PATH> -p <SSH_PORT> -o ConnectTimeout=10 adminclaw@<VPS1_IP> "echo 'VPS-1 online'"
+ssh -i <SSH_KEY> -p <SSH_PORT> -o ConnectTimeout=10 adminclaw@<VPS_IP> "echo 'VPS-1 online'"
 ```
 
 **If VPS doesn't come back after 3-4 minutes:**
@@ -61,11 +61,11 @@ ssh -i <SSH_KEY_PATH> -p <SSH_PORT> -o ConnectTimeout=10 adminclaw@<VPS1_IP> "ec
 
 ```bash
 # Discover all running claw containers for per-claw checks
-CLAWS=$(sudo docker ps --format '{{.Names}}' --filter 'name=^openclaw-' | grep -v '^openclaw-cli$' | grep -v '^openclaw-sbx-' | sort)
+CLAWS=$(sudo docker ps --format '{{.Names}}' --filter 'name=-openclaw-' | sort)
 echo "Claw containers: $CLAWS"
 
 # Check containers are running
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose ps'
+sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose ps'
 
 # Check claw logs for errors
 for CLAW in $CLAWS; do
@@ -75,9 +75,9 @@ done
 
 # Test each claw's health endpoint
 for CLAW in $CLAWS; do
-  PORT=$(sudo docker inspect "$CLAW" --format '{{range .NetworkSettings.Ports}}{{range .}}{{.HostPort}}{{end}}{{end}}' | head -1)
-  echo "$CLAW (port $PORT):"
-  curl -s "http://localhost:${PORT}<OPENCLAW_DOMAIN_PATH>/" | head -5
+  GW_PORT=$(sudo docker port "$CLAW" 18789/tcp 2>/dev/null | grep -oP ':\K\d+')
+  echo "$CLAW (port $GW_PORT):"
+  curl -s "http://localhost:${GW_PORT}<OPENCLAW_DOMAIN_PATH>/" | head -5
 done
 ```
 
@@ -90,7 +90,7 @@ This is expected on the first reboot after deployment. Docker Compose services u
 > "Containers didn't auto-start after reboot. This is a known first-reboot issue — Sysbox wasn't ready when Docker tried to restart the containers. Start them manually:"
 
 ```bash
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose up -d'
+sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d'
 ```
 
 > Subsequent reboots typically work because Sysbox starts faster on warm boots. If containers consistently fail to start after reboot, check that Sysbox is enabled: `sudo systemctl is-enabled sysbox`.
@@ -101,14 +101,14 @@ sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose up -d'
 
 ## 7.2 Verify Vector (Log Shipping)
 
-> **Skip this section** if `ENABLE_VECTOR_LOG_SHIPPING` is `false`.
+> **Skip this section** if `stack.logging.vector` is `false`.
 
 ```bash
-# Check Vector is running (separate compose project)
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/vector && docker compose ps'
+# Check Vector is running (part of main compose project)
+sudo docker ps --filter 'name=vector'
 
-# Check Vector logs for errors
-sudo docker logs --tail 20 vector
+# Check Vector logs for errors (container name is <project>-vector)
+sudo docker logs --tail 20 $(sudo docker ps --format '{{.Names}}' | grep 'vector$')
 
 # Check checkpoint data exists
 sudo ls -la <INSTALL_DIR>/vector/data/
@@ -118,19 +118,45 @@ sudo ls -la <INSTALL_DIR>/vector/data/
 
 ---
 
+## 7.2a Verify Egress Proxy
+
+> **Skip this section** if `stack.egress_proxy` is not configured in `stack.yml`.
+
+```bash
+# Check egress proxy is running (container name is <project>-egress-proxy)
+sudo docker ps --filter 'name=egress-proxy'
+
+# Check egress proxy logs
+sudo docker logs --tail 10 $(sudo docker ps --format '{{.Names}}' | grep 'egress-proxy$')
+
+# Health check (internal — from VPS)
+PROXY_CONTAINER=$(sudo docker ps --format '{{.Names}}' | grep 'egress-proxy$')
+sudo docker exec "$PROXY_CONTAINER" wget -q -O- http://localhost:8787/health
+```
+
+**Expected:** Container running, logs show startup message, health returns `{"status":"ok"}`.
+
+**If external verification is needed** (from local machine, requires tunnel route configured):
+
+```bash
+curl -s https://<EGRESS_PROXY_HOSTNAME>/health
+# Expected: {"status":"ok"}
+```
+
+---
+
 ## 7.3 Verify Cloudflare Workers
 
 ### Log Receiver Worker
 
-> **Skip** Log Receiver verification if `ENABLE_VECTOR_LOG_SHIPPING` is `false`.
+> **Skip** Log Receiver verification if `stack.logging.vector` is `false`.
 
 ```bash
 # Health check (no auth required)
-# NOTE: LOG_WORKER_URL contains /logs suffix — strip it for the base URL health check
-curl -s https://<LOG_WORKER_BASE_URL>/health
+curl -s https://<LOG_WORKER_URL>/health
 
-# Test log ingestion (use the full LOG_WORKER_URL which includes /logs)
-curl -X POST https://<LOG_WORKER_URL> \
+# Test log ingestion
+curl -X POST https://<LOG_WORKER_URL>/logs \
   -H "Authorization: Bearer <LOG_WORKER_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{"container_name":"test","message":"verification test","stream":"stdout","timestamp":"2026-01-01T00:00:00Z"}'
@@ -141,7 +167,7 @@ curl -X POST https://<LOG_WORKER_URL> \
 **If health check fails:**
 
 > "The Log Receiver Worker isn't responding. Check that the worker is deployed
-> and the URL is correct in `openclaw-config.env`. You can verify the worker
+> and `LOG_WORKER_URL` is correct in `.env`. You can verify the worker
 > status in the Cloudflare Dashboard under Workers & Pages."
 
 ### AI Gateway Worker
@@ -153,12 +179,12 @@ curl -s https://<AI_GATEWAY_WORKER_URL>/health
 
 **Expected:** Returns `{"status":"ok"}`.
 
-> **Note:** The health check passing confirms the worker is deployed and reachable. It does NOT verify that provider API keys (e.g., `ANTHROPIC_API_KEY`) are configured — that is tested during post-deploy (`08a-configure-llm-proxy.md`). On a fresh deploy, the worker is healthy but won't proxy LLM requests until keys are added.
+> **Note:** The health check passing confirms the worker is deployed and reachable. It does NOT verify that provider credentials are configured — those are managed via the self-service config UI (`/config`). On a fresh deploy, the worker is healthy but won't proxy LLM requests until credentials are added via `08a-configure-llm-proxy.md`.
 
 **If either worker health check fails:**
 
 > "A Cloudflare Worker isn't responding. Check that it's deployed and the URL
-> is correct in `openclaw-config.env`. Verify the worker status in the
+> is correct in `.env`. Verify the worker status in the
 > Cloudflare Dashboard under Workers & Pages. If not deployed, run
 > `01-workers.md` to deploy it."
 
@@ -173,27 +199,27 @@ curl -s https://<AI_GATEWAY_WORKER_URL>/health
 ## 7.4 Verify Cloudflare Tunnel
 
 ```bash
-# Check tunnel service is running
-sudo systemctl status cloudflared
+# Check cloudflared container is running
+sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose ps cloudflared'
 
 # Check tunnel logs for errors
-sudo journalctl -u cloudflared --no-pager | tail -20
+sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose logs --tail 20 cloudflared'
 
 # Verify port 443 is closed
 sudo ufw status | grep 443 || echo "Port 443 not in UFW (correct)"
 
 # Verify direct IP access fails
-curl -sk --connect-timeout 5 https://<VPS1_IP>/ || echo "Direct access blocked (expected)"
+curl -sk --connect-timeout 5 https://<VPS_IP>/ || echo "Direct access blocked (expected)"
 ```
 
-**Expected:** cloudflared active, no auth errors in logs, port 443 closed, direct IP blocked.
+**Expected:** cloudflared container running, no auth errors in logs, port 443 closed, direct IP blocked.
 
 ### Verify domain routing (run from LOCAL machine)
 
 ```bash
 # Both should return 302/403 (Cloudflare Access redirect)
 curl -sI --connect-timeout 10 https://<OPENCLAW_DOMAIN><OPENCLAW_DOMAIN_PATH>/ 2>&1 | head -5
-curl -sI --connect-timeout 10 https://<OPENCLAW_DASHBOARD_DOMAIN><OPENCLAW_DASHBOARD_DOMAIN_PATH>/ 2>&1 | head -5
+curl -sI --connect-timeout 10 https://<OPENCLAW_DOMAIN><DASHBOARD_BASE_PATH>/ 2>&1 | head -5
 ```
 
 **Expected:** 302 or 403 with `Location` header pointing to Cloudflare Access.
@@ -209,21 +235,20 @@ Comprehensive security check: system hardening, port exposure, and built-in audi
 ### System Hardening (on VPS)
 
 ```bash
-# SSH, firewall, intrusion prevention, tunnel
+# SSH, firewall, intrusion prevention
 sudo ufw status
 sudo systemctl status fail2ban
-sudo systemctl status cloudflared
 ss -tlnp | grep <SSH_PORT>
 
 # Services and cron jobs
 sudo systemctl status sysbox
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose ps'
-sudo docker logs --tail 5 vector
+sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose ps'
+sudo docker logs --tail 5 $(sudo docker ps --format '{{.Names}}' | grep 'vector$')
 cat /etc/cron.d/openclaw-backup
 cat /etc/cron.d/openclaw-alerts
 ```
 
-**Expected:** SSH on port `<SSH_PORT>` only (22 removed), fail2ban active, cloudflared active, all containers running, cron jobs present.
+**Expected:** SSH on port `<SSH_PORT>` only (22 removed), fail2ban active, all containers running (including cloudflared), cron jobs present.
 
 ### Port Binding & External Reachability
 
@@ -249,9 +274,9 @@ done
 ```bash
 # From LOCAL machine: confirm claw ports aren't externally reachable
 for CLAW in $CLAWS; do
-  PORT=$(ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
+  PORT=$(ssh -i <SSH_KEY> -p <SSH_PORT> <SSH_USER>@<VPS_IP> \
     "sudo docker port $CLAW 2>/dev/null | grep -oP '0\.0\.0\.0:\K\d+' | head -1")
-  nc -zv -w 5 <VPS1_IP> $PORT 2>&1 || echo "Port $PORT not reachable (expected)"
+  nc -zv -w 5 <VPS_IP> $PORT 2>&1 || echo "Port $PORT not reachable (expected)"
 done
 ```
 
@@ -280,13 +305,13 @@ openclaw doctor --deep
 
 - [ ] SSH port `<SSH_PORT>` only, key-only auth, AllowUsers adminclaw
 - [ ] UFW enabled (SSH only), port 443 closed
-- [ ] Fail2ban running, cloudflared active
-- [ ] OpenClaw claws + Sysbox running (+ Vector if `ENABLE_VECTOR_LOG_SHIPPING=true`)
+- [ ] Fail2ban running, cloudflared container running
+- [ ] OpenClaw claws + Sysbox running (+ Vector if `stack.logging.vector=true`, + egress proxy if `stack.egress_proxy` configured)
 - [ ] Backup + host alerter + maintenance checker cron jobs configured
 - [ ] Host status JSON files written and readable from agent sandbox
 - [ ] Sandbox toolkit: all binaries from `sandbox-toolkit.yaml` operational in sandbox container
 - [ ] Container ports localhost-only, pids_limit set, resource limits match VPS
-- [ ] AI Gateway Worker responding (+ Log Receiver if `ENABLE_VECTOR_LOG_SHIPPING=true`)
+- [ ] AI Gateway Worker responding (+ Log Receiver if `stack.logging.vector=true`)
 - [ ] Security audit: 0 critical/warnings; Doctor: lan warning only
 
 ---
@@ -295,7 +320,7 @@ openclaw doctor --deep
 
 ## 7.1a Verify Sandbox Toolkit
 
-Verify all tool binaries from `deploy/sandbox-toolkit.yaml` are installed and operational in the sandbox image. The bin list is read dynamically from the toolkit config via `parse-toolkit.mjs`, so this test stays in sync as tools are added or removed.
+Verify all tool binaries from the sandbox toolkit config are installed and operational in the sandbox image. The bin list is read dynamically from the toolkit config via `parse-toolkit.mjs`, so this test stays in sync as tools are added or removed.
 
 > **Why docker exec into the claw container first?** Sandbox containers run as nested Docker inside the claw container (Sysbox). To inspect them, you must first enter the claw container, then exec into the sandbox.
 
@@ -304,7 +329,7 @@ FIRST_CLAW=$(echo "$CLAWS" | head -1)
 
 # Get the list of all tool binaries from sandbox-toolkit.yaml
 BINS=$(sudo docker exec --user node "$FIRST_CLAW" \
-  node /app/deploy/parse-toolkit.mjs /app/deploy/sandbox-toolkit.yaml \
+  node /app/openclaw-stack/parse-toolkit.mjs /app/openclaw-stack/sandbox-toolkit.yaml \
   | jq -r '.allBins[]')
 echo "Bins to test: $BINS"
 
@@ -361,7 +386,7 @@ echo "Results: $PASS passed, $FAIL failed, $TOTAL total"
 
 **If tools are missing:**
 
-- Rebuild the sandbox image: `sudo docker exec --user node $FIRST_CLAW /app/deploy/rebuild-sandboxes.sh --force`
+- Rebuild the sandbox image: `sudo docker exec --user node $FIRST_CLAW /app/openclaw-stack/rebuild-sandboxes.sh --force`
 - Then recreate containers: `sudo docker exec --user node $FIRST_CLAW openclaw sandbox recreate --all --force`
 
 ---
@@ -370,7 +395,7 @@ echo "Results: $PASS passed, $FAIL failed, $TOTAL total"
 
 ```bash
 # Test the alerter script manually (should not send alerts if everything is healthy)
-sudo <INSTALL_DIR>/scripts/host-alert.sh
+sudo <INSTALL_DIR>/host/host-alert.sh
 echo $?  # Should be 0
 
 # Verify health.json was written (even without Telegram) — check first instance
@@ -378,7 +403,7 @@ FIRST_INST=$(ls -d <INSTALL_DIR>/instances/*/ | head -1)
 cat "${FIRST_INST}.openclaw/workspace/host-status/health.json"
 
 # Test the maintenance checker
-sudo <INSTALL_DIR>/scripts/host-maintenance-check.sh
+sudo <INSTALL_DIR>/host/host-maintenance-check.sh
 echo $?  # Should be 0
 
 # Verify maintenance.json was written
@@ -398,8 +423,8 @@ openclaw cron list
 
 ```bash
 # Test Telegram delivery (if configured)
-TELEGRAM_TOKEN=$(sudo grep -oP 'HOSTALERT_TELEGRAM_BOT_TOKEN=\K.+' <INSTALL_DIR>/openclaw/.env)
-TELEGRAM_CHAT=$(sudo grep -oP 'HOSTALERT_TELEGRAM_CHAT_ID=\K.+' <INSTALL_DIR>/openclaw/.env)
+TELEGRAM_TOKEN=$(sudo grep -oP 'ENV__HOSTALERT_TELEGRAM_BOT_TOKEN=\K.+' <INSTALL_DIR>/stack.env)
+TELEGRAM_CHAT=$(sudo grep -oP 'ENV__HOSTALERT_TELEGRAM_CHAT_ID=\K.+' <INSTALL_DIR>/stack.env)
 
 if [[ -n "$TELEGRAM_TOKEN" && -n "$TELEGRAM_CHAT" ]]; then
   RESPONSE=$(curl -s "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
@@ -473,9 +498,8 @@ Re-run the CLI pairing step from `08b-pair-devices.md`:
 
 ```bash
 FIRST_CLAW=$(echo "$CLAWS" | head -1)
-# Read token from the claw's own openclaw.json (not shared .env)
-GATEWAY_TOKEN=$(sudo docker exec --user node "$FIRST_CLAW" \
-  node -e "console.log(require('/home/node/.openclaw/openclaw.json').gateway.auth.token)")
+# Read token from the claw's env var (single source of truth)
+GATEWAY_TOKEN=$(sudo docker exec --user node "$FIRST_CLAW" printenv OPENCLAW_GATEWAY_TOKEN)
 # Discover the claw's gateway port
 PORT=$(sudo docker port "$FIRST_CLAW" | grep -oP '0\.0\.0\.0:\K\d+' | head -1)
 sudo docker exec --user node "$FIRST_CLAW" \
@@ -486,7 +510,7 @@ sudo docker exec --user node "$FIRST_CLAW" \
 
 ## 7.5c Verify Resource Limits
 
-Verify deployed claw resource limits match VPS hardware. Resource limits are configured via `GATEWAY_CPUS` and `GATEWAY_MEMORY` in `openclaw-config.env` (see § 0.4).
+Verify deployed claw resource limits match VPS hardware. Read resource limits from `.deploy/stack.json` (the resolved config as actually deployed) — check `defaults.resources` and per-claw overrides under `claws.<name>.resources`.
 
 ```bash
 # On VPS: query hardware and deployed limits
@@ -505,34 +529,30 @@ Compare per-claw limits against VPS hardware divided by claw count (see `00-fres
 
 **If mismatch during fresh deploy:** Resource limits were already reviewed in `00-fresh-deploy-setup.md` § 0.4. Auto-apply only if the gap is significant (CPUs differ or memory off by >2GB); otherwise report and continue.
 
-**If mismatch outside fresh deploy:** Show comparison and ask user. If confirmed, update `GATEWAY_CPUS` and `GATEWAY_MEMORY` in `openclaw-config.env`, then redeploy the `.env` to the VPS and recreate the container:
+**If mismatch outside fresh deploy:** Show comparison and ask user. If confirmed, update `defaults.resources.cpus` and `defaults.resources.memory` in `stack.yml` (or per-claw overrides under `claws.<name>.resources`), then rebuild and redeploy:
 
 ```bash
-# Update the .env on VPS with new resource limits
-ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
-  "sudo -u openclaw bash -c \"grep -q '^GATEWAY_CPUS=' <INSTALL_DIR>/openclaw/.env && \
-    sed -i 's/^GATEWAY_CPUS=.*/GATEWAY_CPUS=<NEW_CPUS>/' <INSTALL_DIR>/openclaw/.env || \
-    echo 'GATEWAY_CPUS=<NEW_CPUS>' >> <INSTALL_DIR>/openclaw/.env; \
-    grep -q '^GATEWAY_MEMORY=' <INSTALL_DIR>/openclaw/.env && \
-    sed -i 's/^GATEWAY_MEMORY=.*/GATEWAY_MEMORY=<NEW_MEMORY>/' <INSTALL_DIR>/openclaw/.env || \
-    echo 'GATEWAY_MEMORY=<NEW_MEMORY>' >> <INSTALL_DIR>/openclaw/.env\""
+# Locally: update stack.yml resource values, then rebuild artifacts
+npm run pre-deploy
 
-# Recreate container to pick up new limits (up -d re-reads .env)
-ssh -i <SSH_KEY_PATH> -p <SSH_PORT> <SSH_USER>@<VPS1_IP> \
-  "sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose up -d'"
+# Push updated artifacts to VPS (via .deploy/ git repo)
+cd .deploy && git add -A && git commit -m "Update resource limits" && git push
+
+# On VPS: pull and recreate containers with new limits
+ssh -i <SSH_KEY> -p <SSH_PORT> <SSH_USER>@<VPS_IP> \
+  "sudo -u openclaw bash -c 'cd <INSTALL_DIR> && git pull && docker compose up -d'"
 ```
 
 ---
 
 ## 7.6a Telemetry (unified plugin)
 
-> Skip this section if `ENABLE_LLEMTRY_LOGGING` is not `true` in `openclaw-config.env`.
+> Skip this section if `ENABLE_LLEMTRY_LOGGING` is not `true` in the deployed config.
 
 **1. Events endpoint (D1 storage):**
 
 ```bash
-# Derive events URL from LOG_WORKER_URL
-EVENTS_URL="${LOG_WORKER_URL/\/logs/\/events}"
+EVENTS_URL="${LOG_WORKER_URL}/openclaw/events"
 curl -s -X POST "$EVENTS_URL" \
   -H "Authorization: Bearer $LOG_WORKER_TOKEN" \
   -H "Content-Type: application/json" \
@@ -543,7 +563,7 @@ curl -s -X POST "$EVENTS_URL" \
 **2. Llemtry endpoint (Langfuse):**
 
 ```bash
-LLEMTRY_URL="${LOG_WORKER_URL/\/logs/\/llemtry}"
+LLEMTRY_URL="${LOG_WORKER_URL}/llemtry"
 curl -s -X POST "$LLEMTRY_URL" \
   -H "Authorization: Bearer $LOG_WORKER_TOKEN" \
   -H "Content-Type: application/json" \
@@ -556,7 +576,7 @@ curl -s -X POST "$LLEMTRY_URL" \
 ```bash
 FIRST_CLAW=$(echo "$CLAWS" | head -1)
 sudo docker logs "$FIRST_CLAW" 2>&1 | grep -i '\[telemetry\]'
-# Expected: "[telemetry] Plugin registered — outputs: [file:telemetry.log, events:/events, llemtry]"
+# Expected: "[telemetry] Plugin registered — outputs: [file:telemetry.log, events:/openclaw/events, llemtry]"
 # If misconfigured: "[telemetry] events.enabled is true but events.url or events.authToken is missing..."
 ```
 
@@ -599,8 +619,8 @@ npx wrangler d1 execute <D1_DATABASE_NAME> --command="SELECT type, category, age
 ### Container Issues
 
 ```bash
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose ps'
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose logs -f <service>'
+sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose ps'
+sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose logs -f <service>'
 docker system df
 free -h
 ```
@@ -608,14 +628,14 @@ free -h
 ### Vector Issues
 
 ```bash
-# Check Vector logs
-sudo docker logs --tail 50 vector
+# Check Vector logs (container name is <project>-vector)
+sudo docker logs --tail 50 $(sudo docker ps --format '{{.Names}}' | grep 'vector$')
 
-# Restart Vector (use `up -d` instead if .env values changed)
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/vector && docker compose restart'
+# Restart Vector (use `up -d vector` instead if .env values changed)
+sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose restart vector'
 
-# Check if Worker endpoint is reachable (strip /logs suffix for base URL)
-curl -s https://<LOG_WORKER_BASE_URL>/health
+# Check if Worker endpoint is reachable
+curl -s https://<LOG_WORKER_URL>/health
 ```
 
 ### Networking Issues
@@ -629,18 +649,16 @@ sudo ufw status                   # Check firewall rules
 ### Tunnel Issues
 
 ```bash
-# Check tunnel service and logs
-sudo systemctl status cloudflared
-sudo journalctl -u cloudflared --no-pager | tail -30
+# Check cloudflared container status and logs
+sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose ps cloudflared'
+sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose logs --tail 30 cloudflared'
 
 # Check if DNS resolves to tunnel
 dig <OPENCLAW_DOMAIN>
 # Should show CNAME to <tunnel-id>.cfargotunnel.com
 
-# Token issues — reinstall service
-sudo cloudflared service uninstall
-sudo cloudflared service install ${CF_TUNNEL_TOKEN}
-sudo systemctl start cloudflared
+# Token issues — recreate the container (picks up new token from stack.env)
+sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d cloudflared'
 ```
 
 ### Service Not Starting After Reboot
@@ -659,14 +677,15 @@ Deployment is complete when:
 
 1. VPS-1 accessible via SSH on port `<SSH_PORT>`
 2. OpenClaw claws responding on localhost (internal health check)
-3. Vector running and shipping logs (if `ENABLE_VECTOR_LOG_SHIPPING=true`)
+3. Vector running and shipping logs (if `stack.logging.vector=true`)
 4. Cloudflare Workers responding to health checks
-5. Container logs appearing in Cloudflare Workers dashboard (if `ENABLE_VECTOR_LOG_SHIPPING=true`)
+5. Container logs appearing in Cloudflare Workers dashboard (if `stack.logging.vector=true`)
 6. Cloudflare Tunnel running and domain protected by Cloudflare Access (302/403 on unauthenticated curl)
 7. Backup cron job configured on VPS-1
 8. Host alerter and maintenance checker cron jobs configured on VPS-1
 9. Claw ports not reachable from external network (bound to localhost only)
 10. Security audit passes with no critical or warning findings
 11. All sandbox toolkit binaries operational in sandbox container (7.1a)
+12. Egress proxy running and healthy (if `stack.egress_proxy` configured)
 
 > **Note:** Full end-to-end verification (user authenticating through Cloudflare Access, sending messages) is covered in `08b-pair-devices.md` (device pairing) and [`docs/TESTING.md`](../docs/TESTING.md) (browser automation via Chrome DevTools).

@@ -7,16 +7,19 @@ declare namespace Cloudflare {
 	}
 	interface Env {
 		LOG_LEVEL: string;
-		AUTH_TOKEN: string;
-		OPENAI_API_KEY: string;
-		ANTHROPIC_API_KEY: string;
-		CLAUDE_CODE_OAUTH_TOKEN: string;
+		ADMIN_AUTH_TOKEN: string;
 		CF_AI_GATEWAY_ID: string;
 		CF_AI_GATEWAY_ACCOUNT_ID: string;
 		CF_AI_GATEWAY_TOKEN: string;
 		LLEMTRY_ENABLED: string;
 		LLEMTRY_ENDPOINT: string;
 		LLEMTRY_AUTH_TOKEN: string;
+		EGRESS_PROXY_URL: string;
+		EGRESS_PROXY_AUTH_TOKEN: string;
+		CF_ACCESS_CLIENT_ID: string;
+		CF_ACCESS_CLIENT_SECRET: string;
+		// KV namespace for multi-user auth & credential storage (bound via wrangler.jsonc)
+		AUTH_KV: KVNamespace;
 	}
 }
 interface Env extends Cloudflare.Env {}

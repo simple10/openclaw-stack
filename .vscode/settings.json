@@ -10,16 +10,19 @@
     "linuxbrew",
     "llemtry",
     "lockdown",
+    "mcporter",
     "openclaw",
     "ordercli",
     "pids",
     "reloadable",
+    "shellcheck",
+    "tmpfs",
     "urlencode",
     "wacli",
     "webchat",
     "websockify"
   ],
   "files.associations": {
-    "deploy/openclaws/_defaults/openclaw.json": "jsonc"
+    "openclaw.json": "jsonc"
   }
 }

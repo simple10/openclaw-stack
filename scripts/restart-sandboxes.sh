@@ -17,14 +17,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="$SCRIPT_DIR/../openclaw-config.env"
-
-if [[ ! -f "$CONFIG_FILE" ]]; then
-  echo "Error: openclaw-config.env not found at $CONFIG_FILE" >&2
-  exit 1
-fi
-
-source "$CONFIG_FILE"
+source "$SCRIPT_DIR/lib/source-config.sh"
 source "$SCRIPT_DIR/lib/resolve-gateway.sh"
 
 ALL=false
@@ -61,7 +54,7 @@ done
 GATEWAY=$(resolve_gateway ${INSTANCE_ARGS[@]+"${INSTANCE_ARGS[@]}"}) || exit 1
 
 # Check gateway container is running
-if ! ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+if ! ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
   "sudo docker inspect -f '{{.State.Running}}' $GATEWAY 2>/dev/null" | grep -q true; then
   echo "Error: $GATEWAY container is not running on VPS" >&2
   exit 1
@@ -79,7 +72,7 @@ else
   FILTER="name=openclaw-sbx-"
 fi
 
-CONTAINERS=$(TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+CONTAINERS=$(TERM=xterm-256color ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
   "sudo docker exec $GATEWAY docker ps -a --filter '$FILTER' --format '{{.Names}}\t{{.Status}}\t{{.Image}}'" 2>/dev/null || true)
 
 # Filter out browser containers unless --all
@@ -120,7 +113,7 @@ fi
 
 # Graceful stop (SIGTERM + 10s grace period) before removal.
 printf '\033[33mStopping sandbox containers...\033[0m\n'
-TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+TERM=xterm-256color ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
   "sudo docker exec $GATEWAY docker stop $NAMES" 2>/dev/null || true
 
 # Use 'openclaw sandbox recreate' to remove containers AND clean the internal
@@ -131,7 +124,7 @@ if [ "$ALL" = false ]; then
   RECREATE_FLAGS="--force"
 fi
 printf '\033[33mRemoving sandbox containers...\033[0m\n'
-TERM=xterm-256color ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" "${SSH_USER}@${VPS1_IP}" \
+TERM=xterm-256color ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
   "sudo docker exec --user node $GATEWAY openclaw sandbox recreate $RECREATE_FLAGS"
 
 echo ""

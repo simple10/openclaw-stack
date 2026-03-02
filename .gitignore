@@ -1,16 +1,25 @@
 .DS_Store
 certs/
-*.env
-!deploy/openclaws/main-claw/config.env
-!deploy/openclaws/_example/config.env
 *.key
 
-# Multi-claw configs: track _defaults/, _example/, and main-claw/; ignore user-created claws
-# Copy _example/ to create your own (e.g., deploy/openclaws/my-claw/)
-deploy/openclaws/*
-!deploy/openclaws/_defaults/
-!deploy/openclaws/_example/
-!deploy/openclaws/main-claw/
+# ── Secrets & user config (never commit) ───────────────────────
+.env
+.env.local
+stack.yml
+openclaw-config.env
+
+# ── Per-claw env files ────────────────────────────────────────
+*.env
+
+# New config structure: track default/ and example/; ignore user-created claw configs
+openclaw/*
+!openclaw/default/
+!openclaw/example/
+!openclaw/README.md
+
+# ── Build output ───────────────────────────────────────────────
+.deploy/
+node_modules/
 
 tmp/
 _bak/
@@ -18,14 +27,12 @@ source/
 
 .wrangler/
 
-openclaw-config.env
-node_modules/
-
 # Worker configs contain environment-specific values (D1 database IDs, worker names).
 # Use wrangler.jsonc.example as template — see playbooks/01-workers.md.
 workers/*/wrangler.jsonc
 
-# Local sync of /home/node/.openclaw/media/ via the scripts/sync-media.sh script
+# Local syncs from VPS (via scripts/sync-configs.sh and scripts/sync-media.sh)
+synced/
 media/
 
 agents/

@@ -11,98 +11,172 @@ All secrets should be rotated on a regular cadence. If a token is suspected comp
 | Token | Location | Rotation Cadence |
 |-------|----------|-----------------|
 | Gateway token (per-claw) | VPS `<INSTALL_DIR>/instances/<name>/.openclaw/openclaw.json` | 90 days |
-| `AI_GATEWAY_AUTH_TOKEN` | VPS `.env` + AI Gateway Worker secret | 90 days |
-| `LOG_WORKER_TOKEN` | VPS `.env` + Log Receiver Worker secret | 90 days |
-| Provider API keys (Anthropic, OpenAI, etc.) | AI Gateway Worker secrets (Cloudflare Dashboard) | Per provider policy |
-| `HOSTALERT_TELEGRAM_BOT_TOKEN` | VPS `.env` | As needed |
+| `AI_GATEWAY_TOKEN` (user token) | Local `.env` + AI Gateway KV (`token:*`) | 90 days |
+| `AI_WORKER_ADMIN_AUTH_TOKEN` | `.env.local` + AI Gateway Worker secret | 90 days |
+| `LOG_WORKER_TOKEN` | Local `.env` + Log Receiver Worker secret | 90 days |
+| Provider API keys (Anthropic, OpenAI, etc.) | AI Gateway KV (`creds:*`) — managed via `/config` UI | Per provider policy |
+| `EGRESS_PROXY_AUTH_TOKEN` | Local `.env` + AI Gateway Worker secret + VPS egress proxy container | 90 days |
+| `EGRESS_PROXY_URL` | AI Gateway Worker secret | Only if hostname changes |
+| `HOSTALERT_TELEGRAM_BOT_TOKEN` | Local `.env` (deployed via `npm run pre-deploy`) | As needed |
+| `SANDBOX_REGISTRY_TOKEN` | Local `.env` + VPS `sandbox-registry/htpasswd` | 90 days |
 | SSH keys (`~/.ssh/vps1_openclaw_ed25519`) | Local machine + VPS `authorized_keys` | Annual |
 
 ### Rotation Procedures
 
 #### Gateway Token
 
-Each claw has its own `GATEWAY_TOKEN` baked into its `openclaw.json` by `deploy-config.sh`. Rotate each claw's token independently.
+Each claw has its own `GATEWAY_TOKEN` resolved from its environment. Rotate each claw's token independently.
 
 ```bash
 # 1. Generate new token
 NEW_TOKEN=$(openssl rand -hex 32)
 
-# 2. Update the claw's openclaw.json on VPS
-# Edit <INSTALL_DIR>/instances/<CLAW_NAME>/.openclaw/openclaw.json
-#   — update gateway.auth.token and gateway.remote.token
-# Note: The gateway rewrites openclaw.json on startup, so use sed or jq, not manual edit.
+# 2. Write new token to per-claw .gateway-token file
+echo "$NEW_TOKEN" | sudo tee <INSTALL_DIR>/instances/<CLAW_NAME>/.openclaw/.gateway-token > /dev/null
 
-# 3. Restart the claw to pick up the new token (restart is fine — token is read from disk)
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose restart openclaw-<CLAW_NAME>'
+# 3. Update the .env with the new token
+# Edit <INSTALL_DIR>/.env to update the claw's GATEWAY_TOKEN variable
 
-# 4. Update all paired devices with new token (existing browser URLs will need the new token parameter)
-# Repeat steps 2-4 for each claw being rotated
+# 4. Recreate the claw container (up -d, NOT restart — restart doesn't reload .env)
+sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d <PROJECT_NAME>-openclaw-<CLAW_NAME>'
+
+# 5. Update all paired devices with new token (existing browser URLs will need the new token parameter)
+# Repeat steps 2-5 for each claw being rotated
 ```
 
-> **Note:** The shared `.env` contains `OPENCLAW_GATEWAY_TOKEN` from initial setup, but this is not used by multi-claw containers. Each claw reads its token from its own `openclaw.json`. You do not need to update `.env` when rotating a claw's token.
+> **Note:** Each claw reads its token from its own `openclaw.json` (resolved at startup via `envsubst`). The `.gateway-token` file is the persistent source.
 
 > **Verify:** Run § 7.1 — each rotated claw's health endpoint responds. Re-pair devices per `08b-pair-devices.md`.
 
-#### AI Gateway Auth Token
+#### AI Gateway User Token
+
+The user token (`AI_GATEWAY_TOKEN`) is stored in KV and can be rotated via the self-service endpoint. The old token remains valid for 1 hour after rotation.
 
 ```bash
-# 1. Generate new token
-NEW_TOKEN=$(openssl rand -hex 32)
+# 1. Rotate token (from local machine)
+curl -s -X POST https://<AI_GATEWAY_WORKER_URL>/auth/rotate \
+  -H "Authorization: Bearer <AI_GATEWAY_TOKEN>" | jq .
+# Returns: { "token": "<new-token>", "oldTokensExpireAt": "..." }
 
-# 2. Update Worker secret (from local machine)
-cd workers/ai-gateway
-echo "$NEW_TOKEN" | npx wrangler secret put AUTH_TOKEN
+# 2. Update AI_GATEWAY_TOKEN in local .env with the new token, rebuild and push artifacts
+npm run pre-deploy
+scripts/sync-deploy.sh
 
-# 3. Update VPS .env — change AI_GATEWAY_AUTH_TOKEN value
-
-# 4. Recreate all claws to pick up new .env values (no rebuild needed — token is an env var)
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose up -d'
+# 3. Recreate all claws to pick up new env values
+sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d'
 ```
+
+> **Note:** Old tokens expire after 1 hour (KV native TTL). Complete the VPS update within that window.
 
 > **Verify:** Run § 7.3 — AI Gateway Worker health check returns `{"status":"ok"}`.
 
-#### Log Worker Token
+#### AI Gateway Admin Token
 
-> **Skip** if `ENABLE_VECTOR_LOG_SHIPPING` is `false`.
+The `AI_WORKER_ADMIN_AUTH_TOKEN` protects `/admin/*` endpoints. Rotate via `update-env.mjs`:
 
 ```bash
-# 1. Generate new token
-NEW_TOKEN=$(openssl rand -hex 32)
+node build/update-env.mjs AI_WORKER_ADMIN_AUTH_TOKEN --generate
+source scripts/lib/source-config.sh --force
+cd workers/ai-gateway
+echo "$AI_WORKER_ADMIN_AUTH_TOKEN" | npx wrangler secret put ADMIN_AUTH_TOKEN
+```
+
+No VPS update needed (admin token is not used by claws).
+
+#### Log Worker Token
+
+> **Skip** if `stack.logging.vector` is `false`.
+
+```bash
+# 1. Generate new token and update .env
+node build/update-env.mjs LOG_WORKER_TOKEN --generate
+source scripts/lib/source-config.sh --force
 
 # 2. Update Worker secret (from local machine)
 cd workers/log-receiver
-echo "$NEW_TOKEN" | npx wrangler secret put AUTH_TOKEN
+echo "$ENV__LOG_WORKER_TOKEN" | npx wrangler secret put AUTH_TOKEN
 
-# 3. Update VPS vector/.env — change LOG_WORKER_TOKEN value
+# 3. Rebuild and push artifacts
+npm run pre-deploy
+scripts/sync-deploy.sh
 
-# 4. Recreate Vector to pick up new .env values (see CLAUDE.md: restart vs up -d)
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/vector && docker compose up -d'
+# 4. Recreate Vector to pick up new env values (see CLAUDE.md: restart vs up -d)
+sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d vector'
 ```
 
 > **Verify:** Run § 7.2 (Vector running) and § 7.3 (Log Receiver Worker health check returns `{"status":"ok"}`).
 
 #### Provider API Keys
 
-Provider API keys are stored as Cloudflare Worker secrets in the AI Gateway Worker. They never touch the VPS.
+Provider credentials are stored in Cloudflare KV (per-user). Rotate them via the self-service config UI:
 
-**Direct API mode** (default):
+1. Visit `https://<AI_GATEWAY_WORKER_URL>/config`
+2. Authenticate with the user's gateway token
+3. Update the relevant credential fields
+4. Save
 
-```bash
-# From local machine
-cd workers/ai-gateway
-echo "new-key-value" | npx wrangler secret put ANTHROPIC_API_KEY
-echo "new-key-value" | npx wrangler secret put OPENAI_API_KEY
-```
+No VPS restart needed — credential changes take effect immediately.
 
 **CF AI Gateway mode** (optional): If using Cloudflare AI Gateway, also rotate the gateway token:
 
 ```bash
+cd workers/ai-gateway
 echo "new-token" | npx wrangler secret put CF_AI_GATEWAY_TOKEN
 ```
 
-See [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md) for details on both modes.
+See [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md) for details.
 
 > **Verify:** Run § 7.3 — AI Gateway Worker health check. Full LLM routing verified during § 7.7 (E2E test).
+
+#### Egress Proxy Token
+
+> **Skip** if `stack.egress_proxy` is not configured in `stack.yml`.
+
+The egress proxy auth token is shared between the AI Gateway Worker and the VPS egress proxy container. Rotate both simultaneously:
+
+```bash
+# 1. Generate new token and update .env
+node build/update-env.mjs EGRESS_PROXY_AUTH_TOKEN --generate
+source scripts/lib/source-config.sh --force
+
+# 2. Update AI Gateway Worker secrets
+cd workers/ai-gateway
+echo "$STACK__STACK__EGRESS_PROXY__AUTH_TOKEN" | npx wrangler secret put EGRESS_PROXY_AUTH_TOKEN
+
+# 3. Rebuild and push artifacts
+npm run pre-deploy
+scripts/sync-deploy.sh
+
+# 4. Recreate the egress proxy container to pick up new env values
+sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d egress-proxy'
+```
+
+> **Verify:** Run § 7.2a — egress proxy health check. Test a codex request end-to-end if possible.
+
+#### Sandbox Registry Token
+
+> **Skip** if `stack.sandbox_registry` is not configured in `stack.yml`.
+
+```bash
+# 1. Generate new token and update .env
+node build/update-env.mjs SANDBOX_REGISTRY_TOKEN --generate
+
+# 2. Rebuild and push artifacts (regenerates htpasswd with bcrypt)
+npm run pre-deploy
+scripts/sync-deploy.sh
+
+# 3. Restart the registry container to reload the new htpasswd
+# (bind-mounted read-only — restart picks up new file from disk)
+sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose restart sandbox-registry'
+
+# 4. Recreate all claws to pass the new token into containers
+# (env vars are baked at container creation — restart won't reload them)
+sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d'
+```
+
+> **Note:** Steps 3 and 4 must happen in order — the registry needs the new htpasswd before claws attempt to login with the new token.
+
+> **Verify:** Check entrypoint logs for "Logging into sandbox registry" without a WARNING line.
 
 #### SSH Keys
 
@@ -111,14 +185,14 @@ See [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md) for details on b
 ssh-keygen -t ed25519 -f ~/.ssh/vps1_openclaw_ed25519_new
 
 # 2. Add new public key to VPS (while old key still works)
-ssh -i ~/.ssh/vps1_openclaw_ed25519 -p <SSH_PORT> adminclaw@<VPS1_IP> \
+ssh -i ~/.ssh/vps1_openclaw_ed25519 -p <SSH_PORT> adminclaw@<VPS_IP> \
   "echo 'NEW_PUBLIC_KEY' >> ~/.ssh/authorized_keys"
 
 # 3. Test new key
-ssh -i ~/.ssh/vps1_openclaw_ed25519_new -p <SSH_PORT> adminclaw@<VPS1_IP> echo "OK"
+ssh -i ~/.ssh/vps1_openclaw_ed25519_new -p <SSH_PORT> adminclaw@<VPS_IP> echo "OK"
 
 # 4. Remove old key from VPS authorized_keys
-# 5. Update openclaw-config.env with new SSH_KEY_PATH
+# 5. Update .env with new SSH_KEY path
 # 6. Delete old private key
 ```
 
@@ -128,7 +202,7 @@ ssh -i ~/.ssh/vps1_openclaw_ed25519_new -p <SSH_PORT> adminclaw@<VPS1_IP> echo "
 
 See [docs/CLOUDFLARE-TUNNEL.md](../docs/CLOUDFLARE-TUNNEL.md#rotating-tunnel-token) for rotation procedure.
 
-> **Verify:** Run § 7.4 — cloudflared active, domain routing returns 302/403.
+> **Verify:** Run § 7.4 — cloudflared container running, domain routing returns 302/403.
 
 ## Image Updates
 
@@ -154,35 +228,43 @@ scripts/update-sandboxes.sh --dry-run
 
 No container restart needed — builds happen inside the running container's nested Docker. New sandbox containers launched by agents automatically use the rebuilt images.
 
+**With sandbox registry:** When `sandbox_registry` is configured, `update-sandboxes.sh` on one claw builds and pushes updated images to the registry. Other claws pull the updated images on their next restart, avoiding redundant builds.
+
 **When to run:**
 
 - Monthly, for security patches (apt package updates)
 - When entrypoint logs a staleness warning (images > 30 days old)
 - After editing `sandbox-toolkit.yaml` — auto-detected on next container restart, but `update-sandboxes.sh` applies immediately without restart
 
+**Registry garbage collection:** Old image layers accumulate in the registry. Reclaim disk space periodically:
+
+```bash
+# Run GC on the sandbox registry container
+sudo docker exec <PROJECT_NAME>-sandbox-registry bin/registry garbage-collect /etc/docker/registry/config.yml
+```
+
 > **Verify:** Run § 7.1a — all sandbox toolkit binaries operational in sandbox container.
 
 ### Bind-Mounted Deploy Files
 
-Several deploy files are bind-mounted read-only into claw containers. These can be updated without a full image rebuild — just SCP the file and restart the claws.
+Several deploy files are bind-mounted read-only into claw containers. These can be updated without a full image rebuild — rebuild artifacts, sync, and restart.
 
-**Bind-mounted files:** `dashboard/`, `entrypoint-gateway.sh`, `rebuild-sandboxes.sh`, `parse-toolkit.mjs`, `sandbox-toolkit.yaml`, `plugins/`
+**Bind-mounted files:** `dashboard/`, `entrypoint.sh`, `rebuild-sandboxes.sh`, `parse-toolkit.mjs`, `sandbox-toolkit.yaml`, `plugins/`
 
 ```bash
-# From local machine — copy to VPS (use -r for directories like dashboard/ or plugins/)
-scp -i <SSH_KEY_PATH> -P <SSH_PORT> [-r] deploy/<path> adminclaw@<VPS1_IP>:/tmp/deploy-update
+# From local machine — rebuild and sync (shows diff, auto-commits on VPS)
+npm run pre-deploy
+scripts/sync-deploy.sh
 
-# Move into place, fix ownership, and restart all claws (single SSH session)
-ssh -i <SSH_KEY_PATH> -p <SSH_PORT> adminclaw@<VPS1_IP> "
-  sudo rm -rf <INSTALL_DIR>/openclaw/deploy/<path>
-  sudo cp -r /tmp/deploy-update <INSTALL_DIR>/openclaw/deploy/<path>
-  sudo chown -R 1000:1000 <INSTALL_DIR>/openclaw/deploy/<path>
-  rm -rf /tmp/deploy-update
-  sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose restart'
-"
+# Restart all claws to pick up changes (restart is fine for bind-mounted file changes)
+ssh -i <SSH_KEY> -p <SSH_PORT> adminclaw@<VPS_IP> \
+  "sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose restart'"
+
+# Tag successful deploy after verifying services are healthy
+scripts/tag-deploy.sh "updated bind-mounted files"
 ```
 
-> To restart only a specific claw: `docker compose restart openclaw-<CLAW_NAME>`
+> To restart only a specific claw: `docker compose restart <PROJECT_NAME>-openclaw-<CLAW_NAME>`
 
 > **Note:** `sandbox-toolkit.yaml` changes are also auto-detected on container restart via Docker label comparison, triggering a sandbox image rebuild if needed.
 
@@ -205,58 +287,63 @@ Brief downtime (~5-10s) per claw during container swap. The script waits for hea
 
 ## Updating a Single Claw's Configuration
 
-To update just one claw's `openclaw.json` or `models.json` without affecting other claws:
+To update just one claw's `openclaw.json` without affecting other claws:
 
 ```bash
 # From local machine
-# 1. SCP updated deploy files to VPS
-scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r deploy/* ${SSH_USER}@${VPS1_IP}:/tmp/deploy-staging/
+# 1. Rebuild deployment artifacts
+npm run pre-deploy
 
-# 2. Deploy config for one claw only
-ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} ${SSH_USER}@${VPS1_IP} \
-  "env INSTANCE_NAME=personal-claw \
-    OPENCLAW_DOMAIN='${OPENCLAW_DOMAIN}' \
-    OPENCLAW_DOMAIN_PATH='${OPENCLAW_DOMAIN_PATH}' \
-    YOUR_TELEGRAM_ID='${YOUR_TELEGRAM_ID}' \
-    OPENCLAW_INSTANCE_ID='${OPENCLAW_INSTANCE_ID}' \
-    VPS_HOSTNAME='${VPS_HOSTNAME}' \
-    ENABLE_EVENTS_LOGGING='${ENABLE_EVENTS_LOGGING}' \
-    ENABLE_LLEMTRY_LOGGING='${ENABLE_LLEMTRY_LOGGING}' \
-    LOG_WORKER_TOKEN='${LOG_WORKER_TOKEN}' \
-    LOG_WORKER_URL='${LOG_WORKER_URL}' \
-    AI_GATEWAY_WORKER_URL='${AI_GATEWAY_WORKER_URL}' \
-    ENABLE_VECTOR_LOG_SHIPPING='${ENABLE_VECTOR_LOG_SHIPPING}' \
-  bash /tmp/deploy-staging/scripts/deploy-config.sh"
+# 2. Sync the updated claw config to VPS
+scripts/sync-deploy.sh --instance personal-claw
 
-# 3. Restart that claw to pick up new config
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose restart openclaw-personal-claw'
+# 3. Restart that claw to pick up new config (restart is fine for bind-mounted file changes)
+ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
+  "sudo -u openclaw bash -c 'cd ${INSTALL_DIR} && docker compose restart openclaw-stack-openclaw-personal-claw'"
 ```
 
 ---
 
 ## Adding a New Claw
 
-1. Create `deploy/openclaws/<name>/config.env` (copy from `_example/config.env`)
-2. Set per-claw overrides (domain, resources, etc.) in the new `config.env`
-3. SCP deploy files to VPS:
+1. Add a new entry under `claws` in `stack.yml` with per-claw overrides (domain, resources, Telegram bot token, etc.)
+2. Add the claw's Telegram bot token to `.env` (e.g., `NEW_CLAW_TELEGRAM_BOT_TOKEN=...`)
+3. Rebuild deployment artifacts and sync to VPS:
    ```bash
-   scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} -r deploy/* ${SSH_USER}@${VPS1_IP}:/tmp/deploy-staging/
-   scp -P ${SSH_PORT} -i ${SSH_KEY_PATH} openclaw-config.env ${SSH_USER}@${VPS1_IP}:/tmp/openclaw-config.env
+   npm run pre-deploy
+   scripts/sync-deploy.sh --all
    ```
-4. Run `openclaw-multi.sh generate` to update `docker-compose.override.yml`:
+4. Start the new claw:
    ```bash
-   ssh ... "bash /tmp/deploy-staging/scripts/openclaw-multi.sh generate"
+   ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
+     "sudo -u openclaw bash -c 'cd ${INSTALL_DIR} && docker compose up -d openclaw-stack-openclaw-<name>'"
    ```
-5. Run `deploy-config.sh` for the new claw:
+5. Tag successful deploy after verifying the new claw is healthy:
    ```bash
-   ssh ... "env INSTANCE_NAME=<name> ... bash /tmp/deploy-staging/scripts/deploy-config.sh"
+   scripts/tag-deploy.sh "added <name> claw"
    ```
-6. If using `CF_API_TOKEN`, configure tunnel routes and DNS:
-   ```bash
-   ssh ... "bash /tmp/deploy-staging/scripts/openclaw-multi.sh tunnel-config --apply"
-   ```
-7. Start the new claw:
-   ```bash
-   sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && docker compose up -d openclaw-<name>'
-   ```
-8. Clean up secrets: `ssh ... "rm -f /tmp/openclaw-config.env"`
+
+---
+
+## Deploy History
+
+The VPS INSTALL_DIR is a git repo that tracks deploy-managed config. Each `sync-deploy.sh` run auto-commits changes, and `tag-deploy.sh` marks successful deploys.
+
+```bash
+# View deploy history
+ssh ... "cd <INSTALL_DIR> && git log --oneline --decorate"
+
+# Show what changed in a specific deploy
+ssh ... "cd <INSTALL_DIR> && git show <commit> --stat"
+
+# Diff between two deploys (or a deploy and a tag)
+ssh ... "cd <INSTALL_DIR> && git diff <tag1>..<tag2>"
+
+# List all deploy tags
+ssh ... "cd <INSTALL_DIR> && git tag -l 'deploy-*'"
+
+# Roll back to a previous deploy state (review diff first)
+ssh ... "cd <INSTALL_DIR> && git diff HEAD..<tag> --stat"
+ssh ... "cd <INSTALL_DIR> && git checkout <tag> -- ."
+# Then: docker compose up -d to apply
+```

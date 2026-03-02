@@ -12,7 +12,7 @@ transforms:
     type: remap
     inputs:
       - docker_logs
-    source: '.vps_ip = "${VPS1_IP}"'
+    source: '.vps_ip = "${VPS_IP}"'
 
   # Detect log level from message text so the worker can filter cheaply by field
   tag_level:
@@ -43,7 +43,7 @@ sinks:
     type: http
     inputs:
       - tag_level
-    uri: "${LOG_WORKER_URL}"
+    uri: "${LOG_WORKER_URL}/logs"
     encoding:
       codec: json
     auth:

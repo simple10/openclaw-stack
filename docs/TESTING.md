@@ -4,23 +4,21 @@ This document provides comprehensive testing instructions for verifying an exist
 
 ## For Claude Code Agents
 
-When asked to test the OpenClaw deployment, follow both phases below. Read `openclaw-config.env` first for connection details and variable values used throughout.
+When asked to test the OpenClaw deployment, follow both phases below. Source the config first for connection details and variable values used throughout.
 
 ```bash
-# Read configuration file
-cat ../openclaw-config.env
+# Load all config variables
+source deploy/host/source-config.sh
 ```
 
-Extract these values for use in all tests below:
+This exports `ENV__*` vars (from `.env`) and `STACK__*` vars (from `stack.yml`). Key variables used in tests below:
 
-- `VPS1_IP` - OpenClaw VPS
-- `SSH_KEY_PATH` - SSH key location
-- `SSH_USER` - SSH username (should be `adminclaw`)
-- `SSH_PORT` - SSH port (should be `222`)
-- `OPENCLAW_DOMAIN` - Domain for browser tests
-- `OPENCLAW_DOMAIN_PATH` - URL subpath (may be empty)
-- `AI_GATEWAY_WORKER_URL` - AI Gateway Worker URL
-- `LOG_WORKER_URL` - Log Receiver Worker URL (includes `/logs` path)
+- `ENV__VPS_IP` - OpenClaw VPS
+- `ENV__SSH_KEY` - SSH key location
+- `ENV__SSH_USER` - SSH username (should be `adminclaw`)
+- `ENV__SSH_PORT` - SSH port (should be `222`)
+- `STACK__STACK__INSTALL_DIR` - VPS install base (default: `/home/openclaw`)
+- Per-claw domain/path: `STACK__CLAWS__<NAME>__DOMAIN`, `STACK__CLAWS__<NAME>__DASHBOARD_PATH`
 
 ---
 
@@ -30,7 +28,7 @@ Execute **all** verification steps from [`playbooks/07-verification.md`](../play
 
 | Section | What it checks |
 |---------|---------------|
-| **7.1** | OpenClaw containers running, gateway health endpoint |
+| **7.1** | OpenClaw containers running (all claws), gateway health endpoints |
 | **7.2** | Vector running, shipping logs, checkpoint data |
 | **7.3** | Cloudflare Workers health (AI Gateway + Log Receiver) |
 | **7.4** | Cloudflare Tunnel running, external access works, direct IP blocked |
@@ -45,11 +43,12 @@ Execute **all** verification steps from [`playbooks/07-verification.md`](../play
 
 ```bash
 # Run from LOCAL machine — confirm gateway ports aren't externally reachable
-nc -zv -w 5 <VPS1_IP> 18789 2>&1 || echo "Port 18789 not reachable (expected)"
-nc -zv -w 5 <VPS1_IP> 18790 2>&1 || echo "Port 18790 not reachable (expected)"
+# Check each claw's gateway port (discover ports from docker compose config)
+nc -zv -w 5 <VPS_IP> 18789 2>&1 || echo "Port 18789 not reachable (expected)"
+nc -zv -w 5 <VPS_IP> 18790 2>&1 || echo "Port 18790 not reachable (expected)"
 ```
 
-Both connections should fail. If either succeeds, Docker daemon.json localhost binding is misconfigured — see `playbooks/03-docker.md`.
+All connections should fail. If any succeed, Docker daemon.json localhost binding is misconfigured — see `playbooks/03-docker.md`.
 
 ---
 
@@ -142,9 +141,9 @@ After running all tests, compile results:
 | **Infrastructure** | SSH access (port 222) | 7.1 | |
 | | UFW firewall rules | 7.6 | |
 | | Fail2ban running | 7.6 | |
-| **Services** | Docker containers running | 7.1 | |
+| **Services** | Docker containers running (all claws) | 7.1 | |
 | | Cloudflare Tunnel active | 7.4 | |
-| | Gateway health endpoint (localhost) | 7.1 | |
+| | Gateway health endpoint per claw (localhost) | 7.1 | |
 | | Sysbox runtime available | 7.6 | |
 | **Logging** | Vector running and shipping | 7.2 | |
 | **Workers** | AI Gateway healthy | 7.3 | |
@@ -152,8 +151,8 @@ After running all tests, compile results:
 | **Monitoring** | Host alerter cron | 7.5 | |
 | | Log rotation | 7.5a | |
 | | Backup cron | 7.6 | |
-| **CLI** | CLI device paired | 7.5b | |
-| | Resource limits match VPS | 7.5c | |
+| **CLI** | CLI device paired (per claw) | 7.5b | |
+| | Resource limits match VPS (per claw) | 7.5c | |
 | **Security** | Ports bound to localhost only | 7.6 | |
 | | External port reachability blocked | 7.6 | |
 | | Security audit passes | 7.6 | |
@@ -170,11 +169,18 @@ After running all tests, compile results:
 
 ## Quick Test Command
 
-For a rapid health check, run this single command (note: SSH uses port 222):
+For a rapid health check, run this single command. Source config first for variable values.
 
 ```bash
+source deploy/host/source-config.sh
 echo "=== VPS-1 Health ===" && \
-ssh -p 222 adminclaw@<VPS1_IP> "sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose ps --format \"{{.Name}}: {{.Status}}\"' && echo && curl -s http://localhost:18789<OPENCLAW_DOMAIN_PATH>/ | head -1 && echo && sudo systemctl is-active cloudflared"
+ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+  "sudo -u openclaw bash -c 'cd ${INSTALL_DIR} && docker compose ps --format \"{{.Name}}: {{.Status}}\"' && \
+   echo && \
+   echo '=== Claw Instances ===' && \
+   ls -1 ${INSTALL_DIR}/instances/ 2>/dev/null && \
+   echo && \
+   sudo systemctl is-active cloudflared"
 ```
 
 ---
@@ -184,23 +190,23 @@ ssh -p 222 adminclaw@<VPS1_IP> "sudo -u openclaw bash -c 'cd /home/openclaw/open
 ### SSL Certificate Errors in Browser
 
 1. Check Cloudflare SSL mode is "Full (strict)"
-2. Verify tunnel is running: `sudo systemctl status cloudflared`
+2. Verify tunnel is running: `sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose ps cloudflared'`
 3. Check DNS routes through tunnel: `dig <OPENCLAW_DOMAIN>`
 
 ### Gateway Not Healthy
 
-1. Check container logs: `sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose logs --tail 50 openclaw-main-claw'`
-2. Check container is running: `sudo -u openclaw bash -c 'cd /home/openclaw/openclaw && docker compose ps'`
-3. Verify localhost access: `curl -s http://localhost:18789<OPENCLAW_DOMAIN_PATH>/ | head -5`
+1. Check container logs: `sudo -u openclaw bash -c 'cd ${INSTALL_DIR} && docker compose logs --tail 50 openclaw-stack-openclaw-<name>'`
+2. Check all containers running: `sudo -u openclaw bash -c 'cd ${INSTALL_DIR} && docker compose ps'`
+3. Verify localhost access per claw (ports start at 18789, increment per claw): `curl -s http://localhost:<port>/ | head -5`
 
 ### No Logs in Cloudflare
 
-1. Check Vector logs: `sudo -u openclaw bash -c 'cd /home/openclaw/vector && docker compose logs'`
-2. Verify LOG_WORKER_URL includes `/logs` path
-3. Check Log Receiver Worker health (strip `/logs` suffix): `curl -s https://<LOG_WORKER_BASE_URL>/health`
+1. Check Vector logs: `sudo -u openclaw bash -c 'cd ${INSTALL_DIR} && docker compose logs vector'`
+2. Verify LOG_WORKER_URL is set (base URL, no path suffix)
+3. Check Log Receiver Worker health: `curl -s https://<LOG_WORKER_URL>/health`
 
 ### Container Permission Errors
 
 1. Check container user matches volume ownership
-2. Verify `.openclaw` is owned by uid 1000: `sudo ls -la /home/openclaw/.openclaw/`
+2. Verify per-instance `.openclaw` is owned by uid 1000: `sudo ls -la ${INSTALL_DIR}/instances/<name>/.openclaw/`
 3. Review `read_only` settings if files can't be written

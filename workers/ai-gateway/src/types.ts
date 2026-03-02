@@ -7,3 +7,29 @@ export type { ProviderConfig } from './config'
 // export interface Env {
 //   // Vars (wrangler.toml)
 // }
+
+// --- KV schema types ---
+
+export interface UserCredentials {
+  anthropic?: {
+    apiKey?: string       // sk-ant-api-* (regular API key)
+    oauthToken?: string   // sk-ant-oat-* (Claude Code subscription)
+  }
+  openai?: {
+    apiKey?: string       // static API key
+    oauth?: {             // Codex OAuth (priority over apiKey)
+      accessToken: string
+      refreshToken: string
+      expiresAt: number   // epoch ms
+    }
+  }
+}
+
+export interface UserEntry {
+  name: string
+  ip?: string
+  tokens: string[]
+  createdAt: string       // ISO 8601
+}
+
+export type UsersRegistry = Record<string, UserEntry>
