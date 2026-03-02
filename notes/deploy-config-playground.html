@@ -1,0 +1,2197 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenClaw Stack Deploy & Config Playground</title>
+    <style>
+      :root {
+        --bg: #1e1e2e;
+        --bg2: #181825;
+        --bg3: #313244;
+        --bg4: #45475a;
+        --fg: #cdd6f4;
+        --fg2: #a6adc8;
+        --fg3: #6c7086;
+        --blue: #89b4fa;
+        --green: #a6e3a1;
+        --yellow: #f9e2af;
+        --red: #f38ba8;
+        --purple: #cba6f7;
+        --peach: #fab387;
+        --teal: #94e2d5;
+        --pink: #f5c2e7;
+        --sky: #89dceb;
+        --mauve: #cba6f7;
+        --lavender: #b4befe;
+        --radius: 6px;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        background: var(--bg2);
+        color: var(--fg);
+        height: 100vh;
+        overflow: hidden;
+      }
+      #app {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+      header {
+        padding: 10px 20px;
+        background: var(--bg);
+        border-bottom: 1px solid var(--bg3);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-shrink: 0;
+      }
+      header h1 {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--fg);
+        white-space: nowrap;
+      }
+      header h1 span {
+        color: var(--blue);
+      }
+      .tabs {
+        display: flex;
+        gap: 2px;
+        background: var(--bg3);
+        border-radius: var(--radius);
+        padding: 2px;
+      }
+      .tab {
+        padding: 6px 14px;
+        border-radius: 4px;
+        border: none;
+        background: none;
+        color: var(--fg3);
+        cursor: pointer;
+        font-size: 12px;
+        font-family: inherit;
+        transition: all 0.15s;
+        white-space: nowrap;
+      }
+      .tab:hover {
+        color: var(--fg2);
+      }
+      .tab.active {
+        background: var(--bg4);
+        color: var(--fg);
+      }
+      .tab-icon {
+        margin-right: 4px;
+      }
+      header .info {
+        margin-left: auto;
+        font-size: 11px;
+        color: var(--fg3);
+      }
+      main {
+        flex: 1;
+        overflow: hidden;
+        position: relative;
+      }
+      .view {
+        display: none;
+        position: absolute;
+        inset: 0;
+        overflow: auto;
+      }
+      .view.active {
+        display: flex;
+      }
+
+      /* ── Shared styles ── */
+      .panel {
+        background: var(--bg);
+        border: 1px solid var(--bg3);
+        border-radius: var(--radius);
+        padding: 16px;
+      }
+      .panel h3 {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 10px;
+        color: var(--fg);
+      }
+      .panel h4 {
+        font-size: 12px;
+        font-weight: 600;
+        margin: 10px 0 6px;
+        color: var(--fg2);
+      }
+      pre,
+      code {
+        font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+        font-size: 12px;
+      }
+      pre {
+        background: var(--bg2);
+        border: 1px solid var(--bg3);
+        border-radius: var(--radius);
+        padding: 12px;
+        overflow-x: auto;
+        line-height: 1.5;
+      }
+      .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .badge-blue {
+        background: rgba(137, 180, 250, 0.15);
+        color: var(--blue);
+      }
+      .badge-green {
+        background: rgba(166, 227, 161, 0.15);
+        color: var(--green);
+      }
+      .badge-peach {
+        background: rgba(250, 179, 135, 0.15);
+        color: var(--peach);
+      }
+      .badge-purple {
+        background: rgba(203, 166, 247, 0.15);
+        color: var(--purple);
+      }
+      .badge-red {
+        background: rgba(243, 139, 168, 0.15);
+        color: var(--red);
+      }
+      .badge-teal {
+        background: rgba(148, 226, 213, 0.15);
+        color: var(--teal);
+      }
+      .badge-yellow {
+        background: rgba(249, 226, 175, 0.15);
+        color: var(--yellow);
+      }
+      .legend {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        padding: 8px 12px;
+        background: var(--bg);
+        border: 1px solid var(--bg3);
+        border-radius: var(--radius);
+        font-size: 11px;
+      }
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        color: var(--fg2);
+      }
+      .legend-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+      }
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 0;
+      }
+      .toggle-row label {
+        font-size: 12px;
+        color: var(--fg2);
+        cursor: pointer;
+      }
+      .toggle {
+        position: relative;
+        width: 32px;
+        height: 18px;
+        appearance: none;
+        background: var(--bg3);
+        border-radius: 9px;
+        cursor: pointer;
+        transition: background 0.2s;
+        flex-shrink: 0;
+      }
+      .toggle:checked {
+        background: var(--blue);
+      }
+      .toggle::after {
+        content: '';
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 14px;
+        height: 14px;
+        background: var(--fg);
+        border-radius: 50%;
+        transition: transform 0.2s;
+      }
+      .toggle:checked::after {
+        transform: translateX(14px);
+      }
+      .node-detail {
+        position: absolute;
+        background: var(--bg);
+        border: 1px solid var(--bg4);
+        border-radius: var(--radius);
+        padding: 14px;
+        max-width: 400px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        z-index: 100;
+        font-size: 12px;
+      }
+      .node-detail h4 {
+        margin: 0 0 8px;
+        font-size: 13px;
+        color: var(--blue);
+      }
+      .node-detail p {
+        color: var(--fg2);
+        line-height: 1.5;
+        margin-bottom: 6px;
+      }
+      .node-detail .close {
+        position: absolute;
+        top: 8px;
+        right: 10px;
+        background: none;
+        border: none;
+        color: var(--fg3);
+        cursor: pointer;
+        font-size: 16px;
+      }
+
+      /* ── Tab 1: Config Flow ── */
+      #view-config {
+        flex-direction: column;
+        padding: 16px;
+        gap: 16px;
+      }
+      .flow-canvas-wrap {
+        flex: 1;
+        position: relative;
+        min-height: 0;
+      }
+      .flow-canvas-wrap canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      .flow-legend {
+        flex-shrink: 0;
+      }
+
+      /* ── Tab 2: Playbook Pipeline ── */
+      #view-pipeline {
+        flex-direction: row;
+      }
+      .pipeline-left {
+        flex: 1;
+        padding: 16px;
+        overflow: auto;
+        position: relative;
+      }
+      .pipeline-left canvas {
+        width: 100%;
+        height: 100%;
+      }
+      .pipeline-right {
+        width: 340px;
+        border-left: 1px solid var(--bg3);
+        padding: 16px;
+        overflow-y: auto;
+        background: var(--bg);
+      }
+      .pipeline-right .empty-state {
+        color: var(--fg3);
+        font-size: 12px;
+        text-align: center;
+        margin-top: 40px;
+      }
+      .pipeline-presets {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 12px;
+      }
+      .preset-btn {
+        padding: 4px 10px;
+        border-radius: var(--radius);
+        border: 1px solid var(--bg4);
+        background: var(--bg);
+        color: var(--fg2);
+        cursor: pointer;
+        font-size: 11px;
+        font-family: inherit;
+        transition: all 0.15s;
+      }
+      .preset-btn:hover {
+        border-color: var(--blue);
+        color: var(--fg);
+      }
+      .preset-btn.active {
+        background: var(--blue);
+        color: var(--bg);
+        border-color: var(--blue);
+      }
+      .section-list {
+        list-style: none;
+        margin: 6px 0;
+      }
+      .section-list li {
+        padding: 3px 0;
+        font-size: 11px;
+        color: var(--fg2);
+        display: flex;
+        gap: 6px;
+      }
+      .section-list .sec-id {
+        color: var(--fg3);
+        min-width: 24px;
+      }
+      .output-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-top: 4px;
+      }
+
+      /* ── Tab 3: Template Syntax ── */
+      #view-templates {
+        flex-direction: column;
+        padding: 16px;
+        gap: 16px;
+        overflow-y: auto;
+      }
+      .template-section {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .template-section .controls {
+        margin-bottom: 8px;
+      }
+      .template-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+      .template-header h3 {
+        margin: 0;
+      }
+      .arrow-label {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--fg3);
+        font-size: 20px;
+        padding: 0 8px;
+      }
+      .hl-blue {
+        color: var(--blue);
+      }
+      .hl-green {
+        color: var(--green);
+      }
+      .hl-peach {
+        color: var(--peach);
+      }
+      .hl-purple {
+        color: var(--purple);
+      }
+      .hl-teal {
+        color: var(--teal);
+      }
+      .hl-red {
+        color: var(--red);
+      }
+      .hl-yellow {
+        color: var(--yellow);
+      }
+      .hl-fg3 {
+        color: var(--fg3);
+      }
+      .hl-pink {
+        color: var(--pink);
+      }
+
+      /* ── Tab 4: File Map ── */
+      #view-filemap {
+        flex-direction: row;
+      }
+      .tree-panel {
+        width: 380px;
+        padding: 16px;
+        overflow-y: auto;
+        border-right: 1px solid var(--bg3);
+      }
+      .tree-node {
+        cursor: pointer;
+        padding: 4px 6px;
+        border-radius: 3px;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: background 0.1s;
+      }
+      .tree-node:hover {
+        background: var(--bg3);
+      }
+      .tree-node.selected {
+        background: rgba(137, 180, 250, 0.12);
+      }
+      .tree-node .icon {
+        width: 14px;
+        text-align: center;
+        color: var(--fg3);
+      }
+      .tree-node .name {
+        color: var(--fg);
+      }
+      .tree-node.dir .name {
+        color: var(--blue);
+        font-weight: 500;
+      }
+      .tree-children {
+        padding-left: 16px;
+      }
+      .tree-connector {
+        border-left: 1px solid var(--bg4);
+        margin-left: 7px;
+      }
+      .filemap-detail {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+      }
+      .filemap-detail .empty-state {
+        color: var(--fg3);
+        font-size: 12px;
+        text-align: center;
+        margin-top: 60px;
+      }
+      .filemap-detail h3 {
+        color: var(--blue);
+      }
+      .filemap-detail .source-tag {
+        font-size: 11px;
+        color: var(--fg3);
+        margin: 4px 0 12px;
+      }
+      .filemap-detail .desc {
+        color: var(--fg2);
+        font-size: 12px;
+        line-height: 1.6;
+        margin-bottom: 12px;
+      }
+
+      /* scrollbar */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--bg4);
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--fg3);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1><span>OpenClaw Stack</span> Deploy & Config Playground</h1>
+        <div class="tabs" id="tabs">
+          <button class="tab active" data-view="config">
+            <span class="tab-icon">&#9881;</span>Config Flow
+          </button>
+          <button class="tab" data-view="pipeline">
+            <span class="tab-icon">&#9654;</span>Pipeline
+          </button>
+          <button class="tab" data-view="templates">
+            <span class="tab-icon">&lt;/&gt;</span>Template Syntax
+          </button>
+          <button class="tab" data-view="filemap">
+            <span class="tab-icon">&#128193;</span>File Map
+          </button>
+        </div>
+        <div class="info">Interactive reference &mdash; all data embedded from source</div>
+      </header>
+      <main>
+        <!-- Tab 1: Config Flow -->
+        <div id="view-config" class="view active">
+          <div class="flow-legend legend">
+            <div class="legend-item">
+              <div class="legend-dot" style="background: var(--blue)"></div>
+              <code>${VAR}</code> build-time (.env &rarr; stack.yml)
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="background: var(--green)"></div>
+              <code>{{expr}}</code> Handlebars (template &rarr; compose)
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="background: var(--peach)"></div>
+              <code>$VAR</code> runtime (envsubst at container start)
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="background: var(--purple)"></div>
+              JSONC &rarr; JSON (comment strip)
+            </div>
+            <div class="legend-item" style="margin-left: auto; color: var(--fg3)">
+              Click nodes for details &bull; Hover arrows for transforms
+            </div>
+          </div>
+          <div class="flow-canvas-wrap">
+            <canvas id="flowCanvas"></canvas>
+          </div>
+        </div>
+
+        <!-- Tab 2: Playbook Pipeline -->
+        <div id="view-pipeline" class="view">
+          <div class="pipeline-left">
+            <div class="pipeline-presets">
+              <button class="preset-btn active" data-preset="fresh">Fresh Deploy</button>
+              <button class="preset-btn" data-preset="analysis">Analysis</button>
+              <button class="preset-btn" data-preset="maintenance">Maintenance</button>
+            </div>
+            <canvas id="pipelineCanvas"></canvas>
+          </div>
+          <div class="pipeline-right" id="pipelineDetail">
+            <div class="empty-state">Click a playbook node to see details</div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Template Syntax -->
+        <div id="view-templates" class="view">
+          <!-- Section 1: ${VAR} resolution -->
+          <div class="panel">
+            <div class="template-header">
+              <span class="badge badge-blue">Stage 1</span>
+              <h3><code>${VAR}</code> &mdash; .env + stack.yml resolution</h3>
+            </div>
+            <p style="font-size: 12px; color: var(--fg2); margin-bottom: 12px">
+              At <code>npm run pre-deploy</code>, <code>${VAR}</code> and
+              <code>${VAR:-default}</code> references in <code>stack.yml</code> are resolved from
+              <code>.env</code> values. Supports defaults via <code>:-</code> syntax. Comments are
+              preserved.
+            </p>
+            <div class="controls">
+              <div class="toggle-row">
+                <input type="checkbox" class="toggle" id="tpl1-filled" checked />
+                <label for="tpl1-filled">Show resolved values (uncheck for raw)</label>
+              </div>
+            </div>
+            <div class="template-section">
+              <div>
+                <h4 style="color: var(--fg3)">stack.yml (input)</h4>
+                <pre id="tpl1-before"></pre>
+              </div>
+              <div>
+                <h4 style="color: var(--fg3)">Resolved config (output)</h4>
+                <pre id="tpl1-after"></pre>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 2: Handlebars -->
+          <div class="panel">
+            <div class="template-header">
+              <span class="badge badge-green">Stage 2</span>
+              <h3><code>{{expr}}</code> &mdash; Handlebars template rendering</h3>
+            </div>
+            <p style="font-size: 12px; color: var(--fg2); margin-bottom: 12px">
+              The compose template (<code>docker-compose.yml.hbs</code>) uses Handlebars to iterate
+              claws, conditionally include services, and inject resolved values.
+              <code>{{#each claws}}</code> generates per-claw service blocks.
+              <code>{{#if}}</code> toggles optional services.
+            </p>
+            <div class="controls" style="display: flex; gap: 16px; flex-wrap: wrap">
+              <div class="toggle-row">
+                <input type="checkbox" class="toggle" id="tpl2-egress" checked />
+                <label for="tpl2-egress">Egress Proxy</label>
+              </div>
+              <div class="toggle-row">
+                <input type="checkbox" class="toggle" id="tpl2-vector" checked />
+                <label for="tpl2-vector">Vector (logging)</label>
+              </div>
+              <div class="toggle-row">
+                <input type="checkbox" class="toggle" id="tpl2-multiclaw" />
+                <label for="tpl2-multiclaw">Multi-claw (2 claws)</label>
+              </div>
+            </div>
+            <div class="template-section">
+              <div>
+                <h4 style="color: var(--fg3)">docker-compose.yml.hbs (template)</h4>
+                <pre id="tpl2-before"></pre>
+              </div>
+              <div>
+                <h4 style="color: var(--fg3)">docker-compose.yml (rendered)</h4>
+                <pre id="tpl2-after"></pre>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 3: envsubst -->
+          <div class="panel">
+            <div class="template-header">
+              <span class="badge badge-peach">Stage 3</span>
+              <h3><code>$VAR</code> &mdash; Runtime envsubst at container startup</h3>
+            </div>
+            <p style="font-size: 12px; color: var(--fg2); margin-bottom: 12px">
+              <code>openclaw.jsonc</code> is parsed to JSON (comments stripped) during pre-deploy.
+              At container startup, <code>entrypoint.sh</code> runs <code>envsubst</code> on the
+              JSON with a whitelist of allowed variables. Docker env vars (set in compose) provide
+              the values.
+            </p>
+            <div class="controls">
+              <div class="toggle-row">
+                <input type="checkbox" class="toggle" id="tpl3-resolved" checked />
+                <label for="tpl3-resolved">Show resolved runtime values</label>
+              </div>
+            </div>
+            <div class="template-section">
+              <div>
+                <h4 style="color: var(--fg3)">
+                  openclaw.jsonc &rarr; openclaw.json (pre-deploy output)
+                </h4>
+                <pre id="tpl3-before"></pre>
+              </div>
+              <div>
+                <h4 style="color: var(--fg3)">After entrypoint envsubst (runtime)</h4>
+                <pre id="tpl3-after"></pre>
+              </div>
+            </div>
+          </div>
+
+          <!-- Deep merge visualization -->
+          <div class="panel">
+            <div class="template-header">
+              <span class="badge badge-purple">Merge</span>
+              <h3>Deep merge: defaults + claw overrides</h3>
+            </div>
+            <p style="font-size: 12px; color: var(--fg2); margin-bottom: 12px">
+              Each claw inherits from <code>defaults</code> in <code>stack.yml</code>. Per-claw
+              values override at any depth. Arrays are replaced, not merged.
+            </p>
+            <div class="template-section">
+              <div>
+                <h4 style="color: var(--fg3)">defaults + claw config (inputs)</h4>
+                <pre id="merge-before"></pre>
+              </div>
+              <div>
+                <h4 style="color: var(--fg3)">Merged result</h4>
+                <pre id="merge-after"></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 4: File Map -->
+        <div id="view-filemap" class="view">
+          <div class="tree-panel" id="treePanel"></div>
+          <div class="filemap-detail" id="filemapDetail">
+            <div class="empty-state">Click a file or directory in the tree to see details</div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      // ═══════════════════════════════════════════════════════════════════════
+      // DATA
+      // ═══════════════════════════════════════════════════════════════════════
+
+      const FLOW_NODES = [
+        {
+          id: '.env',
+          x: 0.08,
+          y: 0.15,
+          label: '.env',
+          color: 'blue',
+          desc: 'Flat key-value secrets file. Never committed. Contains VPS_IP, tokens, credentials. Referenced in stack.yml via ${VAR} syntax.',
+          example:
+            'VPS_IP=203.0.113.42\nAI_GATEWAY_URL=https://ai-gw.example.workers.dev\nAI_GATEWAY_TOKEN=tok_abc123\nCLOUDFLARE_TUNNEL_TOKEN=eyJhI...\nPERSONAL_CLAW_TELEGRAM_BOT_TOKEN=7234...',
+        },
+        {
+          id: 'stack.yml',
+          x: 0.08,
+          y: 0.45,
+          label: 'stack.yml',
+          color: 'blue',
+          desc: 'Stack structure & config in YAML. References .env via ${VAR}. Defines host settings, stack infra, defaults, and per-claw overrides. Deep-merged with defaults at build time.',
+          example:
+            'stack:\n  install_dir: /home/openclaw\n  ai_gateway:\n    url: ${AI_GATEWAY_URL}\n    token: ${AI_GATEWAY_TOKEN}\ndefaults:\n  resources:\n    cpus: 6\n    memory: 12G\nclaws:\n  personal-claw:\n    domain: openclaw.${ROOT_DOMAIN}\n    gateway_port: 18789',
+        },
+        {
+          id: 'compose.hbs',
+          x: 0.08,
+          y: 0.75,
+          label: 'docker-compose.yml.hbs',
+          color: 'green',
+          desc: 'Handlebars template for Docker Compose. Uses {{#each claws}} to generate per-claw service blocks. {{#if}} toggles optional services (egress proxy, vector).',
+          example:
+            '{{#each claws}}\n  openclaw-{{@key}}:\n    <<: *claw\n    ports:\n      - "127.0.0.1:{{this.gateway_port}}:{{this.gateway_port}}"\n    environment:\n      - ANTHROPIC_BASE_URL={{this.anthropic_base_url}}\n{{/each}}\n{{#if stack.egress_proxy}}\n  egress-proxy: ...\n{{/if}}',
+        },
+        {
+          id: 'jsonc',
+          x: 0.3,
+          y: 0.25,
+          label: 'openclaw.jsonc',
+          color: 'purple',
+          desc: 'OpenClaw config with JSONC comments. Comments stripped during pre-deploy. $VAR references preserved for runtime resolution. Per-claw: each claw can use its own JSONC template.',
+          example:
+            '// Default openclaw.jsonc template\n{\n  "gateway": {\n    "controlUi": {\n      "basePath": "$OPENCLAW_DOMAIN_PATH",\n      "allowedOrigins": ["$OPENCLAW_ALLOWED_ORIGIN"]\n    }\n  },\n  "models": {\n    "providers": {\n      "anthropic": {\n        "baseUrl": "$ANTHROPIC_BASE_URL"\n      }\n    }\n  }\n}',
+        },
+        {
+          id: 'pre-deploy',
+          x: 0.42,
+          y: 0.45,
+          label: 'npm run pre-deploy',
+          color: 'teal',
+          desc: 'Build pipeline (build/pre-deploy.mjs). Reads .env + stack.yml + .hbs template. Resolves ${VAR}, deep-merges defaults into claws, computes derived values, renders Handlebars, strips JSONC comments. Outputs to .deploy/.',
+          example:
+            'Steps:\n1. Read .env → parse key-value pairs\n2. Resolve ${VAR} in stack.yml\n3. Deep merge defaults into each claw\n4. Query VPS for resource % resolution\n5. Compute derived values (URLs, tokens)\n6. Render Handlebars template\n7. Strip JSONC comments → JSON\n8. Write .deploy/ directory',
+        },
+        {
+          id: 'deploy-dir',
+          x: 0.68,
+          y: 0.28,
+          label: '.deploy/',
+          color: 'teal',
+          desc: 'Generated deployment artifacts. Everything needed on the VPS. Pushed via scripts/sync-deploy.sh. Never manually edited.',
+          example:
+            '.deploy/\n├── docker-compose.yml\n├── stack.json\n├── stack.env\n├── openclaw-stack/\n├── host/\n├── setup/\n├── vector/\n├── egress-proxy/\n└── instances/<name>/.openclaw/openclaw.json',
+        },
+        {
+          id: 'compose-out',
+          x: 0.8,
+          y: 0.12,
+          label: 'docker-compose.yml',
+          color: 'green',
+          desc: 'Rendered Docker Compose file. All Handlebars resolved. Per-claw services, cloudflared, optional egress-proxy and vector. Ready for docker compose up.',
+          example:
+            'services:\n  openclaw-personal-claw:\n    <<: *claw\n    ports:\n      - "127.0.0.1:18789:18789"\n    environment:\n      - ANTHROPIC_BASE_URL=https://ai-gw.example.workers.dev/anthropic\n  cloudflared:\n    image: cloudflare/cloudflared:latest',
+        },
+        {
+          id: 'stack-json',
+          x: 0.8,
+          y: 0.32,
+          label: 'stack.json',
+          color: 'blue',
+          desc: 'Full resolved stack config as JSON. Consumed by VPS scripts (setup-infra.sh, build-openclaw.sh). Contains all config with ${VAR} resolved.',
+        },
+        {
+          id: 'stack-env',
+          x: 0.8,
+          y: 0.48,
+          label: 'stack.env',
+          color: 'blue',
+          desc: 'Bash-sourceable key=value file. Convention: ENV__<key> for .env vars, STACK__<path> for stack.yml. Used by host scripts (backup.sh, host-alert.sh).',
+          example:
+            '# Source: .env\nENV__VPS_IP=203.0.113.42\n# Source: stack.yml\nSTACK__STACK__INSTALL_DIR=/home/openclaw\nSTACK__STACK__PROJECT_NAME=openclaw-stack\n# Per-claw\nSTACK__CLAWS__PERSONAL_CLAW__DOMAIN=openclaw.example.com',
+        },
+        {
+          id: 'openclaw-json',
+          x: 0.8,
+          y: 0.64,
+          label: 'openclaw.json',
+          color: 'purple',
+          desc: 'Clean JSON (comments stripped from JSONC). $VAR references still present — resolved at container startup by entrypoint.sh envsubst. One per claw instance.',
+          example:
+            '{\n  "gateway": {\n    "controlUi": {\n      "basePath": "$OPENCLAW_DOMAIN_PATH",\n      "allowedOrigins": ["$OPENCLAW_ALLOWED_ORIGIN"]\n    }\n  }\n}',
+        },
+        {
+          id: 'entrypoint',
+          x: 0.68,
+          y: 0.8,
+          label: 'entrypoint.sh',
+          color: 'peach',
+          desc: 'Container startup script. Runs envsubst with explicit variable whitelist on openclaw.json. Also: cleans locks, fixes permissions, starts nested Docker, builds sandboxes, drops privileges via gosu.',
+          example:
+            'ENVSUBST_VARS=\'$OPENCLAW_DOMAIN_PATH\n  $OPENCLAW_ALLOWED_ORIGIN\n  $OPENCLAW_INSTANCE_ID\n  $VPS_HOSTNAME ...\'\nenvsubst "$ENVSUBST_VARS" < openclaw.json > openclaw.json.tmp\nmv openclaw.json.tmp openclaw.json',
+        },
+        {
+          id: 'final-json',
+          x: 0.92,
+          y: 0.8,
+          label: 'Final openclaw.json',
+          color: 'peach',
+          desc: 'Fully resolved config inside running container. All $VAR replaced with actual Docker env var values. This is what the OpenClaw gateway process reads.',
+          example:
+            '{\n  "gateway": {\n    "controlUi": {\n      "basePath": "",\n      "allowedOrigins": ["https://openclaw.example.com"]\n    }\n  },\n  "models": {\n    "providers": {\n      "anthropic": {\n        "baseUrl": "https://ai-gw.example.workers.dev/anthropic"\n      }\n    }\n  }\n}',
+        },
+      ]
+
+      const FLOW_EDGES = [
+        { from: '.env', to: 'pre-deploy', label: '${VAR} values', color: 'blue' },
+        { from: 'stack.yml', to: 'pre-deploy', label: 'YAML with ${VAR} refs', color: 'blue' },
+        { from: 'compose.hbs', to: 'pre-deploy', label: 'Handlebars template', color: 'green' },
+        {
+          from: 'jsonc',
+          to: 'pre-deploy',
+          label: 'JSONC → JSON (strip comments)',
+          color: 'purple',
+        },
+        { from: 'pre-deploy', to: 'deploy-dir', label: 'Build artifacts', color: 'teal' },
+        { from: 'deploy-dir', to: 'compose-out', label: 'Rendered compose', color: 'green' },
+        { from: 'deploy-dir', to: 'stack-json', label: 'Resolved config', color: 'blue' },
+        { from: 'deploy-dir', to: 'stack-env', label: 'Bash-sourceable', color: 'blue' },
+        {
+          from: 'deploy-dir',
+          to: 'openclaw-json',
+          label: 'Clean JSON ($VAR preserved)',
+          color: 'purple',
+        },
+        { from: 'openclaw-json', to: 'entrypoint', label: 'Container start', color: 'peach' },
+        { from: 'entrypoint', to: 'final-json', label: 'envsubst $VAR → values', color: 'peach' },
+      ]
+
+      const COLORS = {
+        blue: '#89b4fa',
+        green: '#a6e3a1',
+        peach: '#fab387',
+        purple: '#cba6f7',
+        teal: '#94e2d5',
+        red: '#f38ba8',
+        yellow: '#f9e2af',
+        pink: '#f5c2e7',
+        sky: '#89dceb',
+        fg: '#cdd6f4',
+        fg2: '#a6adc8',
+        fg3: '#6c7086',
+        bg: '#1e1e2e',
+        bg2: '#181825',
+        bg3: '#313244',
+        bg4: '#45475a',
+      }
+
+      const PLAYBOOKS = [
+        {
+          id: '00',
+          name: '00-fresh-deploy-setup',
+          label: 'Fresh Deploy\nSetup',
+          purpose:
+            'Validates config, SSH, VPS resources, Cloudflare Access, and presents deployment plan.',
+          deps: [],
+          outputs: [
+            'Validated .env + stack.yml',
+            'SSH connectivity confirmed',
+            'Cloudflare Access verified',
+            'Deployment plan approved',
+          ],
+          sections: [
+            { id: '0.1', name: 'Config File Check' },
+            { id: '0.2', name: 'Required Config Validation' },
+            { id: '0.3', name: 'SSH Check' },
+            { id: '0.4', name: 'VPS Resource Check' },
+            { id: '0.5', name: 'Cloudflare Access Verification' },
+            { id: '0.7', name: 'Deployment Overview' },
+          ],
+          stop: true,
+          color: 'blue',
+          presets: ['fresh'],
+        },
+        {
+          id: '00a',
+          name: '00-analysis-mode',
+          label: 'Analysis\nMode',
+          purpose:
+            'Inspects an existing deployment. Checks running services, config state, and health.',
+          deps: [],
+          outputs: ['Deployment status report'],
+          sections: [
+            { id: 'A.1', name: 'Service Discovery' },
+            { id: 'A.2', name: 'Config Analysis' },
+            { id: 'A.3', name: 'Health Checks' },
+          ],
+          color: 'sky',
+          presets: ['analysis'],
+        },
+        {
+          id: '01',
+          name: '01-workers',
+          label: 'CF Workers\nDeploy',
+          purpose:
+            'Deploys AI Gateway and Log Receiver Cloudflare Workers. Runs locally via wrangler.',
+          deps: ['00'],
+          outputs: ['AI_GATEWAY_URL', 'LOG_WORKER_URL', 'ADMIN_AUTH_TOKEN', 'D1 database ID'],
+          sections: [
+            { id: '1.1', name: 'Install Dependencies' },
+            { id: '1.2', name: 'Deploy AI Gateway Worker' },
+            { id: '1.3', name: 'Deploy Log Receiver Worker' },
+            { id: '1.4', name: 'Update .env with URLs' },
+          ],
+          parallel: true,
+          color: 'purple',
+          presets: ['fresh'],
+        },
+        {
+          id: '02',
+          name: '02-base-setup',
+          label: 'Base Setup\n& Hardening',
+          purpose: 'System updates, user creation, SSH hardening, UFW, fail2ban, kernel tuning.',
+          deps: ['00'],
+          outputs: [
+            'adminclaw user',
+            'openclaw user',
+            'SSH on hardened port',
+            'Firewall configured',
+          ],
+          sections: [
+            { id: '2.1', name: 'System Update' },
+            { id: '2.2', name: 'User Creation' },
+            { id: '2.3', name: 'SSH Hardening' },
+            { id: '2.4', name: 'SSH Port Verification' },
+            { id: '2.5', name: 'System Hardening' },
+          ],
+          stop: true,
+          parallel: true,
+          color: 'purple',
+          presets: ['fresh'],
+        },
+        {
+          id: 'pd',
+          name: 'pre-deploy + sync',
+          label: 'Pre-Deploy\n& Sync',
+          purpose:
+            'Builds .deploy/ artifacts locally, then rsyncs to VPS. Requires worker URLs (01) and openclaw user (02).',
+          deps: ['01', '02'],
+          outputs: ['.deploy/ on VPS', 'All config resolved'],
+          sections: [
+            { id: 'PD.1', name: 'npm run pre-deploy' },
+            { id: 'PD.2', name: 'sync-deploy.sh --fresh' },
+          ],
+          color: 'teal',
+          presets: ['fresh'],
+        },
+        {
+          id: '03',
+          name: '03-docker',
+          label: 'Docker\nInstall',
+          purpose: 'Installs Docker CE, configures daemon, adds openclaw to docker group.',
+          deps: ['pd'],
+          outputs: ['Docker running', 'openclaw in docker group'],
+          sections: [
+            { id: '3.1', name: 'Install Docker CE' },
+            { id: '3.2', name: 'Configure Daemon' },
+            { id: '3.3', name: 'User Permissions' },
+          ],
+          color: 'green',
+          presets: ['fresh'],
+        },
+        {
+          id: '03b',
+          name: '03b-sysbox',
+          label: 'Sysbox\nRuntime',
+          purpose:
+            'Installs Sysbox runtime for secure Docker-in-Docker (nested containers for sandboxes).',
+          deps: ['03'],
+          outputs: ['Sysbox runtime available', 'AppArmor configured'],
+          sections: [
+            { id: '3b.1', name: 'Install Sysbox' },
+            { id: '3b.2', name: 'Verify Runtime' },
+          ],
+          color: 'green',
+          presets: ['fresh'],
+        },
+        {
+          id: '04',
+          name: '04-vps1-openclaw',
+          label: 'OpenClaw\nDeploy',
+          purpose:
+            'Creates directories, clones OpenClaw, builds image, starts stack via docker compose up.',
+          deps: ['03b'],
+          outputs: ['OpenClaw containers running', 'Sandbox images built', 'Gateway accessible'],
+          sections: [
+            { id: '4.1', name: 'Directory Structure' },
+            { id: '4.2', name: 'Infrastructure Setup' },
+            { id: '4.3', name: 'Clone & Build' },
+            { id: '4.4', name: 'Start Stack' },
+          ],
+          color: 'green',
+          presets: ['fresh'],
+        },
+        {
+          id: '06',
+          name: '06-backup',
+          label: 'Backup\nSetup',
+          purpose: 'Configures backup scripts, cron jobs, and log rotation.',
+          deps: ['04'],
+          outputs: ['Backup cron active', 'Session pruning cron', 'Logrotate configured'],
+          sections: [
+            { id: '6.1', name: 'Backup Script' },
+            { id: '6.2', name: 'Cron Jobs' },
+            { id: '6.3', name: 'Logrotate' },
+          ],
+          color: 'yellow',
+          presets: ['fresh'],
+        },
+        {
+          id: '07',
+          name: '07-verification',
+          label: 'Verification\n& Reboot',
+          purpose: 'Full deployment verification: services, health, connectivity, domains.',
+          deps: ['06'],
+          outputs: ['Verification summary table', 'All checks passed'],
+          sections: [
+            { id: '7.1', name: 'Service Status' },
+            { id: '7.2', name: 'Health Checks' },
+            { id: '7.3', name: 'Domain Verification' },
+            { id: '7.4', name: 'Reboot Test' },
+          ],
+          stop: true,
+          color: 'yellow',
+          presets: ['fresh'],
+        },
+        {
+          id: '08a',
+          name: '08a-configure-llm-proxy',
+          label: 'LLM Proxy\nConfig',
+          purpose: 'Configure AI provider credentials via the self-service /config UI.',
+          deps: ['07'],
+          outputs: ['Provider API keys configured', 'AI gateway authenticated'],
+          sections: [
+            { id: '8a.1', name: 'Access /config UI' },
+            { id: '8a.2', name: 'Set Provider Keys' },
+          ],
+          color: 'peach',
+          presets: ['fresh'],
+        },
+        {
+          id: '08b',
+          name: '08b-pair-devices',
+          label: 'Device\nPairing',
+          purpose: 'Pair browser and Telegram devices for each claw instance.',
+          deps: ['08a'],
+          outputs: ['Browser sessions paired', 'Telegram bots active'],
+          sections: [
+            { id: '8b.1', name: 'Browser Pairing' },
+            { id: '8b.2', name: 'Telegram Pairing' },
+          ],
+          stop: true,
+          color: 'peach',
+          presets: ['fresh'],
+        },
+        {
+          id: '08c',
+          name: '08c-deploy-report',
+          label: 'Deploy\nReport',
+          purpose: 'Generates final deployment report with all endpoints, credentials, and status.',
+          deps: ['08b'],
+          outputs: ['Deployment report'],
+          sections: [{ id: '8c.1', name: 'Generate Report' }],
+          color: 'peach',
+          presets: ['fresh'],
+        },
+        {
+          id: 'maint',
+          name: 'maintenance',
+          label: 'Maintenance',
+          purpose: 'Token rotation, image updates, config changes, troubleshooting.',
+          deps: [],
+          outputs: ['Updated deployment'],
+          sections: [
+            { id: 'M.1', name: 'Token Rotation' },
+            { id: 'M.2', name: 'Image Updates' },
+            { id: 'M.3', name: 'Config Sync' },
+          ],
+          color: 'pink',
+          presets: ['maintenance'],
+        },
+      ]
+
+      const FILE_TREE = {
+        name: '.deploy/',
+        type: 'dir',
+        color: 'teal',
+        desc: 'Root deployment artifacts directory. Generated by npm run pre-deploy. Contains everything needed on the VPS. Never manually edited — always regenerated from source.',
+        children: [
+          {
+            name: 'docker-compose.yml',
+            type: 'file',
+            color: 'green',
+            source: 'Rendered from docker-compose.yml.hbs',
+            desc: 'Fully rendered Docker Compose file. All Handlebars expressions resolved. Contains per-claw service blocks, cloudflared tunnel, and optional egress-proxy/vector services.',
+            example:
+              'services:\n  openclaw-personal-claw:\n    <<: *claw\n    container_name: openclaw-personal-claw\n    ports:\n      - "127.0.0.1:18789:18789"\n      - "127.0.0.1:6090:6090"\n    environment:\n      - ANTHROPIC_BASE_URL=https://ai-gw.example.workers.dev/anthropic\n      - OPENAI_BASE_URL=https://ai-gw.example.workers.dev/openai/v1\n  cloudflared:\n    image: cloudflare/cloudflared:latest\n    command: tunnel run',
+          },
+          {
+            name: 'stack.json',
+            type: 'file',
+            color: 'blue',
+            source: 'Resolved from .env + stack.yml',
+            desc: 'Full stack configuration as JSON. All ${VAR} references resolved. Consumed by VPS setup scripts (setup-infra.sh, build-openclaw.sh) that need structured config access.',
+            example:
+              '{\n  "host": { "hostname": "vps1" },\n  "stack": {\n    "install_dir": "/home/openclaw",\n    "project_name": "openclaw-stack",\n    "openclaw": { "version": "stable" }\n  },\n  "claws": { "personal-claw": { ... } }\n}',
+          },
+          {
+            name: 'stack.env',
+            type: 'file',
+            color: 'blue',
+            source: 'Generated from .env + stack.yml',
+            desc: 'Bash-sourceable key=value file. Convention: ENV__<key> for .env values, STACK__<path> for stack.yml values. Used by host shell scripts (backup.sh, host-alert.sh, source-config.sh).',
+            example:
+              'ENV__VPS_IP=203.0.113.42\nSTACK__STACK__INSTALL_DIR=/home/openclaw\nSTACK__STACK__PROJECT_NAME=openclaw-stack\nSTACK__CLAWS__PERSONAL_CLAW__DOMAIN=openclaw.example.com\nSTACK__CLAWS__PERSONAL_CLAW__GATEWAY_PORT=18789',
+          },
+          {
+            name: 'openclaw-stack/',
+            type: 'dir',
+            color: 'green',
+            source: 'Copied from deploy/openclaw-stack/',
+            desc: 'Container bind mount (/app/openclaw-stack:ro). Contains entrypoint, dashboard, plugins, and sandbox toolkit. Read-only inside containers.',
+            children: [
+              {
+                name: 'entrypoint.sh',
+                type: 'file',
+                color: 'peach',
+                desc: 'Container startup script. Cleans locks, fixes permissions, runs envsubst on openclaw.json, starts nested Docker, builds sandboxes, starts dashboard, drops privileges via gosu.',
+              },
+              {
+                name: 'dashboard/',
+                type: 'dir',
+                color: 'green',
+                desc: 'Dashboard web server. Serves browser sessions, logs, stats, media. Uses server.mjs with Express-like routing. Themed with Catppuccin.',
+                children: [
+                  { name: 'server.mjs', type: 'file', desc: 'Dashboard HTTP server on port 6090.' },
+                  {
+                    name: 'html/',
+                    type: 'dir',
+                    desc: 'HTML page templates (home, browsers, logs, stats, changelog).',
+                  },
+                  { name: 'pages/', type: 'dir', desc: 'Route handlers for each dashboard page.' },
+                  { name: 'public/', type: 'dir', desc: 'Static assets (CSS, JS, themes).' },
+                ],
+              },
+              {
+                name: 'plugins/',
+                type: 'dir',
+                color: 'green',
+                desc: 'OpenClaw plugins loaded from bind mount.',
+                children: [
+                  {
+                    name: 'coordinator/',
+                    type: 'dir',
+                    desc: 'Auto-discovers agent routes from config and writes AGENTS.md routing table.',
+                  },
+                  {
+                    name: 'telemetry/',
+                    type: 'dir',
+                    desc: 'Unified telemetry — captures LLM, session, tool, message events. Ships to Log Worker and Langfuse.',
+                  },
+                ],
+              },
+              {
+                name: 'rebuild-sandboxes.sh',
+                type: 'file',
+                desc: "Builds/verifies sandbox Docker images inside the container's nested Docker. Handles config change detection and staleness warnings.",
+              },
+              {
+                name: 'parse-toolkit.mjs',
+                type: 'file',
+                desc: 'Parses sandbox-toolkit.yaml to JSON for entrypoint shim generation.',
+              },
+              {
+                name: 'sandbox-toolkit.yaml',
+                type: 'file',
+                color: 'blue',
+                source: 'Copied from path in stack.sandbox_toolkit',
+                desc: 'Defines sandbox image layers, packages, and binary requirements.',
+              },
+            ],
+          },
+          {
+            name: 'host/',
+            type: 'dir',
+            color: 'blue',
+            source: 'Copied from deploy/host/',
+            desc: 'Host-level scripts running on the VPS as cron jobs or helpers. {{INSTALL_DIR}} resolved at build time.',
+            children: [
+              {
+                name: 'backup.sh',
+                type: 'file',
+                desc: 'Rsync-based backup of instance data, configs, and Docker volumes.',
+              },
+              {
+                name: 'host-alert.sh',
+                type: 'file',
+                desc: 'Sends daily health reports and alerts to Telegram. Checks disk, memory, services.',
+              },
+              {
+                name: 'host-maintenance-check.sh',
+                type: 'file',
+                desc: 'Checks for pending OS updates, reboot requirements, certificate expiry.',
+              },
+              {
+                name: 'session-prune.sh',
+                type: 'file',
+                desc: 'Prunes old OpenClaw session data to prevent disk exhaustion.',
+              },
+              {
+                name: 'source-config.sh',
+                type: 'file',
+                desc: 'Helper: sources stack.env to provide config values to other host scripts.',
+              },
+              {
+                name: 'build-openclaw.sh',
+                type: 'file',
+                desc: 'Builds the OpenClaw Docker image on VPS. Applies patches, sets version.',
+              },
+              {
+                name: 'start-claws.sh',
+                type: 'file',
+                desc: 'Starts all claw containers via docker compose up -d.',
+              },
+              {
+                name: 'openclaw-wrapper.sh',
+                type: 'file',
+                desc: 'The "openclaw" CLI wrapper — auto-detects claw instance.',
+              },
+              { name: 'cron-openclaw-backup', type: 'file', desc: 'Cron schedule for backup.sh.' },
+              {
+                name: 'cron-openclaw-session-prune',
+                type: 'file',
+                desc: 'Cron schedule for session-prune.sh.',
+              },
+              {
+                name: 'register-cron-jobs.sh',
+                type: 'file',
+                desc: 'Installs cron entries and logrotate config.',
+              },
+              {
+                name: 'logrotate-openclaw',
+                type: 'file',
+                desc: 'Logrotate config for Docker JSON log files.',
+              },
+            ],
+          },
+          {
+            name: 'setup/',
+            type: 'dir',
+            color: 'blue',
+            source: 'Copied from deploy/setup/',
+            desc: 'One-time deployment scripts. Run during initial VPS setup only.',
+            children: [
+              {
+                name: 'setup-infra.sh',
+                type: 'file',
+                desc: 'Creates directory structure, sets permissions, deploys configs.',
+              },
+              {
+                name: 'system-hardening.sh',
+                type: 'file',
+                desc: 'Kernel tuning, swap, sysctl, AppArmor profiles.',
+              },
+              {
+                name: 'verify-deployment.sh',
+                type: 'file',
+                desc: 'Post-deploy verification script.',
+              },
+            ],
+          },
+          {
+            name: 'vector/',
+            type: 'dir',
+            color: 'green',
+            source: 'Copied when stack.logging.vector: true',
+            desc: 'Vector log shipper configuration. Ships Docker container logs to Log Receiver Worker.',
+            children: [
+              {
+                name: 'vector.yaml',
+                type: 'file',
+                desc: 'Vector pipeline: docker_logs source → enrich + tag_level transforms → HTTP sink to Log Worker /logs endpoint. Uses bearer token auth.',
+              },
+            ],
+          },
+          {
+            name: 'egress-proxy/',
+            type: 'dir',
+            color: 'green',
+            source: 'Copied when stack.egress_proxy is configured',
+            desc: 'WAF bypass sidecar. Routes requests through VPS IP when Cloudflare Worker IPs are blocked upstream.',
+            children: [
+              {
+                name: 'proxy.mjs',
+                type: 'file',
+                desc: 'HTTP proxy server. Authenticates via PROXY_AUTH_TOKEN, forwards requests with VPS source IP.',
+              },
+            ],
+          },
+          {
+            name: 'instances/',
+            type: 'dir',
+            color: 'peach',
+            desc: 'Per-claw instance configs. Each claw gets its own subdirectory with openclaw.json.',
+            children: [
+              {
+                name: '<name>/',
+                type: 'dir',
+                color: 'peach',
+                desc: "Per-claw directory (e.g., personal-claw/). Bind-mounted into the claw's container.",
+                children: [
+                  {
+                    name: '.openclaw/',
+                    type: 'dir',
+                    desc: 'OpenClaw config directory. Bind-mounted to /home/node/.openclaw in the container.',
+                    children: [
+                      {
+                        name: 'openclaw.json',
+                        type: 'file',
+                        color: 'peach',
+                        desc: 'Clean JSON config (JSONC comments stripped). Contains $VAR references resolved at container startup by entrypoint.sh envsubst. This is the per-claw runtime config.',
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // TAB SWITCHING
+      // ═══════════════════════════════════════════════════════════════════════
+
+      const tabs = document.querySelectorAll('.tab')
+      const views = document.querySelectorAll('.view')
+      let currentView = 'config'
+
+      tabs.forEach((tab) => {
+        tab.addEventListener('click', () => {
+          const view = tab.dataset.view
+          if (view === currentView) return
+          currentView = view
+          tabs.forEach((t) => t.classList.toggle('active', t.dataset.view === view))
+          views.forEach((v) => v.classList.toggle('active', v.id === 'view-' + view))
+          if (view === 'config') drawFlow()
+          if (view === 'pipeline') drawPipeline()
+        })
+      })
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // TAB 1: CONFIG FLOW (Canvas)
+      // ═══════════════════════════════════════════════════════════════════════
+
+      const flowCanvas = document.getElementById('flowCanvas')
+      const flowCtx = flowCanvas.getContext('2d')
+      let flowHover = null
+      let flowPopup = null
+      let flowNodeRects = []
+      let flowEdgePaths = []
+
+      function drawFlow() {
+        const wrap = flowCanvas.parentElement
+        const dpr = window.devicePixelRatio || 1
+        flowCanvas.width = wrap.clientWidth * dpr
+        flowCanvas.height = wrap.clientHeight * dpr
+        flowCanvas.style.width = wrap.clientWidth + 'px'
+        flowCanvas.style.height = wrap.clientHeight + 'px'
+        flowCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
+
+        const W = wrap.clientWidth
+        const H = wrap.clientHeight
+        flowCtx.clearRect(0, 0, W, H)
+        flowNodeRects = []
+        flowEdgePaths = []
+
+        // Draw edges first
+        for (const edge of FLOW_EDGES) {
+          const from = FLOW_NODES.find((n) => n.id === edge.from)
+          const to = FLOW_NODES.find((n) => n.id === edge.to)
+          if (!from || !to) continue
+
+          const x1 = from.x * W,
+            y1 = from.y * H
+          const x2 = to.x * W,
+            y2 = to.y * H
+          const color = COLORS[edge.color] || COLORS.fg3
+
+          flowCtx.beginPath()
+          flowCtx.strokeStyle = color + '60'
+          flowCtx.lineWidth = 2
+          const cpx1 = x1 + (x2 - x1) * 0.4
+          const cpx2 = x1 + (x2 - x1) * 0.6
+          flowCtx.moveTo(x1, y1)
+          flowCtx.bezierCurveTo(cpx1, y1, cpx2, y2, x2, y2)
+          flowCtx.stroke()
+
+          // Arrow
+          const t = 0.95
+          const ax =
+            (1 - t) * (1 - t) * (1 - t) * x1 +
+            3 * (1 - t) * (1 - t) * t * cpx1 +
+            3 * (1 - t) * t * t * cpx2 +
+            t * t * t * x2
+          const ay =
+            (1 - t) * (1 - t) * (1 - t) * y1 +
+            3 * (1 - t) * (1 - t) * t * y1 +
+            3 * (1 - t) * t * t * y2 +
+            t * t * t * y2
+          const angle = Math.atan2(y2 - ay, x2 - ax)
+          flowCtx.beginPath()
+          flowCtx.fillStyle = color + '80'
+          flowCtx.moveTo(x2, y2)
+          flowCtx.lineTo(x2 - 8 * Math.cos(angle - 0.4), y2 - 8 * Math.sin(angle - 0.4))
+          flowCtx.lineTo(x2 - 8 * Math.cos(angle + 0.4), y2 - 8 * Math.sin(angle + 0.4))
+          flowCtx.fill()
+
+          // Edge label at midpoint
+          const mx = (x1 + x2) / 2
+          const my = (y1 + y2) / 2 - 8
+          flowCtx.font = '10px system-ui'
+          flowCtx.fillStyle = COLORS.fg3
+          flowCtx.textAlign = 'center'
+          flowCtx.fillText(edge.label, mx, my)
+
+          // Store edge path for hover
+          flowEdgePaths.push({ edge, x1, y1, x2, y2, cpx1, cpx2 })
+        }
+
+        // Draw nodes
+        for (const node of FLOW_NODES) {
+          const cx = node.x * W
+          const cy = node.y * H
+          const color = COLORS[node.color] || COLORS.fg
+
+          // Measure text
+          flowCtx.font = '600 11px system-ui'
+          const lines = node.label.split('\n')
+          const maxW = Math.max(...lines.map((l) => flowCtx.measureText(l).width))
+          const nw = maxW + 24
+          const nh = lines.length * 16 + 16
+          const nx = cx - nw / 2
+          const ny = cy - nh / 2
+
+          // Box
+          flowCtx.fillStyle = COLORS.bg + 'ee'
+          flowCtx.strokeStyle = color + '80'
+          flowCtx.lineWidth = 1.5
+          roundRect(flowCtx, nx, ny, nw, nh, 6)
+          flowCtx.fill()
+          flowCtx.stroke()
+
+          // Top accent
+          flowCtx.fillStyle = color + '30'
+          flowCtx.beginPath()
+          flowCtx.moveTo(nx + 6, ny)
+          flowCtx.lineTo(nx + nw - 6, ny)
+          flowCtx.quadraticCurveTo(nx + nw, ny, nx + nw, ny + 6)
+          flowCtx.lineTo(nx + nw, ny + 4)
+          flowCtx.lineTo(nx, ny + 4)
+          flowCtx.lineTo(nx, ny + 6)
+          flowCtx.quadraticCurveTo(nx, ny, nx + 6, ny)
+          flowCtx.fill()
+
+          // Text
+          flowCtx.fillStyle = color
+          flowCtx.textAlign = 'center'
+          flowCtx.textBaseline = 'middle'
+          lines.forEach((line, i) => {
+            flowCtx.fillText(line, cx, cy - (lines.length - 1) * 8 + i * 16)
+          })
+
+          flowNodeRects.push({ node, x: nx, y: ny, w: nw, h: nh })
+        }
+      }
+
+      function roundRect(ctx, x, y, w, h, r) {
+        ctx.beginPath()
+        ctx.moveTo(x + r, y)
+        ctx.lineTo(x + w - r, y)
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r)
+        ctx.lineTo(x + w, y + h - r)
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+        ctx.lineTo(x + r, y + h)
+        ctx.quadraticCurveTo(x, y + h, x, y + h - r)
+        ctx.lineTo(x, y + r)
+        ctx.quadraticCurveTo(x, y, x + r, y)
+        ctx.closePath()
+      }
+
+      flowCanvas.addEventListener('click', (e) => {
+        const rect = flowCanvas.getBoundingClientRect()
+        const mx = e.clientX - rect.left
+        const my = e.clientY - rect.top
+
+        // Close existing popup
+        if (flowPopup) {
+          flowPopup.remove()
+          flowPopup = null
+        }
+
+        for (const { node, x, y, w, h } of flowNodeRects) {
+          if (mx >= x && mx <= x + w && my >= y && my <= y + h) {
+            showNodePopup(node, e.clientX, e.clientY)
+            return
+          }
+        }
+      })
+
+      flowCanvas.addEventListener('mousemove', (e) => {
+        const rect = flowCanvas.getBoundingClientRect()
+        const mx = e.clientX - rect.left
+        const my = e.clientY - rect.top
+        let cursor = 'default'
+        for (const { x, y, w, h } of flowNodeRects) {
+          if (mx >= x && mx <= x + w && my >= y && my <= y + h) {
+            cursor = 'pointer'
+            break
+          }
+        }
+        flowCanvas.style.cursor = cursor
+      })
+
+      function showNodePopup(node, px, py) {
+        const el = document.createElement('div')
+        el.className = 'node-detail'
+        el.style.left = Math.min(px + 10, window.innerWidth - 420) + 'px'
+        el.style.top = Math.min(py + 10, window.innerHeight - 300) + 'px'
+        el.innerHTML = `
+    <button class="close" onclick="this.parentElement.remove()">&times;</button>
+    <h4>${node.label.replace('\n', ' ')}</h4>
+    <span class="badge badge-${node.color}">${
+          node.color === 'blue'
+            ? '${VAR} build-time'
+            : node.color === 'green'
+            ? '{{}} Handlebars'
+            : node.color === 'peach'
+            ? '$VAR runtime'
+            : node.color === 'purple'
+            ? 'JSONC→JSON'
+            : 'build step'
+        }</span>
+    <p style="margin-top:8px">${node.desc}</p>
+    ${
+      node.example
+        ? `<pre style="margin-top:8px;font-size:11px;max-height:200px;overflow:auto">${escHtml(
+            node.example
+          )}</pre>`
+        : ''
+    }
+  `
+        document.body.appendChild(el)
+        flowPopup = el
+      }
+
+      function escHtml(s) {
+        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      }
+
+      // Close popup on outside click
+      document.addEventListener('click', (e) => {
+        if (flowPopup && !flowPopup.contains(e.target) && e.target !== flowCanvas) {
+          flowPopup.remove()
+          flowPopup = null
+        }
+      })
+
+      window.addEventListener('resize', () => {
+        if (currentView === 'config') drawFlow()
+        if (currentView === 'pipeline') drawPipeline()
+      })
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // TAB 2: PLAYBOOK PIPELINE (Canvas)
+      // ═══════════════════════════════════════════════════════════════════════
+
+      const pipeCanvas = document.getElementById('pipelineCanvas')
+      const pipeCtx = pipeCanvas.getContext('2d')
+      let pipeNodeRects = []
+      let selectedPlaybook = null
+      let activePreset = 'fresh'
+
+      document.querySelectorAll('.preset-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          activePreset = btn.dataset.preset
+          document
+            .querySelectorAll('.preset-btn')
+            .forEach((b) => b.classList.toggle('active', b === btn))
+          drawPipeline()
+        })
+      })
+
+      function layoutPipeline() {
+        const filtered = PLAYBOOKS.filter((p) => p.presets.includes(activePreset))
+        // Topological layout
+        const levels = {}
+        const placed = new Set()
+
+        function getLevel(pb) {
+          if (levels[pb.id] !== undefined) return levels[pb.id]
+          const depLevels = pb.deps
+            .filter((d) => filtered.some((f) => f.id === d))
+            .map((d) => {
+              const dep = PLAYBOOKS.find((p) => p.id === d)
+              return dep ? getLevel(dep) : -1
+            })
+          const level = depLevels.length > 0 ? Math.max(...depLevels) + 1 : 0
+          levels[pb.id] = level
+          return level
+        }
+        filtered.forEach((pb) => getLevel(pb))
+
+        // Group by level
+        const byLevel = {}
+        filtered.forEach((pb) => {
+          const l = levels[pb.id]
+          if (!byLevel[l]) byLevel[l] = []
+          byLevel[l].push(pb)
+        })
+
+        return { filtered, levels, byLevel }
+      }
+
+      function drawPipeline() {
+        const wrap = pipeCanvas.parentElement
+        const dpr = window.devicePixelRatio || 1
+        const W = wrap.clientWidth
+        const H = wrap.clientHeight - 40 // account for presets
+        pipeCanvas.width = W * dpr
+        pipeCanvas.height = H * dpr
+        pipeCanvas.style.width = W + 'px'
+        pipeCanvas.style.height = H + 'px'
+        pipeCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
+        pipeCtx.clearRect(0, 0, W, H)
+        pipeNodeRects = []
+
+        const { filtered, levels, byLevel } = layoutPipeline()
+        const maxLevel = Math.max(...Object.keys(byLevel).map(Number))
+        const colW = W / (maxLevel + 1.5)
+
+        // Position nodes
+        const positions = {}
+        for (const [level, pbs] of Object.entries(byLevel)) {
+          const l = Number(level)
+          const rowH = H / (pbs.length + 1)
+          pbs.forEach((pb, i) => {
+            positions[pb.id] = {
+              x: colW * (l + 0.5),
+              y: rowH * (i + 1),
+            }
+          })
+        }
+
+        // Draw edges
+        for (const pb of filtered) {
+          const to = positions[pb.id]
+          if (!to) continue
+          for (const dep of pb.deps) {
+            const from = positions[dep]
+            if (!from) continue
+            pipeCtx.beginPath()
+            pipeCtx.strokeStyle = COLORS.fg3 + '50'
+            pipeCtx.lineWidth = 1.5
+            const cpx = from.x + (to.x - from.x) * 0.5
+            pipeCtx.moveTo(from.x + 50, from.y)
+            pipeCtx.bezierCurveTo(cpx, from.y, cpx, to.y, to.x - 50, to.y)
+            pipeCtx.stroke()
+
+            // Arrow
+            const angle = Math.atan2(to.y - from.y, to.x - 50 - cpx)
+            pipeCtx.beginPath()
+            pipeCtx.fillStyle = COLORS.fg3 + '60'
+            const ax = to.x - 50,
+              ay = to.y
+            pipeCtx.moveTo(ax, ay)
+            pipeCtx.lineTo(ax - 6 * Math.cos(angle - 0.4), ay - 6 * Math.sin(angle - 0.4))
+            pipeCtx.lineTo(ax - 6 * Math.cos(angle + 0.4), ay - 6 * Math.sin(angle + 0.4))
+            pipeCtx.fill()
+          }
+        }
+
+        // Draw nodes
+        for (const pb of filtered) {
+          const pos = positions[pb.id]
+          if (!pos) continue
+          const color = COLORS[pb.color] || COLORS.fg
+          const nw = 100,
+            nh = 44
+          const nx = pos.x - nw / 2
+          const ny = pos.y - nh / 2
+
+          const isSelected = selectedPlaybook && selectedPlaybook.id === pb.id
+
+          pipeCtx.fillStyle = isSelected ? color + '20' : COLORS.bg + 'ee'
+          pipeCtx.strokeStyle = isSelected ? color : color + '60'
+          pipeCtx.lineWidth = isSelected ? 2 : 1
+          roundRect(pipeCtx, nx, ny, nw, nh, 6)
+          pipeCtx.fill()
+          pipeCtx.stroke()
+
+          // Indicators
+          if (pb.parallel) {
+            pipeCtx.fillStyle = COLORS.purple + '40'
+            pipeCtx.fillRect(nx, ny, 3, nh)
+            pipeCtx.fillRect(nx + nw - 3, ny, 3, nh)
+          }
+          if (pb.stop) {
+            pipeCtx.fillStyle = COLORS.red
+            pipeCtx.beginPath()
+            pipeCtx.arc(nx + nw - 8, ny + 8, 3, 0, Math.PI * 2)
+            pipeCtx.fill()
+          }
+
+          // Text
+          const lines = pb.label.split('\n')
+          pipeCtx.font = '600 10px system-ui'
+          pipeCtx.fillStyle = color
+          pipeCtx.textAlign = 'center'
+          pipeCtx.textBaseline = 'middle'
+          lines.forEach((line, i) => {
+            pipeCtx.fillText(line, pos.x, pos.y - (lines.length - 1) * 7 + i * 14)
+          })
+
+          pipeNodeRects.push({ pb, x: nx, y: ny, w: nw, h: nh })
+        }
+
+        // Legend
+        pipeCtx.font = '10px system-ui'
+        pipeCtx.fillStyle = COLORS.fg3
+        pipeCtx.textAlign = 'left'
+        const ly = H - 10
+        pipeCtx.fillStyle = COLORS.purple
+        pipeCtx.fillRect(10, ly - 6, 3, 12)
+        pipeCtx.fillRect(16, ly - 6, 3, 12)
+        pipeCtx.fillStyle = COLORS.fg3
+        pipeCtx.fillText('Parallel', 24, ly + 3)
+        pipeCtx.fillStyle = COLORS.red
+        pipeCtx.beginPath()
+        pipeCtx.arc(82, ly, 3, 0, Math.PI * 2)
+        pipeCtx.fill()
+        pipeCtx.fillStyle = COLORS.fg3
+        pipeCtx.fillText('Stop point', 90, ly + 3)
+      }
+
+      pipeCanvas.addEventListener('click', (e) => {
+        const rect = pipeCanvas.getBoundingClientRect()
+        const mx = e.clientX - rect.left
+        const my = e.clientY - rect.top
+        for (const { pb, x, y, w, h } of pipeNodeRects) {
+          if (mx >= x && mx <= x + w && my >= y && my <= y + h) {
+            selectedPlaybook = pb
+            showPlaybookDetail(pb)
+            drawPipeline()
+            return
+          }
+        }
+      })
+
+      pipeCanvas.addEventListener('mousemove', (e) => {
+        const rect = pipeCanvas.getBoundingClientRect()
+        const mx = e.clientX - rect.left
+        const my = e.clientY - rect.top
+        let cursor = 'default'
+        for (const { x, y, w, h } of pipeNodeRects) {
+          if (mx >= x && mx <= x + w && my >= y && my <= y + h) {
+            cursor = 'pointer'
+            break
+          }
+        }
+        pipeCanvas.style.cursor = cursor
+      })
+
+      function showPlaybookDetail(pb) {
+        const el = document.getElementById('pipelineDetail')
+        const depNames = pb.deps.map((d) => PLAYBOOKS.find((p) => p.id === d)?.name || d).join(', ')
+        el.innerHTML = `
+    <h3 style="color:${COLORS[pb.color]};margin-bottom:4px;">${pb.name}</h3>
+    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+      ${pb.parallel ? '<span class="badge badge-purple">Parallel</span>' : ''}
+      ${pb.stop ? '<span class="badge badge-red">Stop Point</span>' : ''}
+      <span class="badge badge-${pb.color}">${pb.color}</span>
+    </div>
+    <h4>Purpose</h4>
+    <p style="font-size:12px;color:var(--fg2);line-height:1.6;margin-bottom:12px;">${pb.purpose}</p>
+    ${
+      pb.deps.length
+        ? `<h4>Dependencies</h4><p style="font-size:12px;color:var(--fg2);margin-bottom:12px;">${depNames}</p>`
+        : ''
+    }
+    <h4>Sections</h4>
+    <ul class="section-list">
+      ${pb.sections.map((s) => `<li><span class="sec-id">${s.id}</span> ${s.name}</li>`).join('')}
+    </ul>
+    <h4 style="margin-top:12px">Outputs</h4>
+    <div class="output-list">
+      ${pb.outputs.map((o) => `<span class="badge badge-${pb.color}">${o}</span>`).join('')}
+    </div>
+  `
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // TAB 3: TEMPLATE SYNTAX
+      // ═══════════════════════════════════════════════════════════════════════
+
+      function renderTemplates() {
+        // Stage 1: ${VAR} resolution
+        const filled = document.getElementById('tpl1-filled').checked
+        document.getElementById('tpl1-before').innerHTML =
+          highlight(`<span class="hl-fg3"># stack.yml (excerpt)</span>
+stack:
+  install_dir: /home/openclaw
+  project_name: <span class="hl-fg3">\${PROJECT_NAME:-openclaw-stack}</span>
+  ai_gateway:
+    url: <span class="hl-blue">\${AI_GATEWAY_URL}</span>
+    token: <span class="hl-blue">\${AI_GATEWAY_TOKEN}</span>
+  cloudflare:
+    tunnel_token: <span class="hl-blue">\${CLOUDFLARE_TUNNEL_TOKEN}</span>
+claws:
+  personal-claw:
+    domain: <span class="hl-fg3">openclaw.\${ROOT_DOMAIN}</span>
+    gateway_port: 18789
+    telegram:
+      bot_token: <span class="hl-blue">\${PERSONAL_CLAW_TELEGRAM_BOT_TOKEN}</span>`)
+
+        document.getElementById('tpl1-after').innerHTML = highlight(
+          filled
+            ? `<span class="hl-fg3"># Resolved output</span>
+stack:
+  install_dir: /home/openclaw
+  project_name: <span class="hl-teal">openclaw-stack</span>  <span class="hl-fg3"># default used</span>
+  ai_gateway:
+    url: <span class="hl-teal">https://ai-gw.example.workers.dev</span>
+    token: <span class="hl-teal">tok_abc123</span>
+  cloudflare:
+    tunnel_token: <span class="hl-teal">eyJhI...</span>
+claws:
+  personal-claw:
+    domain: <span class="hl-teal">openclaw.example.com</span>
+    gateway_port: 18789
+    telegram:
+      bot_token: <span class="hl-teal">7234...</span>`
+            : `<span class="hl-fg3"># Raw (unresolved)</span>
+stack:
+  install_dir: /home/openclaw
+  project_name: <span class="hl-blue">\${PROJECT_NAME:-openclaw-stack}</span>
+  ai_gateway:
+    url: <span class="hl-blue">\${AI_GATEWAY_URL}</span>
+    token: <span class="hl-blue">\${AI_GATEWAY_TOKEN}</span>
+  cloudflare:
+    tunnel_token: <span class="hl-blue">\${CLOUDFLARE_TUNNEL_TOKEN}</span>
+claws:
+  personal-claw:
+    domain: <span class="hl-blue">openclaw.\${ROOT_DOMAIN}</span>
+    gateway_port: 18789
+    telegram:
+      bot_token: <span class="hl-blue">\${PERSONAL_CLAW_TELEGRAM_BOT_TOKEN}</span>`
+        )
+
+        // Stage 2: Handlebars
+        const egress = document.getElementById('tpl2-egress').checked
+        const vector = document.getElementById('tpl2-vector').checked
+        const multi = document.getElementById('tpl2-multiclaw').checked
+
+        document.getElementById('tpl2-before').innerHTML =
+          highlight(`<span class="hl-fg3">{{!-- docker-compose.yml.hbs --}}</span>
+x-openclaw-claw: &claw
+  image: <span class="hl-green">openclaw-{{stack.project_name}}:local</span>
+  runtime: sysbox-runc
+
+services:
+<span class="hl-green">{{#each claws}}</span>
+  openclaw-<span class="hl-green">{{@key}}</span>:
+    <<: *claw
+    ports:
+      - "127.0.0.1:<span class="hl-green">{{this.gateway_port}}</span>:<span class="hl-green">{{this.gateway_port}}</span>"
+    environment:
+      - ANTHROPIC_BASE_URL=<span class="hl-green">{{this.anthropic_base_url}}</span>
+<span class="hl-green">{{/each}}</span>
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+
+<span class="hl-green">{{#if stack.egress_proxy}}</span>
+  egress-proxy:
+    image: node:22-alpine
+    environment:
+      - PORT=<span class="hl-green">{{stack.egress_proxy.port}}</span>
+<span class="hl-green">{{/if}}</span>
+
+<span class="hl-green">{{#if stack.vector}}</span>
+  vector:
+    image: timberio/vector:0.43.1-alpine
+<span class="hl-green">{{/if}}</span>`)
+
+        let rendered = `<span class="hl-fg3"># Rendered docker-compose.yml</span>
+x-openclaw-claw: &claw
+  image: <span class="hl-teal">openclaw-openclaw-stack:local</span>
+  runtime: sysbox-runc
+
+services:
+  <span class="hl-teal">openclaw-personal-claw</span>:
+    <<: *claw
+    ports:
+      - "127.0.0.1:<span class="hl-teal">18789</span>:<span class="hl-teal">18789</span>"
+    environment:
+      - ANTHROPIC_BASE_URL=<span class="hl-teal">https://ai-gw.example.workers.dev/anthropic</span>
+`
+        if (multi) {
+          rendered += `
+  <span class="hl-teal">openclaw-work-claw</span>:
+    <<: *claw
+    ports:
+      - "127.0.0.1:<span class="hl-teal">18790</span>:<span class="hl-teal">18790</span>"
+    environment:
+      - ANTHROPIC_BASE_URL=<span class="hl-teal">https://ai-gw.example.workers.dev/anthropic</span>
+`
+        }
+        rendered += `
+  cloudflared:
+    image: cloudflare/cloudflared:latest`
+        if (egress) {
+          rendered += `
+
+  <span class="hl-teal">egress-proxy</span>:
+    image: node:22-alpine
+    environment:
+      - PORT=<span class="hl-teal">8787</span>`
+        }
+        if (vector) {
+          rendered += `
+
+  <span class="hl-teal">vector</span>:
+    image: timberio/vector:0.43.1-alpine`
+        }
+        document.getElementById('tpl2-after').innerHTML = highlight(rendered)
+
+        // Stage 3: envsubst
+        const resolved3 = document.getElementById('tpl3-resolved').checked
+        document.getElementById('tpl3-before').innerHTML =
+          highlight(`<span class="hl-fg3">// openclaw.json (after JSONC strip, before envsubst)</span>
+{
+  "gateway": {
+    "controlUi": {
+      "basePath": "<span class="hl-peach">$OPENCLAW_DOMAIN_PATH</span>",
+      "allowedOrigins": ["<span class="hl-peach">$OPENCLAW_ALLOWED_ORIGIN</span>"]
+    }
+  },
+  "models": {
+    "providers": {
+      "anthropic": {
+        "baseUrl": "<span class="hl-peach">$ANTHROPIC_BASE_URL</span>"
+      },
+      "openai": {
+        "baseUrl": "<span class="hl-peach">$OPENAI_BASE_URL</span>"
+      }
+    }
+  },
+  "plugins": {
+    "entries": {
+      "telemetry": {
+        "config": {
+          "instanceId": "<span class="hl-peach">$OPENCLAW_INSTANCE_ID</span>",
+          "hostname": "<span class="hl-peach">$VPS_HOSTNAME</span>"
+        }
+      }
+    }
+  }
+}`)
+
+        document.getElementById('tpl3-after').innerHTML = highlight(
+          resolved3
+            ? `<span class="hl-fg3">// After envsubst (runtime values)</span>
+{
+  "gateway": {
+    "controlUi": {
+      "basePath": "<span class="hl-teal"></span>",
+      "allowedOrigins": ["<span class="hl-teal">https://openclaw.example.com</span>"]
+    }
+  },
+  "models": {
+    "providers": {
+      "anthropic": {
+        "baseUrl": "<span class="hl-teal">https://ai-gw.example.workers.dev/anthropic</span>"
+      },
+      "openai": {
+        "baseUrl": "<span class="hl-teal">https://ai-gw.example.workers.dev/openai/v1</span>"
+      }
+    }
+  },
+  "plugins": {
+    "entries": {
+      "telemetry": {
+        "config": {
+          "instanceId": "<span class="hl-teal">personal-claw</span>",
+          "hostname": "<span class="hl-teal">vps1</span>"
+        }
+      }
+    }
+  }
+}`
+            : `<span class="hl-fg3">// Still has $VAR references (not yet resolved)</span>
+{
+  "gateway": {
+    "controlUi": {
+      "basePath": "<span class="hl-peach">$OPENCLAW_DOMAIN_PATH</span>",
+      "allowedOrigins": ["<span class="hl-peach">$OPENCLAW_ALLOWED_ORIGIN</span>"]
+    }
+  },
+  "models": {
+    "providers": {
+      "anthropic": {
+        "baseUrl": "<span class="hl-peach">$ANTHROPIC_BASE_URL</span>"
+      },
+      "openai": {
+        "baseUrl": "<span class="hl-peach">$OPENAI_BASE_URL</span>"
+      }
+    }
+  },
+  "plugins": {
+    "entries": {
+      "telemetry": {
+        "config": {
+          "instanceId": "<span class="hl-peach">$OPENCLAW_INSTANCE_ID</span>",
+          "hostname": "<span class="hl-peach">$VPS_HOSTNAME</span>"
+        }
+      }
+    }
+  }
+}`
+        )
+
+        // Deep merge
+        document.getElementById('merge-before').innerHTML =
+          highlight(`<span class="hl-fg3"># defaults (from stack.yml)</span>
+<span class="hl-purple">defaults</span>:
+  allow_updates: false
+  domain_path: ""
+  dashboard_path: /dashboard
+  telegram:
+    allow_from: 123456789
+  resources:
+    cpus: 6
+    memory: 12G
+  openclaw_json: openclaw/default/openclaw.jsonc
+
+<span class="hl-fg3"># claw override (from stack.yml claws section)</span>
+<span class="hl-purple">personal-claw</span>:
+  domain: openclaw.example.com
+  gateway_port: 18789
+  dashboard_port: 6090
+  telegram:
+    bot_token: 7234...
+  allow_updates: <span class="hl-green">true</span>  <span class="hl-fg3"># overrides default false</span>`)
+
+        document.getElementById('merge-after').innerHTML =
+          highlight(`<span class="hl-fg3"># Result: deepMerge(defaults, personal-claw)</span>
+<span class="hl-teal">personal-claw</span>:
+  allow_updates: <span class="hl-green">true</span>          <span class="hl-fg3"># ← claw wins</span>
+  domain: openclaw.example.com  <span class="hl-fg3"># ← claw-only</span>
+  domain_path: ""               <span class="hl-fg3"># ← from defaults</span>
+  dashboard_path: /dashboard    <span class="hl-fg3"># ← from defaults</span>
+  gateway_port: 18789           <span class="hl-fg3"># ← claw-only</span>
+  dashboard_port: 6090          <span class="hl-fg3"># ← claw-only</span>
+  telegram:
+    allow_from: 123456789       <span class="hl-fg3"># ← from defaults (deep)</span>
+    bot_token: 7234...          <span class="hl-fg3"># ← from claw (deep)</span>
+  resources:
+    cpus: 6                     <span class="hl-fg3"># ← from defaults</span>
+    memory: 12G                 <span class="hl-fg3"># ← from defaults</span>
+  openclaw_json: openclaw/default/openclaw.jsonc`)
+      }
+
+      function highlight(html) {
+        return html
+      }
+
+      // Wire toggles
+      ;['tpl1-filled', 'tpl2-egress', 'tpl2-vector', 'tpl2-multiclaw', 'tpl3-resolved'].forEach(
+        (id) => {
+          document.getElementById(id).addEventListener('change', renderTemplates)
+        }
+      )
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // TAB 4: FILE MAP
+      // ═══════════════════════════════════════════════════════════════════════
+
+      let selectedFile = null
+
+      function renderTree(node, container, depth = 0) {
+        const el = document.createElement('div')
+        const isDir = node.type === 'dir'
+
+        const nodeEl = document.createElement('div')
+        nodeEl.className = 'tree-node' + (isDir ? ' dir' : '')
+        const icon = isDir ? '&#128193;' : '&#128196;'
+        const colorDot = node.color
+          ? `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${
+              COLORS[node.color] || COLORS.fg3
+            };margin-right:2px;"></span>`
+          : ''
+        nodeEl.innerHTML = `<span class="icon">${icon}</span>${colorDot}<span class="name">${node.name}</span>`
+        nodeEl.addEventListener('click', (e) => {
+          e.stopPropagation()
+          document
+            .querySelectorAll('.tree-node.selected')
+            .forEach((n) => n.classList.remove('selected'))
+          nodeEl.classList.add('selected')
+          selectedFile = node
+          showFileDetail(node)
+          if (isDir && childrenEl) {
+            childrenEl.style.display = childrenEl.style.display === 'none' ? 'block' : 'none'
+          }
+        })
+        el.appendChild(nodeEl)
+
+        let childrenEl = null
+        if (isDir && node.children) {
+          childrenEl = document.createElement('div')
+          childrenEl.className = 'tree-children tree-connector'
+          node.children.forEach((child) => renderTree(child, childrenEl, depth + 1))
+          el.appendChild(childrenEl)
+        }
+
+        container.appendChild(el)
+      }
+
+      function showFileDetail(node) {
+        const el = document.getElementById('filemapDetail')
+        const colorBadge = node.color || 'blue'
+        el.innerHTML = `
+    <h3>${node.name}</h3>
+    ${node.source ? `<div class="source-tag">Source: ${node.source}</div>` : ''}
+    <div style="display:flex;gap:6px;margin-bottom:12px;">
+      <span class="badge badge-${colorBadge}">${node.type === 'dir' ? 'directory' : 'file'}</span>
+      ${node.color === 'green' ? '<span class="badge badge-green">generated</span>' : ''}
+      ${node.color === 'blue' ? '<span class="badge badge-blue">from source</span>' : ''}
+      ${node.color === 'peach' ? '<span class="badge badge-peach">per-instance</span>' : ''}
+    </div>
+    <div class="desc">${node.desc || 'No description available.'}</div>
+    ${
+      node.example
+        ? `<h4>Example Content</h4><pre style="font-size:11px;">${escHtml(node.example)}</pre>`
+        : ''
+    }
+  `
+      }
+
+      renderTree(FILE_TREE, document.getElementById('treePanel'))
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // INIT
+      // ═══════════════════════════════════════════════════════════════════════
+
+      renderTemplates()
+      requestAnimationFrame(() => {
+        drawFlow()
+      })
+    </script>
+  </body>
+</html>
