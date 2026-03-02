@@ -16,7 +16,7 @@ This playbook verifies:
 
 | Tier | Purpose | Sections | When to run |
 |------|---------|----------|-------------|
-| **Tier 1: Critical** | Smoke test — deployment is functional | 7.1, 7.2, 7.3, 7.4, 7.6 | Every deployment, after reboots, after maintenance |
+| **Tier 1: Critical** | Smoke test — deployment is functional | 7.1, 7.2, 7.2a, 7.3, 7.4, 7.6 | Every deployment, after reboots, after maintenance |
 | **Tier 2: Extended** | Full validation — comprehensive checks | 7.1a, 7.5, 7.5a–c, 7.6a, 7.7 | Fresh deploys, major updates, periodic audits |
 
 > **Quick smoke test:** Run Tier 1 only (~5 min). If all pass, the deployment is operational. Run Tier 2 for full confidence on fresh deploys or after significant changes.
@@ -118,6 +118,33 @@ sudo ls -la <INSTALL_DIR>/vector/data/
 
 ---
 
+## 7.2a Verify Egress Proxy
+
+> **Skip this section** if `stack.egress_proxy` is not configured in `stack.yml`.
+
+```bash
+# Check egress proxy is running (container name is <project>-egress-proxy)
+sudo docker ps --filter 'name=egress-proxy'
+
+# Check egress proxy logs
+sudo docker logs --tail 10 $(sudo docker ps --format '{{.Names}}' | grep 'egress-proxy$')
+
+# Health check (internal — from VPS)
+PROXY_CONTAINER=$(sudo docker ps --format '{{.Names}}' | grep 'egress-proxy$')
+sudo docker exec "$PROXY_CONTAINER" wget -q -O- http://localhost:8787/health
+```
+
+**Expected:** Container running, logs show startup message, health returns `{"status":"ok"}`.
+
+**If external verification is needed** (from local machine, requires tunnel route configured):
+
+```bash
+curl -s https://<EGRESS_PROXY_HOSTNAME>/health
+# Expected: {"status":"ok"}
+```
+
+---
+
 ## 7.3 Verify Cloudflare Workers
 
 ### Log Receiver Worker
@@ -192,7 +219,7 @@ curl -sk --connect-timeout 5 https://<VPS_IP>/ || echo "Direct access blocked (e
 ```bash
 # Both should return 302/403 (Cloudflare Access redirect)
 curl -sI --connect-timeout 10 https://<OPENCLAW_DOMAIN><OPENCLAW_DOMAIN_PATH>/ 2>&1 | head -5
-curl -sI --connect-timeout 10 https://<OPENCLAW_DASHBOARD_DOMAIN><OPENCLAW_DASHBOARD_DOMAIN_PATH>/ 2>&1 | head -5
+curl -sI --connect-timeout 10 https://<OPENCLAW_DOMAIN><DASHBOARD_BASE_PATH>/ 2>&1 | head -5
 ```
 
 **Expected:** 302 or 403 with `Location` header pointing to Cloudflare Access.
@@ -279,7 +306,7 @@ openclaw doctor --deep
 - [ ] SSH port `<SSH_PORT>` only, key-only auth, AllowUsers adminclaw
 - [ ] UFW enabled (SSH only), port 443 closed
 - [ ] Fail2ban running, cloudflared container running
-- [ ] OpenClaw claws + Sysbox running (+ Vector if `stack.logging.vector=true`)
+- [ ] OpenClaw claws + Sysbox running (+ Vector if `stack.logging.vector=true`, + egress proxy if `stack.egress_proxy` configured)
 - [ ] Backup + host alerter + maintenance checker cron jobs configured
 - [ ] Host status JSON files written and readable from agent sandbox
 - [ ] Sandbox toolkit: all binaries from `sandbox-toolkit.yaml` operational in sandbox container
@@ -659,5 +686,6 @@ Deployment is complete when:
 9. Claw ports not reachable from external network (bound to localhost only)
 10. Security audit passes with no critical or warning findings
 11. All sandbox toolkit binaries operational in sandbox container (7.1a)
+12. Egress proxy running and healthy (if `stack.egress_proxy` configured)
 
 > **Note:** Full end-to-end verification (user authenticating through Cloudflare Access, sending messages) is covered in `08b-pair-devices.md` (device pairing) and [`docs/TESTING.md`](../docs/TESTING.md) (browser automation via Chrome DevTools).

@@ -34,8 +34,11 @@ The config page lets users add or update:
 - **Anthropic OAuth Token** (`sk-ant-oat-*`) — Claude Code subscription token (takes priority over API key)
 - **OpenAI API Key** (`sk-*`) — standard API key
 - **OpenAI Codex OAuth** — paste `.codex/auth.json` contents (takes priority over API key)
+- **Codex Paste Token** — the config UI can generate a JWT paste token for `openai-codex` setup (used by the `codex --full-setup` flow to authenticate against the AI gateway's codex endpoint)
 
 Credentials are stored in Cloudflare KV — they never touch the VPS.
+
+> **Egress proxy required for Codex:** The `openai-codex` provider routes through `chatgpt.com/backend-api`, which blocks Cloudflare Worker IPs. If `stack.egress_proxy` is configured in `stack.yml`, codex requests are automatically routed through the VPS egress proxy sidecar. Without it, codex requests will fail with a 502 error.
 
 > **Note:** Provider credentials can be added now or later. The deployment can proceed without them — claws will show an error when trying to reach a provider without configured credentials.
 

@@ -89,7 +89,7 @@ ssh -i <SSH_KEY> -p <SSH_PORT> adminclaw@<VPS_IP>
 
 | Service | URL |
 |---------|-----|
-| **Dashboard** | `https://<OPENCLAW_DASHBOARD_DOMAIN><OPENCLAW_DASHBOARD_DOMAIN_PATH>/` |
+| **Dashboard** | `https://<CLAW_DOMAIN><DASHBOARD_BASE_PATH>/` |
 
 All URLs are protected by Cloudflare Access.
 
@@ -102,6 +102,7 @@ All URLs are protected by Cloudflare Access.
 | AI Gateway Proxy | `<AI_GATEWAY_WORKER_URL>` |
 | AI Gateway Config | `<AI_GATEWAY_WORKER_URL>/config` |
 | Log Receiver | `<LOG_WORKER_URL>` |
+| Egress Proxy | `<EGRESS_PROXY_URL>` (if configured) |
 
 | Secret | Value |
 |--------|-------|

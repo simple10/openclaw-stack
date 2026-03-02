@@ -82,7 +82,7 @@ If you're NOT using a AI proxy...
 
 ```bash
 # SSH into the gateway
-./scripts/ssh-vsp.sh
+./scripts/ssh-vps.sh
 
 # Provide the setup token to openclaw
 openclaw models auth paste-token --provider anthropic

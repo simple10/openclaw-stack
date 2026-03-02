@@ -10,7 +10,7 @@ User browser → Cloudflare Edge → Tunnel → cloudflared (VPS host)
     → reads browsers.json → 127.0.0.1:<noVncPort> (browser container)
 ```
 
-Browser sandbox containers run inside the gateway's nested Docker (Sysbox DinD). Each browser container serves noVNC on port 6080, Docker-mapped to a random host port inside the gateway container. The dashboard server (`deploy/dashboard.mjs`) runs inside the gateway and routes requests to the correct browser container based on dynamic port mappings.
+Browser sandbox containers run inside the gateway's nested Docker (Sysbox DinD). Each browser container serves noVNC on port 6080, Docker-mapped to a random host port inside the gateway container. The dashboard server (`deploy/openclaw-stack/dashboard/server.mjs`) runs inside the gateway and routes requests to the correct browser container based on dynamic port mappings.
 
 ### How Port Discovery Works
 
@@ -76,7 +76,7 @@ The `?path=` query parameter tells the noVNC client where to connect the WebSock
 
 ## Components
 
-### `deploy/dashboard.mjs`
+### `deploy/openclaw-stack/dashboard/server.mjs`
 
 Node.js dashboard server (zero dependencies — built-in `http` module only). Reads `DASHBOARD_BASE_PATH` env var for subpath-aware routing. Handles:
 
@@ -85,22 +85,9 @@ Node.js dashboard server (zero dependencies — built-in `http` module only). Re
 - **Health checking**: TCP probes each container's noVNC port before proxying; shows friendly HTML error page if the container is down (avoids Cloudflare intercepting 502 errors)
 - **Index page**: lists all registered sessions with live up/down status indicators, auto-refreshes every 10 seconds
 
-### `deploy/openclaw-stack/entrypoint.sh` (Phase 2b)
+### `deploy/openclaw-stack/entrypoint.sh`
 
-Starts the dashboard server as a background process before gosu drops privileges:
-
-```bash
-DASHBOARD_SERVER="/app/openclaw-stack/dashboard/server.mjs"
-if [ -f "$DASHBOARD_SERVER" ]; then
-  node "$DASHBOARD_SERVER" &
-fi
-```
-
-### `docker-compose.yml`
-
-- Port mapping: `127.0.0.1:6090:6090` (localhost-only for tunnel access)
-- Volume: `./openclaw-stack:/app/openclaw-stack:ro`
-- Environment: `DASHBOARD_BASE_PATH=${DASHBOARD_BASE_PATH:-}` (set from `OPENCLAW_DASHBOARD_DOMAIN_PATH`)
+The entrypoint starts the dashboard server as a background process. The dashboard is exposed on port 6090 (localhost-only via Docker port mapping) for tunnel access.
 
 ### Cloudflare Tunnel Route
 
@@ -180,7 +167,7 @@ This avoids the concurrency problems of a shared browser sidecar approach.
 
 - Gateway deployed with Sysbox (Docker-in-Docker)
 - Cloudflare Tunnel connected
-- `deploy/dashboard.mjs` bind-mounted into the gateway container
+- `deploy/openclaw-stack/dashboard/server.mjs` bind-mounted into the gateway container
 
 ### Adding the Tunnel Route
 

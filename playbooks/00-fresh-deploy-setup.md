@@ -4,14 +4,14 @@ Validation and overview for starting a fresh VPS deployment. All required config
 
 ## Overview
 
-This playbook validates the configuration needed to deploy OpenClaw on a fresh Ubuntu VPS. Domain settings (`OPENCLAW_DOMAIN`, `OPENCLAW_DASHBOARD_DOMAIN`, `OPENCLAW_DASHBOARD_DOMAIN_PATH`, `OPENCLAW_DOMAIN_PATH`) and Cloudflare Access protection are required upfront so the full deployment can run end-to-end without interruption.
+This playbook validates the configuration needed to deploy OpenClaw on a fresh Ubuntu VPS. Per-claw domain settings (`claws.<name>.domain`, `defaults.domain_path`, `defaults.dashboard_path` in `stack.yml`) and Cloudflare Access protection are required upfront so the full deployment can run end-to-end without interruption.
 
 ## Prerequisites
 
 - A fresh Ubuntu VPS (>= 24.04) with root/sudo access
 - An SSH key pair for VPS access
 - A Cloudflare account with a domain
-- Cloudflare Tunnel token (`CF_TUNNEL_TOKEN`, manual) OR Cloudflare API token (`CF_API_TOKEN`, automated)
+- Cloudflare Tunnel token (`CLOUDFLARE_TUNNEL_TOKEN`, manual) OR Cloudflare API token (`CLOUDFLARE_API_TOKEN`, automated)
 - Cloudflare Access application protecting the domain
 
 ---
@@ -112,8 +112,6 @@ When `CF_API_TOKEN` is set, automate tunnel creation, route configuration, and D
 > **Multi-instance note:** When using `CF_API_TOKEN` with multiple claws, a single Cloudflare Access
 > application with a wildcard domain (e.g., `openclaw*.example.com` or `*claw.example.com`) can
 > protect all instance subdomains. This must still be configured manually in the CF Dashboard.
-
----
 
 ---
 
@@ -255,10 +253,12 @@ Wait for user. Re-check.
 > a single Cloudflare Access application with a wildcard domain (e.g., `openclaw*.example.com`)
 > can protect all instance subdomains. This must still be configured manually in the CF Dashboard.
 
-### Also verify the dashboard domain
+### Also verify the dashboard path
+
+The dashboard is served on the same domain as the claw, at the `dashboard_path` (default: `/dashboard`):
 
 ```bash
-curl -sI --connect-timeout 10 https://<OPENCLAW_DASHBOARD_DOMAIN><OPENCLAW_DASHBOARD_DOMAIN_PATH>/ 2>&1 | head -10
+curl -sI --connect-timeout 10 https://<OPENCLAW_DOMAIN><DASHBOARD_BASE_PATH>/ 2>&1 | head -10
 ```
 
 Same logic: expect 302/403. If not, guide user to fix.
@@ -305,7 +305,7 @@ Deployment Plan:
 
 Domain and Cloudflare Access have been verified.
 
-> **Note:** AI proxy provider credentials are configured during post-deploy (step 6, `08a-configure-llm-proxy.md`) via the self-service `/config` UI, not during worker deployment (step 1). Worker deployment sets up the infrastructure (`ADMIN_AUTH_TOKEN`, KV namespace, and the first gateway user).
+> **Note:** AI proxy provider credentials are configured during post-deploy (step 7, `08a-configure-llm-proxy.md`) via the self-service `/config` UI, not during worker deployment (step 1). Worker deployment sets up the infrastructure (`ADMIN_AUTH_TOKEN`, KV namespace, and the first gateway user).
 
 Ask the user to confirm before proceeding with the deployment.
 

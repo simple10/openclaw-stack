@@ -69,13 +69,13 @@ cat ~/.ssh/vps1_openclaw_ed25519.pub
 
 If you setup a VPS that's smaller or larger than 6 cores + 12GB RAM, you'll likely want to adjust:
 
-1. Gateway container size in [docker-compoase.override.yml](../deploy/docker-compose.override.yml)
-2. Sandbox container resources in [openclaw.json](../deploy/openclaw.json)
+1. Gateway container resource limits in `stack.yml` under `defaults` or `claws.<name>`
+2. Sandbox container resources in `openclaw/default/openclaw.jsonc`
 
-Just ask claude to do adjust the sizing for you before deploying. The gateway container limits should
-nearly max out the limits of your VPS. It effectively shares resources with it's nested sandbox
-containers - the openclaw agent and browser containers. Besides the openclaw gateway, the VPS
-runs the vector container and normal Ubuntu system daemons.
+Just ask Claude to adjust the sizing for you before deploying. The gateway container limits should
+nearly max out the limits of your VPS. It effectively shares resources with its nested sandbox
+containers -- the agent and browser containers. Besides the gateway, the VPS
+runs Vector (if logging enabled) and normal Ubuntu system daemons.
 
 ---
 
@@ -162,9 +162,16 @@ Expected output:
 
 ---
 
-### Step 7: Continue with Steps in [README.md](./README.md)
+### Step 7: Continue with Deployment
 
-Finish the setup steps in README.md and hand off to claude to implement.
+Return to the repo root and start Claude:
+
+```bash
+cd openclaw-vps
+claude "start"
+```
+
+Claude reads `CLAUDE.md` and walks you through the rest of the deployment.
 
 ---
 

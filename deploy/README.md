@@ -6,29 +6,30 @@ Authoritative source files for VPS deployment, organized into three tiers.
 
 ```
 deploy/
-  openclaw-stack/     ← Container bind mount (tier 1) → /app/openclaw-stack:ro
+  openclaw-stack/     <- Container bind mount (tier 1) -> /app/openclaw-stack:ro
     entrypoint.sh       Gateway entrypoint script
     rebuild-sandboxes.sh Sandbox image builder
     parse-toolkit.mjs   Toolkit config parser
     dashboard/          Dashboard web app
-    plugins/            Telemetry, coordinator plugins
-  host/               ← Host-only scripts (tier 2) — cron jobs, config
+    plugins/            Coordinator plugin
+  host/               <- Host-only scripts (tier 2) -- cron jobs, config
     source-config.sh    Config resolver (sources stack.env)
     backup.sh           Backup all claw instances
+    build-openclaw.sh   Build gateway image with auto-patching
+    start-claws.sh      Build image and start containers
     host-alert.sh       Host resource monitoring + Telegram alerts
     host-maintenance-check.sh  OS update/reboot checker
     session-prune.sh    Session transcript cleanup
-    build-openclaw.sh   Build gateway image with auto-patching
-    start-claws.sh      Build image and start containers
     register-cron-jobs.sh Install all crons + logrotate + OpenClaw CLI crons
+    openclaw-wrapper.sh OpenClaw CLI wrapper for host
     logrotate-openclaw  Logrotate config ({{INSTALL_DIR}} resolved by pre-deploy)
-    cron-openclaw-backup  Daily backup cron ({{INSTALL_DIR}} resolved by pre-deploy)
-    cron-openclaw-session-prune  Session pruning cron ({{INSTALL_DIR}} resolved by pre-deploy)
-  setup/              ← Deploy-time scripts (tier 3) — run once during setup
+    cron-openclaw-backup  Daily backup cron
+    cron-openclaw-session-prune  Session pruning cron
+  setup/              <- Deploy-time scripts (tier 3) -- run once during setup
     system-hardening.sh SSH/UFW/fail2ban hardening
     setup-infra.sh      Create directories, clone repo
     verify-deployment.sh Verify sandbox images, binaries, health
-  vector/             ← Vector log shipper config
+  vector/             <- Vector log shipper config
     vector.yaml
 ```
 
@@ -37,12 +38,10 @@ deploy/
 When a playbook bash block contains:
 
 ```
-# SOURCE: deploy/<tier>/<file> → /vps/target/path
+# SOURCE: deploy/<tier>/<file> -> /vps/target/path
 ```
 
-The executor reads `deploy/<tier>/<file>` from this repo and deploys its contents
-to the target path on the VPS. The heredoc body contains a sentinel
-`# <<< deploy/<tier>/<file> >>>` as a placeholder.
+The executor reads `deploy/<tier>/<file>` from this repo and deploys its contents to the target path on the VPS.
 
 ## source-config.sh Discovery
 

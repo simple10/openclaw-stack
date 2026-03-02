@@ -308,7 +308,7 @@ The gateway performs these checks in order:
 
 ## Dashboard Authentication
 
-The dashboard (`deploy/dashboard.mjs`) serves browser session UIs (noVNC), media files, and future dashboard features. It enforces two authentication layers:
+The dashboard (`deploy/openclaw-stack/dashboard/server.mjs`) serves browser session UIs (noVNC), media files, and future dashboard features. It enforces two authentication layers:
 
 ### Request Flow
 

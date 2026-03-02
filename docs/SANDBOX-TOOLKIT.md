@@ -2,14 +2,14 @@
 
 The sandbox toolkit defines what tools are available inside agent sandbox containers. All configuration lives in `openclaw/default/sandbox-toolkit.yaml` — adding, updating, or removing a tool is a config edit + rebuild.
 
-See also [SKILL-ROUTING.md](SKILL-ROUTING.md)
+See also [deploy/openclaw-stack/plugins/coordinator/README.md](../deploy/openclaw-stack/plugins/coordinator/README.md) for agent routing details.
 
 ## How It Works
 
 ```
 sandbox-toolkit.yaml  (config: packages, tools, binaries)
         │
-        ├─→  entrypoint-gateway.sh    (generates gateway shims at boot)
+        ├─→  entrypoint.sh            (generates gateway shims at boot)
         │
         └─→  rebuild-sandboxes.sh     (builds sandbox images with tools baked in)
                 │

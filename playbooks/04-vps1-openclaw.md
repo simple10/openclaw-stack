@@ -9,7 +9,8 @@ This playbook configures:
 - Directory structure and permissions
 - OpenClaw repository and configuration
 - Docker Compose with security hardening
-- Vector for log shipping to Cloudflare
+- Vector for log shipping to Cloudflare (when `stack.logging.vector: true`)
+- Egress proxy sidecar for routing requests through VPS IP (when `stack.egress_proxy` configured)
 - Host alerter for Telegram notifications
 - Maintenance checker for OS update monitoring
 

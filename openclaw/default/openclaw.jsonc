@@ -1,3 +1,12 @@
+// Default openclaw.jsonc template — used when a claw doesn't specify its own
+// `openclaw_json` path in stack.yml. JSONC comments are stripped during pre-deploy;
+// output is saved as .deploy/instances/<name>/.openclaw/openclaw.json.
+// $VAR references are resolved at container startup by entrypoint envsubst.
+//
+// To customize for a specific claw:
+//   1. Copy this file to openclaw/<claw-name>/openclaw.jsonc
+//   2. Set openclaw_json: openclaw/<claw-name>/openclaw.jsonc in that claw's stack.yml section
+//
 // Hot-reloadable (no restart needed):
 //   - hooks — reloads hook handlers
 //   - cron — restarts cron jobs

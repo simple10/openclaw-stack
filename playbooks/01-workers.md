@@ -83,6 +83,23 @@ echo "$ADMIN_TOKEN" | npx wrangler secret put ADMIN_AUTH_TOKEN
 
 Save `ADMIN_TOKEN` — it's needed for user management and the deploy report.
 
+### Configure Egress Proxy Secrets (optional)
+
+If `stack.egress_proxy` is configured in `stack.yml` (for routing openai-codex requests through the VPS IP to bypass chatgpt.com WAF blocks), set the proxy URL and auth token as worker secrets:
+
+```bash
+# Set egress proxy URL (the tunnel hostname pointing to the VPS egress proxy container)
+echo "https://egress-proxy.<domain>" | npx wrangler secret put EGRESS_PROXY_URL
+
+# Set shared auth token (must match EGRESS_PROXY_AUTH_TOKEN in .env / stack.yml)
+source ../../.env
+echo "$EGRESS_PROXY_AUTH_TOKEN" | npx wrangler secret put EGRESS_PROXY_AUTH_TOKEN
+```
+
+> **Note:** The egress proxy container is deployed on the VPS during `04-vps1-openclaw.md`. Skip this step if `egress_proxy` is not in your `stack.yml`.
+>
+> **Tunnel route required:** Add a public hostname route in the Cloudflare Tunnel configuration (CF Dashboard or via `scripts/cf-tunnel-setup.sh`) pointing to the egress proxy container: hostname `egress-proxy.<domain>` -> service `http://<project_name>-egress-proxy:8787`. The `EGRESS_PROXY_URL` secret must match this hostname (e.g., `https://egress-proxy.<domain>`). No Cloudflare Access policy is needed — the proxy authenticates requests via the `X-Proxy-Auth` header.
+
 ### Deploy AI Gateway Worker
 
 ```bash

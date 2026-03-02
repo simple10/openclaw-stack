@@ -6,7 +6,7 @@ This document orchestrates the automated deployment of OpenClaw on a single VPS 
 
 | Component | Role | Services |
 |-----------|------|----------|
-| **VPS-1** | OpenClaw | Gateway, Sysbox, Vector (log shipper) |
+| **VPS-1** | OpenClaw | Gateway, Sysbox, Vector (log shipper), Egress Proxy (optional) |
 | **AI Gateway Worker** | LLM Proxy | LLM proxy (direct API or optional CF AI Gateway), per-user KV auth & credentials |
 | **Log Receiver Worker** | Log Ingestion | Accepts container logs from Vector, Cloudflare real-time logs |
 
@@ -29,8 +29,6 @@ All deployment steps are in modular playbooks under `playbooks/`:
 | `08a-configure-llm-proxy.md` | AI proxy credential setup (via `/config` UI) |
 | `08b-pair-devices.md` | Browser & Telegram device pairing |
 | `08c-deploy-report.md` | Deployment report generation |
-
-See [playbooks/README.md](playbooks/README.md) for detailed playbook documentation.
 
 ---
 

@@ -15,6 +15,8 @@ All secrets should be rotated on a regular cadence. If a token is suspected comp
 | `ADMIN_AUTH_TOKEN` | AI Gateway Worker secret | 90 days |
 | `LOG_WORKER_TOKEN` | Local `.env` + Log Receiver Worker secret | 90 days |
 | Provider API keys (Anthropic, OpenAI, etc.) | AI Gateway KV (`creds:*`) — managed via `/config` UI | Per provider policy |
+| `EGRESS_PROXY_AUTH_TOKEN` | Local `.env` + AI Gateway Worker secret + VPS egress proxy container | 90 days |
+| `EGRESS_PROXY_URL` | AI Gateway Worker secret | Only if hostname changes |
 | `HOSTALERT_TELEGRAM_BOT_TOKEN` | Local `.env` (deployed via `npm run pre-deploy`) | As needed |
 | SSH keys (`~/.ssh/vps1_openclaw_ed25519`) | Local machine + VPS `authorized_keys` | Annual |
 
@@ -121,6 +123,30 @@ echo "new-token" | npx wrangler secret put CF_AI_GATEWAY_TOKEN
 See [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md) for details.
 
 > **Verify:** Run § 7.3 — AI Gateway Worker health check. Full LLM routing verified during § 7.7 (E2E test).
+
+#### Egress Proxy Token
+
+> **Skip** if `stack.egress_proxy` is not configured in `stack.yml`.
+
+The egress proxy auth token is shared between the AI Gateway Worker and the VPS egress proxy container. Rotate both simultaneously:
+
+```bash
+# 1. Generate new token
+NEW_TOKEN=$(openssl rand -hex 32)
+
+# 2. Update AI Gateway Worker secrets
+cd workers/ai-gateway
+echo "$NEW_TOKEN" | npx wrangler secret put EGRESS_PROXY_AUTH_TOKEN
+
+# 3. Update EGRESS_PROXY_AUTH_TOKEN in local .env, rebuild and push artifacts
+npm run pre-deploy
+scripts/sync-deploy.sh
+
+# 4. Recreate the egress proxy container to pick up new env values
+sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d egress-proxy'
+```
+
+> **Verify:** Run § 7.2a — egress proxy health check. Test a codex request end-to-end if possible.
 
 #### SSH Keys
 
