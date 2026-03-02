@@ -188,6 +188,7 @@
             // cron job reads the reports and notifies user over Telegram if there are any issues.
             // The cron is redundant to the host-alert.sh cron that runs on host - it's used to allow the agent
             // to help the user debug if there are any issues. It also reports on the main Telegram channel.
+            // Optionally comment this out if health_check_cron is disabled in stack.yml
             "dangerouslyAllowExternalBindSources": true,
             "dangerouslyAllowReservedContainerTargets": true,
             "binds": [

@@ -132,6 +132,14 @@ IFS=',' read -ra CLAWS <<< "$CLAW_IDS"
 for CLAW in "${CLAWS[@]}"; do
   echo "  Checking claw: $CLAW"
 
+  # Check per-claw toggle (default: disabled)
+  envKey=$(echo "$CLAW" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
+  varName="STACK__CLAWS__${envKey}__HEALTH_CHECK_CRON"
+  if [ "${!varName:-false}" != "true" ]; then
+    echo "    CLI health check cron disabled for $CLAW, skipping."
+    continue
+  fi
+
   # Idempotent: skip if already registered
   # shellcheck disable=SC2086
   if openclaw --instance "$CLAW" cron list 2>/dev/null | grep -q "Daily VPS Health Check"; then

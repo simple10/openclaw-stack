@@ -71,6 +71,7 @@ stack:
 # All claws inherit these. Per-claw settings override via deep merge.
 defaults:
   allow_updates: true
+  health_check_cron: false
   domain_path: ""
   dashboard_path: /dashboard
   telegram:
@@ -90,11 +91,12 @@ claws:
     dashboard_port: 6090
     telegram:
       bot_token: ${PERSONAL_CLAW_TELEGRAM_BOT_TOKEN}
-    allow_updates: true
+    health_check_cron: true  # Enable health check cron on the main claw - not needed on each claw
 
   # work-claw:
   #   domain: openclaw-work.${ROOT_DOMAIN}
-  #   allow_updates: false # Prevent work-claw from auto updating
+  #   allow_updates: false    # Prevent work-claw from auto updating
+  #   health_check_cron: true # Enable CLI health check on this claw
   #   gateway_port: 18790
   #   dashboard_port: 6091
   #   telegram:
