@@ -6,7 +6,7 @@ import { isLlemtryEnabled, isLlmRoute, reportGeneration } from './llemtry'
 import { createLog, logInboundRequest } from './log'
 import { matchProviderRoute } from './routing'
 import { getProviderApiKey } from './keys'
-import { handleAdminRequest, handleTokenRotation, handleGetUserCreds, handleUpdateUserCreds } from './admin'
+import { handleAdminRequest, handleTokenRotation, handleGetUserCreds, handleUpdateUserCreds, handleCodexTokenGeneration } from './admin'
 import { serveConfigPage } from './config-ui'
 import { proxyOpenAI } from './providers/openai'
 import { proxyAnthropic } from './providers/anthropic'
@@ -71,6 +71,10 @@ export default {
       }
       if (request.method === 'PUT' && pathname === '/auth/creds') {
         const response = await handleUpdateUserCreds(request, userId, env.AUTH_KV, log)
+        return addCorsHeaders(response)
+      }
+      if (request.method === 'POST' && pathname === '/auth/codex-token') {
+        const response = await handleCodexTokenGeneration(userId, env.AUTH_KV, log)
         return addCorsHeaders(response)
       }
 

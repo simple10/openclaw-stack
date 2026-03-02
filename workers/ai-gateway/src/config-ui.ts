@@ -129,6 +129,22 @@ const CONFIG_HTML = /* html */ `<!DOCTYPE html>
       </div>
       <div id="save-status" class="status"></div>
     </div>
+
+    <div id="codex-token-section" class="card" style="display:none">
+      <h2>OpenClaw Codex Paste Token</h2>
+      <p style="font-size:0.85rem; color:var(--dim); margin-bottom:1rem;">
+        A gateway auth token was generated for OpenClaw. Run this in your OpenClaw container:
+      </p>
+      <pre style="background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:0.6rem 0.75rem; font-family:var(--mono); font-size:0.8rem; color:var(--accent); margin-bottom:1rem; overflow-x:auto;">openclaw models auth paste-token --provider openai-codex --expiresIn 999d</pre>
+      <p style="font-size:0.85rem; color:var(--dim); margin-bottom:0.5rem;">Then paste this token when prompted:</p>
+      <div class="field">
+        <textarea id="codex-token-display" readonly style="min-height:60px; font-size:0.75rem; color:var(--success); cursor:text;"></textarea>
+      </div>
+      <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+        <button class="btn-small" id="copy-codex-token">Copy Token</button>
+        <button class="btn-small" id="regen-codex-token">Regenerate</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -245,6 +261,11 @@ const CONFIG_HTML = /* html */ `<!DOCTYPE html>
         el.querySelector('input, textarea').disabled = false;
       });
       populateForm(updated);
+
+      // Show codex paste token if generated
+      if (updated.codexPasteToken) {
+        showCodexToken(updated.codexPasteToken);
+      }
     } catch (err) {
       showStatus('#save-status', 'Save failed: ' + err.message, 'error');
     }
@@ -352,6 +373,42 @@ const CONFIG_HTML = /* html */ `<!DOCTYPE html>
     d.textContent = s;
     return d.innerHTML;
   }
+
+  // --- Codex paste token ---
+  function showCodexToken(jwt) {
+    $('#codex-token-display').value = jwt;
+    $('#codex-token-section').style.display = 'block';
+  }
+
+  $('#copy-codex-token').addEventListener('click', () => {
+    const token = $('#codex-token-display').value;
+    navigator.clipboard.writeText(token).then(() => {
+      const btn = $('#copy-codex-token');
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = 'Copy Token'; }, 2000);
+    });
+  });
+
+  $('#regen-codex-token').addEventListener('click', async () => {
+    const btn = $('#regen-codex-token');
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+    try {
+      const res = await api('POST', '/auth/codex-token');
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        showStatus('#save-status', 'Error: ' + (body.error?.message || res.statusText), 'error');
+        return;
+      }
+      const data = await res.json();
+      showCodexToken(data.codexPasteToken);
+      showStatus('#save-status', 'New codex paste token generated', 'success');
+    } catch (err) {
+      showStatus('#save-status', 'Failed: ' + err.message, 'error');
+    }
+    btn.disabled = false;
+    btn.textContent = 'Regenerate';
+  });
 
   // Auto-connect if token stored
   if (authToken()) {

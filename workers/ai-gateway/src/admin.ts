@@ -9,6 +9,86 @@ function randomHex(bytes: number): string {
   return Array.from(buf, b => b.toString(16).padStart(2, '0')).join('')
 }
 
+/** SHA-256 hash of a string, returned as hex. */
+async function sha256Hex(input: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
+  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('')
+}
+
+/** Base64url-encode a buffer (no padding). */
+function base64url(buf: Uint8Array | ArrayBuffer): string {
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf)
+  let binary = ''
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+/**
+ * Generate a JWT-shaped gateway auth token for OpenClaw's openai-codex provider.
+ * Uses anonymized claims so the token passes OpenClaw's JWT validation without
+ * containing any real user data. The gateway matches the full token (via SHA-256
+ * hash lookup) and swaps it for the real Codex OAuth credentials.
+ */
+async function generateCodexJwt(): Promise<string> {
+  const enc = new TextEncoder()
+  const header = { alg: 'HS256', typ: 'JWT' }
+  const payload = {
+    exp: 9999999999,
+    'https://api.openai.com/auth': {
+      chatgpt_account_id: crypto.randomUUID(),
+      chatgpt_user_id: `user-${randomHex(12)}`,
+    },
+    'https://api.openai.com/profile': {
+      email: 'user@example.com',
+    },
+    sub: 'gateway-proxy',
+    iat: Math.floor(Date.now() / 1000),
+    iss: 'https://auth.openai.com',
+  }
+
+  const headerB64 = base64url(enc.encode(JSON.stringify(header)))
+  const payloadB64 = base64url(enc.encode(JSON.stringify(payload)))
+  const signingInput = `${headerB64}.${payloadB64}`
+
+  const key = await crypto.subtle.generateKey(
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  ) as CryptoKey
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(signingInput))
+
+  return `${headerB64}.${payloadB64}.${base64url(sig)}`
+}
+
+/**
+ * Generate a Codex paste JWT and store its hash as a valid auth token in KV.
+ * Returns the raw JWT string for the user to paste into OpenClaw.
+ */
+async function generateAndStoreCodexToken(
+  userId: string,
+  kv: KVNamespace,
+  log: Log
+): Promise<string> {
+  const jwt = await generateCodexJwt()
+  const hash = await sha256Hex(jwt)
+
+  // Store token hash → userId mapping in KV
+  await kv.put(`token:${hash}`, userId)
+
+  // Add hash to user's tokens list in registry
+  const registry = await getRegistry(kv)
+  const user = registry[userId]
+  if (user) {
+    user.tokens.push(hash)
+    await putRegistry(kv, registry)
+  }
+
+  log.info(`[admin] generated codex paste token for user ${userId}`)
+  return jwt
+}
+
 /** Read the users registry from KV, returning an empty object if missing. */
 async function getRegistry(kv: KVNamespace): Promise<UsersRegistry> {
   const raw = await kv.get('users')
@@ -238,7 +318,35 @@ export async function handleUpdateUserCreds(
   await kv.put(`creds:${userId}`, JSON.stringify(merged))
   log.info(`[admin] user ${userId} updated their credentials`)
 
-  return jsonResponse(maskCredentials(merged))
+  // Auto-generate codex paste token when openai.oauth is set/updated
+  const openaiUpdate = update.openai as Record<string, unknown> | undefined
+  let codexPasteToken: string | undefined
+  if (openaiUpdate?.oauth && openaiUpdate.oauth !== null) {
+    codexPasteToken = await generateAndStoreCodexToken(userId, kv, log)
+  }
+
+  const response: Record<string, unknown> = maskCredentials(merged)
+  if (codexPasteToken) {
+    response.codexPasteToken = codexPasteToken
+  }
+
+  return jsonResponse(response)
+}
+
+/** POST /auth/codex-token — generate a new codex paste token for the authenticated user. */
+export async function handleCodexTokenGeneration(
+  userId: string,
+  kv: KVNamespace,
+  log: Log
+): Promise<Response> {
+  const raw = await kv.get(`creds:${userId}`)
+  const creds: UserCredentials = raw ? JSON.parse(raw) : {}
+  if (!creds.openai?.oauth) {
+    return jsonError('No Codex OAuth credentials configured — add them first', 400)
+  }
+
+  const jwt = await generateAndStoreCodexToken(userId, kv, log)
+  return jsonResponse({ codexPasteToken: jwt })
 }
 
 // --- Mask / Merge helpers ---

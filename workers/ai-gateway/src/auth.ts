@@ -16,9 +16,10 @@ export function extractToken(request: Request): string | null {
  * Look up a user token in KV. Returns the userId or null if the token
  * is invalid/expired (expired tokens are auto-deleted by KV TTL).
  *
- * Handles provider-prefixed tokens: OpenClaw may send the gateway token
- * with a provider prefix prepended (e.g. "sk-ant-api03-xxxxx-GATEWAY_TOKEN").
- * If the full token isn't found in KV, the last dash-segment is tried.
+ * Supports three token formats:
+ * 1. Exact hex tokens (e.g. gateway auth tokens)
+ * 2. JWT tokens — stored by SHA-256 hash since JWTs exceed KV key limits
+ * 3. Provider-prefixed tokens — OpenClaw may prepend a prefix (e.g. "sk-ant-api03-xxxxx-TOKEN")
  */
 export async function authenticateRequest(
   request: Request,
@@ -27,9 +28,16 @@ export async function authenticateRequest(
   const token = extractToken(request)
   if (!token) return null
 
-  // Try exact match first
+  // Try exact match first (regular hex tokens)
   const userId = await kv.get(`token:${token}`)
   if (userId) return userId
+
+  // JWT tokens are too long for KV keys — look up by SHA-256 hash
+  if (token.split('.').length === 3) {
+    const hash = await sha256Hex(token)
+    const jwtUserId = await kv.get(`token:${hash}`)
+    if (jwtUserId) return jwtUserId
+  }
 
   // Fallback: strip provider prefix (last dash-segment is the real token)
   if (token.includes('-')) {
@@ -38,6 +46,12 @@ export async function authenticateRequest(
   }
 
   return null
+}
+
+/** SHA-256 hash of a string, returned as hex. */
+async function sha256Hex(input: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
+  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('')
 }
 
 /**
