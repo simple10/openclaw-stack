@@ -268,6 +268,15 @@ function computeDerivedValues(claws, stack, host, previousDeploy) {
   // Stack-level derived values
   stack.vector = !!stack.logging?.vector;
 
+  if (stack.egress_proxy) {
+    // Auto-generate auth token if not explicitly set (cached in stack.json between builds)
+    stack.egress_proxy.auth_token = resolveAutoToken(
+      stack.egress_proxy.auth_token,
+      "stack.egress_proxy.auth_token",
+      previousDeploy
+    );
+  }
+
   if (stack.sandbox_registry) {
     const sr = stack.sandbox_registry;
     // Auto-generate token if not explicitly set (cached in stack.json between builds)
@@ -419,6 +428,9 @@ function generateStackEnv(env, config, claws) {
   if (stack.sandbox_registry) {
     lines.push(`STACK__STACK__SANDBOX_REGISTRY__PORT=${stack.sandbox_registry_port || ""}`);
     lines.push(`STACK__STACK__SANDBOX_REGISTRY__URL=${stack.sandbox_registry_url || ""}`);
+  }
+  if (stack.egress_proxy) {
+    lines.push(`STACK__STACK__EGRESS_PROXY__AUTH_TOKEN=${formatEnvValue(stack.egress_proxy.auth_token)}`);
   }
   lines.push("");
 

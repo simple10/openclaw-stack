@@ -45,7 +45,7 @@ stack:
   # Local Docker registry for sharing sandbox images between claws.
   # First claw to build pushes images; others pull (~30s vs ~15min build).
   sandbox_registry:
-    token: ${SANDBOX_REGISTRY_TOKEN}         # htpasswd basic auth; pre-deploy script auto generates token if empty
+    token: ${SANDBOX_REGISTRY_TOKEN:-}       # auto-generated if empty
     port: 5100                               # host port (own registry)
     # OR: use another stack's registry (no container in this stack):
     # url: "10.0.0.1:5100"                   # set url instead of port
@@ -56,7 +56,7 @@ stack:
   # Requires a tunnel route: hostname → http://<project_name>-egress-proxy:8787
   egress_proxy:
     port: 8787
-    auth_token: ${EGRESS_PROXY_AUTH_TOKEN}
+    auth_token: ${EGRESS_PROXY_AUTH_TOKEN:-}  # auto-generated if empty
     log_level: info                       # info | debug (debug logs outbound headers)
 
   # Total VPS resource budget for this stack

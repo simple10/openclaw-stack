@@ -4,5 +4,5 @@
 # If the config resolver moves, only this file needs updating.
 
 _LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$_LIB_DIR/../../deploy/host/source-config.sh"
+source "$_LIB_DIR/../../deploy/host/source-config.sh" "$@"
 unset _LIB_DIR

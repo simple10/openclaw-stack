@@ -91,9 +91,9 @@ If `stack.egress_proxy` is configured in `stack.yml` (for routing openai-codex r
 # Set egress proxy URL (the tunnel hostname pointing to the VPS egress proxy container)
 echo "https://egress-proxy.<domain>" | npx wrangler secret put EGRESS_PROXY_URL
 
-# Set shared auth token (must match EGRESS_PROXY_AUTH_TOKEN in .env / stack.yml)
-source ../../.env
-echo "$EGRESS_PROXY_AUTH_TOKEN" | npx wrangler secret put EGRESS_PROXY_AUTH_TOKEN
+# Set shared auth token (resolved from stack.yml via source-config.sh)
+source ../../scripts/lib/source-config.sh
+echo "$STACK__STACK__EGRESS_PROXY__AUTH_TOKEN" | npx wrangler secret put EGRESS_PROXY_AUTH_TOKEN
 ```
 
 > **Note:** The egress proxy container is deployed on the VPS during `04-vps1-openclaw.md`. Skip this step if `egress_proxy` is not in your `stack.yml`.

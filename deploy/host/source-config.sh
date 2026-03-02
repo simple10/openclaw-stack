@@ -30,6 +30,15 @@ while [ "$_SEARCH" != "/" ] && [ "$_DEPTH" -lt 10 ]; do
   _DEPTH=$((_DEPTH + 1))
 done
 
+# Auto-run pre-deploy if stack.env missing or --force requested (local only)
+if [ "$OPENCLAW_CONTEXT" = "local" ]; then
+  _FORCE="${1:-}"
+  if [ ! -f "$_STACK_ENV" ] || [ "$_FORCE" = "--force" ]; then
+    echo "→ Running pre-deploy to generate stack.env..." >&2
+    (cd "$REPO_ROOT" && npm run pre-deploy) >&2
+  fi
+fi
+
 if [ -z "$_STACK_ENV" ] || [ ! -f "$_STACK_ENV" ]; then
   echo "Error: stack.env not found (searched up from $_SC_DIR)" >&2
   echo "Run 'npm run pre-deploy' to generate it." >&2
@@ -44,4 +53,4 @@ set +a
 export OPENCLAW_CONTEXT REPO_ROOT
 
 # Clean up internal variables
-unset _SC_DIR _STACK_ENV _SEARCH _DEPTH
+unset _SC_DIR _STACK_ENV _SEARCH _DEPTH _FORCE
