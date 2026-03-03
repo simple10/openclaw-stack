@@ -14,5 +14,7 @@ jobs:
           ref: public
           fetch-depth: 0
       - run: |
-          git remote add public-repo https://x-access-token:${{ secrets.PUBLIC_REPO_TOKEN }}@github.com/simple10/openclaw-stack.git
+          git remote add public-repo https://x-access-token:${TOKEN}@github.com/simple10/openclaw-stack.git
           git push public-repo public:main
+        env:
+          TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
