@@ -30,13 +30,15 @@ while IFS= read -r install_dir; do
     mkdir -p "${BACKUP_DIR}"
     chown 1000:1000 "${BACKUP_DIR}"
 
-    # Create backup of this claw's config and data
+    # Create backup of this claw's config and data.
+    # Include all workspace dirs (main=workspace, agents=workspace-<id>).
     # || true: continue to other instances if one fails (error still printed)
+    workspace_dirs=$(cd "${inst_dir}" && ls -d .openclaw/workspace .openclaw/workspace-* 2>/dev/null || true)
     tar -czf "${BACKUP_FILE}" \
         -C "${inst_dir}" \
         .openclaw/openclaw.json \
         .openclaw/credentials \
-        .openclaw/workspace \
+        ${workspace_dirs} \
         || true
 
     # Set ownership so container can also access backups if needed

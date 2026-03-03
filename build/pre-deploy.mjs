@@ -603,6 +603,7 @@ async function main() {
     rmSync(DEPLOY_DIR, { recursive: true, force: true });
   }
   mkdirSync(DEPLOY_DIR, { recursive: true });
+  mkdirSync(join(DEPLOY_DIR, ".tmp"), { recursive: true });
 
   // 7a. Write docker-compose.yml
   writeFileSync(join(DEPLOY_DIR, "docker-compose.yml"), composeFinal);

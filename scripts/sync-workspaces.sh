@@ -14,6 +14,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/source-config.sh"
+source "$SCRIPT_DIR/lib/colors.sh"
+source "$SCRIPT_DIR/lib/ssh.sh"
+source "$SCRIPT_DIR/lib/instances.sh"
 
 # ── Parse args ────────────────────────────────────────────────────────────────
 
@@ -37,36 +40,10 @@ if [ -z "$DIRECTION" ]; then
   exit 1
 fi
 
-# ── Config ────────────────────────────────────────────────────────────────────
+# Extra rsync flags for workspace sync (itemize changes, exclude dotfiles)
+RSYNC_EXTRA="--itemize-changes --exclude=.*"
 
-INSTALL_DIR="$STACK__STACK__INSTALL_DIR"
-SSH_CMD="ssh -i ${ENV__SSH_KEY} -p ${ENV__SSH_PORT} -o StrictHostKeyChecking=accept-new"
-VPS="${ENV__SSH_USER}@${ENV__VPS_IP}"
-
-info()    { echo -e "\033[36m→ $1\033[0m"; }
-success() { echo -e "\033[32m✓ $1\033[0m"; }
-warn()    { echo -e "\033[33m! $1\033[0m"; }
-
-# Helper: run rsync with SSH config
-do_rsync() {
-  rsync -avz --itemize-changes --exclude='.*' \
-    -e "${SSH_CMD}" \
-    --rsync-path='sudo rsync' \
-    "$@"
-}
-
-# ── Resolve instance list ────────────────────────────────────────────────────
-
-CLAWS_IDS="$STACK__CLAWS__IDS"
-if [ -n "$SYNC_INSTANCE" ]; then
-  if ! echo ",$CLAWS_IDS," | grep -q ",${SYNC_INSTANCE},"; then
-    echo "Error: Instance '${SYNC_INSTANCE}' not found in stack config." >&2
-    exit 1
-  fi
-  INSTANCE_LIST="$SYNC_INSTANCE"
-else
-  INSTANCE_LIST=$(echo "$CLAWS_IDS" | tr ',' ' ')
-fi
+resolve_instance_list "${SYNC_INSTANCE:-all}"
 
 # ── Map agent name ↔ VPS directory ───────────────────────────────────────────
 # "main" maps to bare workspace/, others to workspace-<agent-id>/
@@ -74,9 +51,9 @@ fi
 vps_workspace_dir() {
   local claw="$1" agent="$2"
   if [ "$agent" = "main" ]; then
-    echo "${INSTALL_DIR}/instances/${claw}/workspace/"
+    echo "${INSTALL_DIR}/instances/${claw}/.openclaw/workspace/"
   else
-    echo "${INSTALL_DIR}/instances/${claw}/workspace-${agent}/"
+    echo "${INSTALL_DIR}/instances/${claw}/.openclaw/workspace-${agent}/"
   fi
 }
 
@@ -164,7 +141,7 @@ do_down() {
 
   # Discover agents from VPS workspace dirs
   local raw_dirs
-  raw_dirs=$(${SSH_CMD} "${VPS}" "sudo ls -1d ${INSTALL_DIR}/instances/${claw}/workspace* 2>/dev/null" 2>/dev/null) || true
+  raw_dirs=$(${SSH_CMD} "${VPS}" "sudo bash -c 'ls -1d ${INSTALL_DIR}/instances/${claw}/.openclaw/workspace* 2>/dev/null'" 2>/dev/null) || true
 
   if [ -z "$raw_dirs" ]; then
     warn "No workspace directories found on VPS for '${claw}'"

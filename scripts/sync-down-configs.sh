@@ -14,6 +14,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/source-config.sh"
+source "$SCRIPT_DIR/lib/colors.sh"
+source "$SCRIPT_DIR/lib/ssh.sh"
+source "$SCRIPT_DIR/lib/instances.sh"
 
 SYNC_INSTANCE=""
 while [[ $# -gt 0 ]]; do
@@ -23,21 +26,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-INSTALL_DIR="$STACK__STACK__INSTALL_DIR"
-SSH_CMD="ssh -i ${ENV__SSH_KEY} -p ${ENV__SSH_PORT} -o StrictHostKeyChecking=accept-new"
-VPS="${ENV__SSH_USER}@${ENV__VPS_IP}"
-
-info()    { echo -e "\033[36m→ $1\033[0m"; }
-success() { echo -e "\033[32m✓ $1\033[0m"; }
-warn()    { echo -e "\033[33m! $1\033[0m"; }
-
-# Discover instances from stack config
-CLAWS_IDS="$STACK__CLAWS__IDS"
-if [ -n "$SYNC_INSTANCE" ]; then
-  INSTANCE_LIST="$SYNC_INSTANCE"
-else
-  INSTANCE_LIST=$(echo "$CLAWS_IDS" | tr ',' ' ')
-fi
+resolve_instance_list "${SYNC_INSTANCE:-all}"
 
 CREATED_FILES=()
 DIFFED_FILES=()
@@ -51,8 +40,7 @@ for name in $INSTANCE_LIST; do
   mkdir -p "$local_dir"
 
   info "Downloading live config for ${name}..."
-  if ! eval rsync -avz -e "'${SSH_CMD}'" --rsync-path="'sudo rsync'" \
-    "${VPS}:${remote_file}" "$tmp_file" 2>/dev/null; then
+  if ! do_rsync "${VPS}:${remote_file}" "$tmp_file" 2>/dev/null; then
     warn "No live config found for ${name} (not yet deployed?)"
     rm -f "$tmp_file"
     continue

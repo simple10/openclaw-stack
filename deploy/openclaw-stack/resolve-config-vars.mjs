@@ -19,7 +19,8 @@ if (!configFile || !clawName) {
   process.exit(1);
 }
 
-// Find .deploy/docker-compose.yml relative to the config file
+// Find .deploy/docker-compose.yml by walking up from the config file.
+// Works for files anywhere in the repo tree, including .deploy/.tmp/<claw>/.
 let repoRoot = dirname(configFile);
 while (repoRoot !== "/" && !existsSync(join(repoRoot, ".deploy"))) {
   repoRoot = dirname(repoRoot);
