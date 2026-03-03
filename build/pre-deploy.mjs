@@ -306,23 +306,26 @@ function validateClaw(name, claw) {
 function computeDerivedValues(claws, stack, host, previousDeploy) {
   const logUrl = stack.logging?.worker_url || "";
   const logToken = stack.logging?.worker_token || "";
+  const autoTokens = {};  // env var name → value, for .env persistence
 
   // Stack-level derived values
   stack.vector = !!stack.logging?.vector;
 
   if (stack.egress_proxy) {
-    // Auto-generate auth token if not explicitly set (cached in stack.json between builds)
+    const before = stack.egress_proxy.auth_token;
     stack.egress_proxy.auth_token = resolveAutoToken(
-      stack.egress_proxy.auth_token,
+      before,
       "stack.egress_proxy.auth_token",
       previousDeploy
     );
+    autoTokens.EGRESS_PROXY_AUTH_TOKEN = stack.egress_proxy.auth_token;
   }
 
   if (stack.sandbox_registry) {
     const sr = stack.sandbox_registry;
-    // Auto-generate token if not explicitly set (cached in stack.json between builds)
-    sr.token = resolveAutoToken(sr.token, "stack.sandbox_registry.token", previousDeploy);
+    const before = sr.token;
+    sr.token = resolveAutoToken(before, "stack.sandbox_registry.token", previousDeploy);
+    autoTokens.SANDBOX_REGISTRY_TOKEN = sr.token;
     sr.log_level = sr.log_level || "warn";
     if (sr.port && !sr.url) {
       stack.sandbox_registry_container = true;
@@ -354,6 +357,8 @@ function computeDerivedValues(claws, stack, host, previousDeploy) {
     claw.enable_events_logging = stack.logging?.events || false;
     claw.enable_llemtry_logging = stack.logging?.llemtry || false;
   }
+
+  return autoTokens;
 }
 
 // ── Step 8: Parse human-readable time → cron expression + IANA timezone ──────
@@ -566,7 +571,10 @@ async function main() {
   // 5b. Compute derived values for template
   info("Computing derived values...");
   const previousDeploy = loadPreviousDeploy();
-  computeDerivedValues(claws, stack, host, previousDeploy);
+  const autoTokens = computeDerivedValues(claws, stack, host, previousDeploy);
+  if (Object.keys(autoTokens).length > 0) {
+    appendToEnv(autoTokens);
+  }
   success("Derived values computed");
 
   // 6. Compile and render Handlebars template

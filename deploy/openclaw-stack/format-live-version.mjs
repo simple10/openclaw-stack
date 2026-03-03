@@ -2,14 +2,18 @@
 // format-live-version.mjs — Format a live openclaw.json for human review.
 //
 // Produces an annotated JSONC file with:
-//   - Top-level keys sorted to match the local file's order
+//   - Top-level keys sorted to match the local file's order (2 levels deep)
 //   - Inline // DRIFT comments above keys that differ from local
 //   - Deep comparison summaries showing what specifically changed
+//   - ${VAR} references resolved before comparison (avoids false positives)
 //
-// Usage: node format-live-version.mjs <local-file> <live-file>
+// Usage: node format-live-version.mjs [--claw <name>] <local-file> <live-file>
+//   --claw <name>  Resolve ${VAR} refs using env vars from .deploy/docker-compose.yml
 // Output: annotated JSONC to stdout
 
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
+import { join, dirname } from "path";
+import yaml from "js-yaml";
 
 // ── JSONC parser (same approach as config-diff.mjs) ─────────────────────────
 let parseJsonc;
@@ -144,11 +148,70 @@ function describeDiffs(local, live, prefix, maxDepth) {
   return diffs;
 }
 
+// ── Env var resolution ──────────────────────────────────────────────────────
+
+// Extract env vars for a claw from .deploy/docker-compose.yml
+function extractClawEnvVars(clawName, repoRoot) {
+  const composePath = join(repoRoot, ".deploy", "docker-compose.yml");
+  if (!existsSync(composePath)) return {};
+
+  const compose = yaml.load(readFileSync(composePath, "utf-8"));
+  const services = compose?.services || {};
+
+  // Find the claw's service (e.g., openclaw-stack-openclaw-personal-claw)
+  const suffix = `openclaw-${clawName}`;
+  const service = Object.entries(services).find(([name]) => name.endsWith(suffix));
+  if (!service) return {};
+
+  const envList = service[1]?.environment || [];
+  const env = {};
+  for (const entry of envList) {
+    const eq = entry.indexOf("=");
+    if (eq > 0) env[entry.slice(0, eq)] = entry.slice(eq + 1);
+  }
+  return env;
+}
+
+// Resolve ${VAR} references in all string values of an object (deep)
+function resolveEnvVars(obj, env) {
+  if (typeof obj === "string") {
+    return obj.replace(/\$\{([^}]+)\}/g, (_match, expr) => {
+      // Handle ${VAR:-default} syntax
+      const defaultMatch = expr.match(/^([^:]+):-(.*)$/);
+      if (defaultMatch) {
+        const key = defaultMatch[1];
+        const defaultVal = defaultMatch[2];
+        return (key in env && env[key] !== "") ? env[key] : defaultVal;
+      }
+      return (expr in env) ? env[expr] : "";
+    });
+  }
+  if (Array.isArray(obj)) return obj.map((v) => resolveEnvVars(v, env));
+  if (obj && typeof obj === "object") {
+    const out = {};
+    for (const [k, v] of Object.entries(obj)) out[k] = resolveEnvVars(v, env);
+    return out;
+  }
+  return obj;
+}
+
 // ── Main ────────────────────────────────────────────────────────────────────
 
-const [localFile, liveFile] = process.argv.slice(2);
+// Parse args: [--claw <name>] <local-file> <live-file>
+let clawName = "";
+const positional = [];
+const args = process.argv.slice(2);
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === "--claw" && i + 1 < args.length) {
+    clawName = args[++i];
+  } else {
+    positional.push(args[i]);
+  }
+}
+
+const [localFile, liveFile] = positional;
 if (!localFile || !liveFile) {
-  process.stderr.write("Usage: format-live-version.mjs <local-file> <live-file>\n");
+  process.stderr.write("Usage: format-live-version.mjs [--claw <name>] <local-file> <live-file>\n");
   process.exit(1);
 }
 
@@ -170,6 +233,24 @@ try {
 delete localConfig.meta;
 delete liveConfig.meta;
 
+// Resolve ${VAR} references in both configs before comparison
+// so that e.g. "${OPENCLAW_DOMAIN_PATH}" matches the resolved "" on either side.
+// The live file may also contain ${VAR} refs if it was uploaded before resolve-all.
+let localResolved = localConfig;
+let liveResolved = liveConfig;
+if (clawName) {
+  // Walk up from localFile to find repo root (contains .deploy/)
+  let repoRoot = dirname(localFile);
+  while (repoRoot !== "/" && !existsSync(join(repoRoot, ".deploy"))) {
+    repoRoot = dirname(repoRoot);
+  }
+  const env = extractClawEnvVars(clawName, repoRoot);
+  if (Object.keys(env).length > 0) {
+    localResolved = resolveEnvVars(localConfig, env);
+    liveResolved = resolveEnvVars(liveConfig, env);
+  }
+}
+
 // Build ordered key list: local order first, then any live-only keys
 const localKeys = Object.keys(localConfig);
 const liveKeys = Object.keys(liveConfig);
@@ -186,7 +267,7 @@ const lines = [];
 lines.push(`// Live config from VPS`);
 lines.push(`// Downloaded: ${new Date().toISOString().replace(/\.\d+Z$/, "Z")}`);
 
-// Summary
+// Summary (compare resolved local values against live)
 const changedKeys = [];
 const liveOnlyKeys = [];
 const localOnlyKeys = [];
@@ -195,7 +276,7 @@ for (const k of orderedKeys) {
     localOnlyKeys.push(k);
   } else if (!localKeySet.has(k)) {
     liveOnlyKeys.push(k);
-  } else if (!deepEqual(localConfig[k], liveConfig[k])) {
+  } else if (!deepEqual(localResolved[k], liveResolved[k])) {
     changedKeys.push(k);
   }
 }
@@ -262,9 +343,9 @@ for (const jline of jsonLines) {
       output.push(`  // DRIFT: only in live (not in local openclaw.jsonc)`);
     } else if (!liveKeySet.has(key)) {
       // Shouldn't happen (we only serialize live keys), but guard anyway
-    } else if (!deepEqual(localConfig[key], liveConfig[key])) {
-      // Deep diff
-      const diffs = describeDiffs(localConfig[key], liveConfig[key], key, 3);
+    } else if (!deepEqual(localResolved[key], liveResolved[key])) {
+      // Deep diff (use resolved values on both sides for accurate comparison)
+      const diffs = describeDiffs(localResolved[key], liveResolved[key], key, 3);
       for (const d of diffs) {
         output.push(`  // DRIFT: ${d}`);
       }

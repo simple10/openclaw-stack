@@ -172,7 +172,6 @@ if [ -n "$SYNC_INSTANCES" ]; then
 
   CONFIG_HASH="${DEPLOY_DIR}/openclaw-stack/config-hash.mjs"
   CONFIG_DIFF="${DEPLOY_DIR}/openclaw-stack/config-diff.mjs"
-  EMPTY_VARS_FILE="${DEPLOY_DIR}/openclaw-stack/empty-env-vars"
   DRIFT_DETECTED=false
   RESTART_SUMMARY=""       # "instance:key1,key2\n..." accumulated across loop
   RESTART_REQUIRED_FILE="${DEPLOY_DIR}/.restart-required"
@@ -242,17 +241,13 @@ if [ -n "$SYNC_INSTANCES" ]; then
     rm -f "$live_version"
 
     # Upload config (always as openclaw.json — no staging)
-    # Resolve empty env vars so OpenClaw's ${VAR} substitution doesn't throw
-    # MissingEnvVarError on hot-reload. Source file stays clean with ${VAR} refs.
-    upload_file="$local_file"
-    if [ -f "$EMPTY_VARS_FILE" ]; then
-      upload_tmp=$(mktemp)
-      cp "$local_file" "$upload_tmp"
-      while IFS= read -r var; do
-        [ -n "$var" ] && sed -i '' "s/\${${var}}//g" "$upload_tmp"
-      done < "$EMPTY_VARS_FILE"
-      upload_file="$upload_tmp"
-    fi
+    # Resolve ALL ${VAR} refs using the claw's docker-compose env vars.
+    # Uploaded file has concrete values matching the container runtime,
+    # preventing false drift when OpenClaw's control UI rewrites the config.
+    RESOLVE_SCRIPT="${DEPLOY_DIR}/openclaw-stack/resolve-config-vars.mjs"
+    upload_tmp=$(mktemp)
+    node "$RESOLVE_SCRIPT" "$local_file" "$name" > "$upload_tmp"
+    upload_file="$upload_tmp"
 
     info "Syncing instance config: ${name}..."
     do_rsync "$upload_file" "${VPS}:${remote_dir}/openclaw.json"

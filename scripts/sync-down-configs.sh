@@ -75,8 +75,9 @@ for name in $INSTANCE_LIST; do
     fi
 
     # Format live version with key-order matching and inline drift annotations
+    # --claw resolves ${VAR} refs using env vars from .deploy/docker-compose.yml
     FORMAT_SCRIPT="${REPO_ROOT}/deploy/openclaw-stack/format-live-version.mjs"
-    node "$FORMAT_SCRIPT" "$diff_against" "$tmp_file" > "$local_live"
+    node "$FORMAT_SCRIPT" --claw "$name" "$diff_against" "$tmp_file" > "$local_live"
 
     rm -f "$tmp_file"
     success "${local_live}"

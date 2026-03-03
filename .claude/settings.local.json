@@ -30,7 +30,9 @@
       "Bash(git check-ignore:*)",
       "Bash(scripts/sync-deploy.sh:*)",
       "Bash(scripts/restart-gateway.sh:*)",
-      "Bash(bash:*)"
+      "Bash(bash:*)",
+      "Bash(chmod +x:*)",
+      "Bash(node:*)"
     ]
   }
 }
