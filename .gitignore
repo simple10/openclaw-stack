@@ -4,7 +4,6 @@ certs/
 
 # ── Secrets & user config (never commit) ───────────────────────
 .env
-.env.local
 stack.yml
 openclaw-config.env
 
@@ -16,6 +15,8 @@ openclaw/*
 !openclaw/default/
 !openclaw/example/
 !openclaw/README.md
+# Downloaded live configs from VPS (via sync-down-configs.sh)
+openclaw/*/openclaw.live-version.jsonc
 
 # ── Build output ───────────────────────────────────────────────
 .deploy/

@@ -101,20 +101,23 @@ export function getContainerStatus(containerName) {
   return new Promise((res) => {
     execFile(
       'docker',
-      [
-        'inspect',
-        '--format',
-        '{{.State.Running}}|{{(index (index .NetworkSettings.Ports "6080/tcp") 0).HostPort}}',
-        containerName,
-      ],
-      { timeout: 3000 },
+      ['inspect', '--format', '{{json .}}', containerName],
+      { timeout: 3000, maxBuffer: 1024 * 1024 },
       (err, stdout) => {
         if (err) return res({ running: false })
-        const parts = stdout.trim().split('|')
-        if (parts[0] === 'true' && parts[1]) {
-          return res({ running: true, noVncPort: parseInt(parts[1], 10) })
+        try {
+          const info = JSON.parse(stdout)
+          const running = info.State?.Running === true
+          if (!running) return res({ running: false })
+          const portEntry = info.NetworkSettings?.Ports?.['6080/tcp']
+          const noVncPort = portEntry?.[0]?.HostPort ? parseInt(portEntry[0].HostPort, 10) : null
+          if (!noVncPort) return res({ running: false })
+          const pwEnv = (info.Config?.Env || []).find(e => e.startsWith('OPENCLAW_BROWSER_NOVNC_PASSWORD='))
+          const noVncPassword = pwEnv ? pwEnv.split('=')[1] : ''
+          return res({ running: true, noVncPort, noVncPassword })
+        } catch {
+          return res({ running: false })
         }
-        res({ running: false })
       }
     )
   })

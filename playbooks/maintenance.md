@@ -12,7 +12,7 @@ All secrets should be rotated on a regular cadence. If a token is suspected comp
 |-------|----------|-----------------|
 | Gateway token (per-claw) | VPS `<INSTALL_DIR>/instances/<name>/.openclaw/openclaw.json` | 90 days |
 | `AI_GATEWAY_TOKEN` (user token) | Local `.env` + AI Gateway KV (`token:*`) | 90 days |
-| `AI_WORKER_ADMIN_AUTH_TOKEN` | `.env.local` + AI Gateway Worker secret | 90 days |
+| `AI_WORKER_ADMIN_AUTH_TOKEN` | `.env` + AI Gateway Worker secret | 90 days |
 | `LOG_WORKER_TOKEN` | Local `.env` + Log Receiver Worker secret | 90 days |
 | Provider API keys (Anthropic, OpenAI, etc.) | AI Gateway KV (`creds:*`) — managed via `/config` UI | Per provider policy |
 | `EGRESS_PROXY_AUTH_TOKEN` | Local `.env` + AI Gateway Worker secret + VPS egress proxy container | 90 days |

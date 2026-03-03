@@ -48,6 +48,9 @@
     // (e.g. chatgpt.com blocking Cloudflare Worker IPs for openai-codex).
     // EGRESS_PROXY_URL        — e.g. https://egress-proxy.yourdomain.com (set via `wrangler secret put ...`)
     // EGRESS_PROXY_AUTH_TOKEN — shared secret with the VPS egress proxy (set via `wrangler secret put ...`)
+    // Cloudflare Access Token required to to reach Egress Proxy
+    // CF_ACCESS_CLIENT_ID - Cloudflare Access token client ID (set via `wrangler secret put ...`)
+    // CF_ACCESS_CLIENT_SECRET - Cloudflare Access token client secret (set via `wrangler secret put ...`)
     //
     //
     // ---- CF AI Gateway ID (optional) ----

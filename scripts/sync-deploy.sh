@@ -7,6 +7,7 @@
 #   ./scripts/sync-deploy.sh --all                    # Stack files + all instance configs
 #   ./scripts/sync-deploy.sh --instance <name>        # Stack files + one instance's config
 #   ./scripts/sync-deploy.sh --fresh                  # Implies --all, prints post-sync next-steps
+#   ./scripts/sync-deploy.sh --force                  # Skip drift detection, overwrite live configs
 #   ./scripts/sync-deploy.sh -n | --dry-run           # Preview without transferring
 
 set -euo pipefail
@@ -18,6 +19,7 @@ source "$SCRIPT_DIR/lib/source-config.sh"
 
 SYNC_INSTANCES=""      # "" = none, "all" = all, or a specific name
 FRESH=false
+FORCE=false
 DRY_RUN=false
 RSYNC_DRY=""
 
@@ -26,6 +28,7 @@ while [[ $# -gt 0 ]]; do
     --all)        SYNC_INSTANCES="all"; shift ;;
     --instance)   SYNC_INSTANCES="$2"; shift 2 ;;
     --fresh)      SYNC_INSTANCES="all"; FRESH=true; shift ;;
+    --force)      FORCE=true; shift ;;
     -n|--dry-run) DRY_RUN=true; RSYNC_DRY="--dry-run"; shift ;;
     *)            echo "Unknown option: $1" >&2; exit 1 ;;
   esac
@@ -49,6 +52,8 @@ RSYNC_BASE="rsync -avz ${RSYNC_DRY} --rsync-path='sudo rsync'"
 
 info()    { echo -e "\033[36m→ $1\033[0m"; }
 success() { echo -e "\033[32m✓ $1\033[0m"; }
+warn()    { echo -e "\033[33m! $1\033[0m"; }
+err()     { echo -e "\033[31m✗ $1\033[0m"; }
 
 # Helper: run rsync with our SSH config
 do_rsync() {
@@ -154,50 +159,146 @@ success "Ownership fixed"
 # ── Sync per-instance configs ─────────────────────────────────────────────────
 
 if [ -n "$SYNC_INSTANCES" ]; then
-  # Discover instance names from .deploy/instances/
-  INSTANCES_DIR="${DEPLOY_DIR}/instances"
-  if [ ! -d "$INSTANCES_DIR" ]; then
-    echo "Error: No instances found in .deploy/instances/. Run 'npm run pre-deploy'." >&2
-    exit 1
-  fi
-
+  # Discover instances from stack config (not .deploy/instances/)
+  CLAWS_IDS="$STACK__CLAWS__IDS"
   if [ "$SYNC_INSTANCES" = "all" ]; then
-    INSTANCE_LIST=$(ls -1 "$INSTANCES_DIR")
+    INSTANCE_LIST=$(echo "$CLAWS_IDS" | tr ',' ' ')
   else
-    if [ ! -d "${INSTANCES_DIR}/${SYNC_INSTANCES}" ]; then
-      echo "Error: Instance '${SYNC_INSTANCES}' not found in .deploy/instances/." >&2
+    if ! echo ",$CLAWS_IDS," | grep -q ",${SYNC_INSTANCES},"; then
+      echo "Error: Instance '${SYNC_INSTANCES}' not found in stack config." >&2
       exit 1
     fi
     INSTANCE_LIST="$SYNC_INSTANCES"
   fi
 
+  CONFIG_HASH="${DEPLOY_DIR}/openclaw-stack/config-hash.mjs"
+  CONFIG_DIFF="${DEPLOY_DIR}/openclaw-stack/config-diff.mjs"
+  EMPTY_VARS_FILE="${DEPLOY_DIR}/openclaw-stack/empty-env-vars"
+  DRIFT_DETECTED=false
+  RESTART_SUMMARY=""       # "instance:key1,key2\n..." accumulated across loop
+  RESTART_REQUIRED_FILE="${DEPLOY_DIR}/.restart-required"
+  rm -f "$RESTART_REQUIRED_FILE"
+
   for name in $INSTANCE_LIST; do
-    local_file="${INSTANCES_DIR}/${name}/.openclaw/openclaw.json"
+    # Resolve local config: openclaw/<claw>/openclaw.jsonc (source of truth)
+    # Always .jsonc locally, uploaded as .json remotely (both support comments).
+    local_dir="${REPO_ROOT}/openclaw/${name}"
+    local_file="${local_dir}/openclaw.jsonc"
+
+    # Normalize: rename .json → .jsonc if needed
+    if [ ! -f "$local_file" ] && [ -f "${local_dir}/openclaw.json" ]; then
+      mv "${local_dir}/openclaw.json" "$local_file"
+      info "Renamed openclaw/${name}/openclaw.json → openclaw.jsonc"
+    fi
+
     if [ ! -f "$local_file" ]; then
-      echo "Warning: No openclaw.json for instance '${name}', skipping." >&2
+      warn "No openclaw.jsonc for '${name}' — copy openclaw/default/openclaw.jsonc to openclaw/${name}/openclaw.jsonc"
       continue
     fi
 
-    # Stage config for merge at container startup (preserves runtime changes).
-    # --fresh bypasses staging and overwrites directly (clean slate).
-    if $FRESH; then
-      target_filename="openclaw.json"
-    else
-      target_filename="openclaw.json.staged"
+    remote_dir="${INSTALL_DIR}/instances/${name}/.openclaw"
+    live_version="${REPO_ROOT}/openclaw/${name}/openclaw.live-version.jsonc"
+
+    # Ensure remote directory exists and fix permissions to match setup-infra.sh:
+    #   instances/<name>/  → openclaw:openclaw 755 (host scripts can traverse)
+    #   .openclaw/         → 1000:1000 700 (container's node user, private data)
+    ${SSH_CMD} "${VPS}" "sudo mkdir -p ${remote_dir} && \
+      sudo chown openclaw:openclaw ${INSTALL_DIR}/instances/${name} && \
+      sudo chown 1000:1000 ${remote_dir} && \
+      sudo chmod 700 ${remote_dir}"
+
+    # Download live config for drift detection (normal mode) or diff comparison (fresh/force).
+    tmp_dir=$(mktemp -d)
+    has_live_config=false
+
+    # Pull live config + stored hash locally. Runs in all modes so we can
+    # detect restart-required changes even on --fresh/--force deploys.
+    do_rsync \
+      --include='openclaw.json' --include='openclaw.json.sha256' --exclude='*' \
+      "${VPS}:${remote_dir}/" "$tmp_dir/" 2>/dev/null || true
+
+    if [ -f "$tmp_dir/openclaw.json" ]; then
+      has_live_config=true
     fi
 
-    info "Syncing instance config: ${name} (→ ${target_filename})..."
-    # Ensure remote directory exists (setup-infra.sh creates these, but be safe)
-    ${SSH_CMD} "${VPS}" "sudo mkdir -p ${INSTALL_DIR}/instances/${name}/.openclaw"
-    do_rsync \
-      "$local_file" \
-      "${VPS}:${INSTALL_DIR}/instances/${name}/.openclaw/${target_filename}"
-    # Instance .openclaw is owned by uid 1000 (container's node user)
-    # Chown both the directory and the target file so setup-infra.sh can create
-    # subdirectories as the openclaw user (which runs as uid 1000 in container)
-    ${SSH_CMD} "${VPS}" "sudo chown 1000:1000 ${INSTALL_DIR}/instances/${name}/.openclaw ${INSTALL_DIR}/instances/${name}/.openclaw/${target_filename}"
-    success "instances/${name}/.openclaw/${target_filename} (owner: 1000:1000)"
+    if ! $FRESH && ! $FORCE && $has_live_config && [ -f "$tmp_dir/openclaw.json.sha256" ]; then
+      # Drift detection — compare stored hash vs live content hash
+      stored_hash=$(cat "$tmp_dir/openclaw.json.sha256")
+      live_hash=$(node "$CONFIG_HASH" "$tmp_dir/openclaw.json")
+
+      if [ "$stored_hash" != "$live_hash" ]; then
+        rm -rf "$tmp_dir"
+        # Drift: download live-version with diff for user review
+        rm -f "$live_version"
+        "${SCRIPT_DIR}/sync-down-configs.sh" --instance "$name"
+        warn "Config drift detected for '${name}'!"
+        warn "  Review: openclaw/${name}/openclaw.live-version.jsonc"
+        warn "  Re-run with --force to overwrite."
+        DRIFT_DETECTED=true
+        continue
+      fi
+    fi
+
+    # No drift — clean up any stale live-version from previous drift
+    rm -f "$live_version"
+
+    # Upload config (always as openclaw.json — no staging)
+    # Resolve empty env vars so OpenClaw's ${VAR} substitution doesn't throw
+    # MissingEnvVarError on hot-reload. Source file stays clean with ${VAR} refs.
+    upload_file="$local_file"
+    if [ -f "$EMPTY_VARS_FILE" ]; then
+      upload_tmp=$(mktemp)
+      cp "$local_file" "$upload_tmp"
+      while IFS= read -r var; do
+        [ -n "$var" ] && sed -i '' "s/\${${var}}//g" "$upload_tmp"
+      done < "$EMPTY_VARS_FILE"
+      upload_file="$upload_tmp"
+    fi
+
+    info "Syncing instance config: ${name}..."
+    do_rsync "$upload_file" "${VPS}:${remote_dir}/openclaw.json"
+    ${SSH_CMD} "${VPS}" "sudo chown 1000:1000 ${remote_dir}/openclaw.json"
+
+    # Write deploy hash for future drift detection (hash the uploaded version, with empty vars resolved)
+    local_hash=$(node "$CONFIG_HASH" "$upload_file")
+
+    # Detect restart-required changes by comparing live config to uploaded config
+    if $has_live_config; then
+      diff_json=$(node "$CONFIG_DIFF" "$tmp_dir/openclaw.json" "$upload_file" 2>/dev/null) || diff_json=""
+      if [ -n "$diff_json" ]; then
+        restart_keys=$(echo "$diff_json" | node -e "
+          const d = JSON.parse(require('fs').readFileSync('/dev/stdin','utf-8'));
+          if (d.restartRequired) process.stdout.write(d.restartKeys.join(','));
+        " 2>/dev/null) || restart_keys=""
+        if [ -n "$restart_keys" ]; then
+          RESTART_SUMMARY="${RESTART_SUMMARY}${name}:${restart_keys}\n"
+        fi
+        # Log hot-reload changes for visibility
+        hot_keys=$(echo "$diff_json" | node -e "
+          const d = JSON.parse(require('fs').readFileSync('/dev/stdin','utf-8'));
+          if (d.hotReloadKeys.length) process.stdout.write(d.hotReloadKeys.join(','));
+        " 2>/dev/null) || hot_keys=""
+        if [ -n "$hot_keys" ]; then
+          info "  Hot-reloaded: ${hot_keys}"
+        fi
+      fi
+    fi
+
+    [ -n "${upload_tmp:-}" ] && rm -f "$upload_tmp"
+    rm -rf "$tmp_dir"
+    ${SSH_CMD} "${VPS}" "echo ${local_hash} | sudo tee ${remote_dir}/openclaw.json.sha256 > /dev/null && sudo chown 1000:1000 ${remote_dir}/openclaw.json.sha256"
+    success "openclaw/${name}/openclaw.jsonc → instances/${name}/.openclaw/openclaw.json (hash: ${local_hash:0:12}...)"
   done
+
+  if $DRIFT_DETECTED; then
+    err "Deploy aborted — config drift detected (see warnings above)."
+    exit 1
+  fi
+
+  # Write restart-required summary if any instances need it
+  if [ -n "$RESTART_SUMMARY" ]; then
+    printf "%b" "$RESTART_SUMMARY" > "$RESTART_REQUIRED_FILE"
+  fi
 fi
 
 # ── Deploy tracking (diff + auto-commit) ─────────────────────────────────────
@@ -235,5 +336,26 @@ else
     echo "     ssh ... \"env INSTANCE_NAMES='...' bash ${INSTALL_DIR}/setup/setup-infra.sh\""
     echo "  2. Start claws:"
     echo "     ssh ... \"bash ${INSTALL_DIR}/host/start-claws.sh\""
+  fi
+
+  # Restart-required summary
+  if [ -f "${DEPLOY_DIR}/.restart-required" ]; then
+    echo ""
+    # Collect instance names and all changed keys
+    restart_instances=""
+    all_restart_keys=""
+    while IFS=: read -r inst keys; do
+      restart_instances="${restart_instances:+${restart_instances}, }${inst}"
+      for k in $(echo "$keys" | tr ',' ' '); do
+        case ",$all_restart_keys," in
+          *",$k,"*) ;;  # already listed
+          *) all_restart_keys="${all_restart_keys:+${all_restart_keys}, }${k}" ;;
+        esac
+      done
+    done < "${DEPLOY_DIR}/.restart-required"
+
+    warn "Restart required for: ${restart_instances}"
+    warn "  Changed keys: ${all_restart_keys}"
+    warn "  Run: sudo -u openclaw bash -c 'cd ${INSTALL_DIR} && docker compose up -d --force-recreate'"
   fi
 fi

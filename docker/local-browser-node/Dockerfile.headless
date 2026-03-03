@@ -1,0 +1,69 @@
+# Headless browser node: self-contained OpenClaw node host with Chromium.
+# Clones OpenClaw from GitHub, builds from source, runs `openclaw node run`.
+# No GUI — use the default Kasm profile (Dockerfile) for visible browser.
+
+FROM node:22-bookworm
+
+# System deps: Chromium + git (headless only, no display server)
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      chromium git && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Bun (required by OpenClaw build scripts)
+RUN curl -fsSL https://bun.sh/install | bash
+ENV PATH="/root/.bun/bin:${PATH}"
+
+RUN corepack enable
+
+# Clone OpenClaw and checkout requested version
+ARG OPENCLAW_VERSION=stable
+WORKDIR /tmp/openclaw-src
+RUN git clone --depth=50 https://github.com/openclaw/openclaw.git . && \
+    git fetch --tags --force && \
+    if [ "$OPENCLAW_VERSION" = "stable" ]; then \
+      TAG=$(git tag -l 'v20*' | grep -vE '(beta|rc|alpha)' | sort -V | tail -1) && \
+      echo "[build] Latest stable tag: ${TAG}" && \
+      git checkout "$TAG"; \
+    elif [ "$OPENCLAW_VERSION" = "latest" ]; then \
+      echo "[build] Using main branch"; \
+    else \
+      echo "[build] Checking out ${OPENCLAW_VERSION}" && \
+      git checkout "$OPENCLAW_VERSION"; \
+    fi
+
+# Stage dependency files first for better layer caching
+WORKDIR /app
+RUN cp /tmp/openclaw-src/package.json /tmp/openclaw-src/pnpm-lock.yaml \
+       /tmp/openclaw-src/pnpm-workspace.yaml /tmp/openclaw-src/.npmrc ./ && \
+    mkdir -p ui && cp /tmp/openclaw-src/ui/package.json ./ui/ && \
+    cp -r /tmp/openclaw-src/patches ./patches && \
+    cp -r /tmp/openclaw-src/scripts ./scripts
+
+RUN chown -R node:node /app
+USER node
+RUN NODE_OPTIONS=--max-old-space-size=2048 pnpm install --frozen-lockfile
+
+# Copy full source and build
+USER root
+RUN cp -r /tmp/openclaw-src/. /app/ && \
+    chown -R node:node /app && \
+    rm -rf /tmp/openclaw-src
+
+USER node
+RUN pnpm build
+ENV OPENCLAW_PREFER_PNPM=1
+RUN pnpm ui:build
+
+# Expose CLI binary
+USER root
+RUN ln -sf /app/openclaw.mjs /usr/local/bin/openclaw && chmod 755 /app/openclaw.mjs
+
+COPY --chown=root:root entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY --chown=root:root ws-proxy.mjs /app/ws-proxy.mjs
+RUN chmod 755 /usr/local/bin/entrypoint.sh
+
+ENV NODE_ENV=production
+USER node
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

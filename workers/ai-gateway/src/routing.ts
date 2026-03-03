@@ -23,6 +23,10 @@ const ROUTES: Record<string, string> = {
   // remaps the provider and strips the /v1/ prefix for the correct upstream path.
   // NOTE (2026-03-01): chatgpt.com WAF blocks CF Worker IPs — see config.ts for details.
   'openai/v1/codex/responses': 'POST',
+  // OpenClaw's code agent uses a dedicated openai-codex provider with its own base URL,
+  // which sends requests on /openai-codex/codex/responses instead of /openai/v1/codex/responses.
+  // Both routes map to the same upstream (chatgpt.com/backend-api/codex/responses).
+  'openai-codex/codex/responses': 'POST',
 }
 
 /**
@@ -31,6 +35,7 @@ const ROUTES: Record<string, string> = {
  */
 const ROUTE_OVERRIDES: Record<string, { provider: Provider; directPath: string }> = {
   'openai/v1/codex/responses': { provider: 'openai-codex', directPath: 'codex/responses' },
+  'openai-codex/codex/responses': { provider: 'openai-codex', directPath: 'codex/responses' },
 }
 
 /** AI Gateway sub-path: strip /v1/ segment → provider/rest */

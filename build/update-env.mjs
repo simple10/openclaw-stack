@@ -1,13 +1,10 @@
 #!/usr/bin/env node
 /**
- * update-env.mjs — Set or rotate environment variables in the correct file.
+ * update-env.mjs — Set or rotate environment variables in .env.
  *
  * Usage:
  *   node build/update-env.mjs VAR_NAME value         # Set explicit value
  *   node build/update-env.mjs VAR_NAME --generate     # Auto-generate new value
- *
- * Protected vars (ADMINCLAW_PASSWORD, OPENCLAW_PASSWORD, AI_WORKER_ADMIN_AUTH_TOKEN)
- * are written to .env.local. All others are written to .env.
  */
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
@@ -62,11 +59,10 @@ function main() {
 
   const varName = args[0];
   const isGenerate = args[1] === "--generate";
-  const isProtected = varName in PROTECTED_VARS;
 
   let value;
   if (isGenerate) {
-    if (isProtected) {
+    if (varName in PROTECTED_VARS) {
       value = PROTECTED_VARS[varName]();
     } else {
       // Default generator for non-protected vars: 64 hex chars
@@ -76,13 +72,12 @@ function main() {
     value = args[1];
   }
 
-  const targetFile = isProtected ? ".env.local" : ".env";
-  const targetPath = join(ROOT, targetFile);
+  const targetPath = join(ROOT, ".env");
 
   upsertEnvVar(targetPath, varName, value);
 
   console.log(`\x1b[32m✓\x1b[0m ${varName}=${value}`);
-  console.log(`  → ${targetFile}`);
+  console.log(`  → .env`);
 }
 
 main();

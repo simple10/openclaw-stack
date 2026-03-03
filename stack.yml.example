@@ -74,7 +74,7 @@ stack:
 # ── Claw Defaults ─────────────────────────────────────────────
 # All claws inherit these. Per-claw settings override via deep merge.
 defaults:
-  allow_updates: true
+  allow_updates: true # Allow openclaw to update in-place
   health_check_cron: false
   domain_path: ""
   dashboard_path: /dashboard
@@ -100,7 +100,6 @@ claws:
   # work-claw:
   #   domain: openclaw-work.${ROOT_DOMAIN}
   #   allow_updates: false    # Prevent work-claw from auto updating
-  #   health_check_cron: true # Enable CLI health check on this claw
   #   gateway_port: 18790
   #   dashboard_port: 6091
   #   telegram:
@@ -108,3 +107,12 @@ claws:
   #   resources:
   #     cpus: 20
   #     memory: 64G
+
+  # Example claw config with coordinator plugin enabled to route skills to sub-agents
+  # skill-router-claw:
+  #   openclaw_json: openclaw/default/openclaw.router.jsonc
+  #   domain: openclaw-skills.${ROOT_DOMAIN}
+  #   gateway_port: 18790
+  #   dashboard_port: 6091
+  #   telegram:
+  #     bot_token: ${SKILLS_CLAW_TELEGRAM_BOT_TOKEN}

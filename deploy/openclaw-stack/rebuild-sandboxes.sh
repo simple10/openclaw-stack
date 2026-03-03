@@ -430,7 +430,8 @@ build_packages() {
   build_date=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   printf 'FROM openclaw-sandbox-packages:bookworm-slim\nLABEL openclaw.packages-config="%s"\nLABEL openclaw.build-date="%s"\n' \
     "$packages_hash" "$build_date" \
-    | docker build -t openclaw-sandbox-packages:bookworm-slim -
+    | docker build --cache-from openclaw-sandbox-packages:bookworm-slim \
+      -t openclaw-sandbox-packages:bookworm-slim -
 
   log "Packages image built successfully"
   return 0
@@ -497,8 +498,11 @@ build_toolkit() {
   if [ "$has_tool_installs" = true ]; then
     log "Installing custom tools into sandbox-toolkit..."
   fi
+  # --cache-from lets Docker reuse layers from registry-pulled images
+  # (pulled images have different layer IDs than local builds)
   printf "%b" "$tool_dockerfile" \
-    | docker build -t openclaw-sandbox-toolkit:bookworm-slim -
+    | docker build --cache-from openclaw-sandbox-toolkit:bookworm-slim \
+      -t openclaw-sandbox-toolkit:bookworm-slim -
 
   if image_exists "openclaw-sandbox-toolkit:bookworm-slim"; then
     log "Toolkit image built successfully"
@@ -552,7 +556,8 @@ quick_add_tool() {
 
   local dockerfile="FROM openclaw-sandbox-toolkit:bookworm-slim\nUSER root\nENV BIN_DIR=${bin_dir}\n${install_cmds}\nUSER 1000\n"
   printf "%b" "$dockerfile" \
-    | docker build -t openclaw-sandbox-toolkit:bookworm-slim -
+    | docker build --cache-from openclaw-sandbox-toolkit:bookworm-slim \
+      -t openclaw-sandbox-toolkit:bookworm-slim -
 
   if image_exists "openclaw-sandbox-toolkit:bookworm-slim"; then
     log "Tool '$tool_name' added successfully"

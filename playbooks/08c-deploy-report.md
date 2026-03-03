@@ -17,7 +17,7 @@ Collect the following values and present them in a single, neatly formatted repo
 
 ## Values to collect
 
-1. **User passwords** — source `scripts/lib/source-config.sh` to get `ADMINCLAW_PASSWORD` and `OPENCLAW_PASSWORD`. These are auto-generated and persisted in `.env.local`.
+1. **User passwords** — source `scripts/lib/source-config.sh` to get `ADMINCLAW_PASSWORD` and `OPENCLAW_PASSWORD`. These are auto-generated and persisted in `.env`.
 
 2. **Per-claw gateway tokens** — read from container env var (NOT openclaw.json):
 
@@ -153,7 +153,7 @@ Read `HOSTALERT_TELEGRAM_BOT_TOKEN` and `HOSTALERT_TELEGRAM_CHAT_ID` from `.env`
 
 > To add or update provider API keys, visit the AI Gateway Config URL above. For advanced configuration (Cloudflare AI Gateway, Claude Code subscription), see [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md).
 
-> **Note:** User passwords and the AI Gateway admin token are always available via `source scripts/lib/source-config.sh` (stored in `.env.local`).
+> **Note:** User passwords and the AI Gateway admin token are always available via `source scripts/lib/source-config.sh` (stored in `.env`).
 
 ## Save and display
 

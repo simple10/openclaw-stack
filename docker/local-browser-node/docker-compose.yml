@@ -1,0 +1,103 @@
+services:
+  # KasmVNC desktop — visible browser at https://localhost:6901
+  # Activate with: ./run.sh --profile kasm up --build
+  # NOTE: Kasm uses a special base image and requires a full build.
+  browser-node:
+    profiles: [kasm]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        OPENCLAW_VERSION: stable
+    container_name: openclaw-browser-node
+    environment:
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      GATEWAY_DOMAIN: ${GATEWAY_DOMAIN}
+      CF_ACCESS_CLIENT_ID: ${CF_ACCESS_CLIENT_ID}
+      CF_ACCESS_CLIENT_SECRET: ${CF_ACCESS_CLIENT_SECRET}
+      NODE_DISPLAY_NAME: local-browser-node
+      VNC_PW: password
+    ports:
+      - "6901:6901"
+    volumes:
+      - ./data/openclaw:/home/kasm-user/.openclaw
+    restart: unless-stopped
+    shm_size: '2gb'
+
+  # noVNC mode — visible Chromium via http://localhost:6080 (ARM native)
+  # Activate with: ./run.sh --profile novnc up --build
+  browser-node-novnc:
+    profiles: [novnc]
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        PROFILE: novnc
+    container_name: openclaw-browser-node-novnc
+    entrypoint: ["/usr/local/bin/entrypoint-novnc.sh"]
+    environment:
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      GATEWAY_DOMAIN: ${GATEWAY_DOMAIN}
+      CF_ACCESS_CLIENT_ID: ${CF_ACCESS_CLIENT_ID}
+      CF_ACCESS_CLIENT_SECRET: ${CF_ACCESS_CLIENT_SECRET}
+      NODE_DISPLAY_NAME: local-browser-node
+      # Browser fingerprint — match host machine appearance
+      TZ: America/Los_Angeles
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+      # CHROME_USER_AGENT: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"
+    ports:
+      - "6080:6080"
+    volumes:
+      - ./data/openclaw:/home/node/.openclaw
+    restart: unless-stopped
+    shm_size: '2gb'
+
+  # Extension relay — controls host's Chrome via browser extension (lightest)
+  # Activate with: ./run.sh --profile extension up --build
+  # Then load unpacked extension from: ./data/openclaw/browser/chrome-extension/
+  # Relay binds to 127.0.0.1 (hardcoded); socat bridges 0.0.0.0 → loopback.
+  # Internal relay port 28793 exposed as 28793; set extension relay port to 28793.
+  browser-node-extension:
+    profiles: [extension]
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        PROFILE: extension
+    container_name: openclaw-browser-node-extension
+    entrypoint: ["/usr/local/bin/entrypoint-extension.sh"]
+    environment:
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      GATEWAY_DOMAIN: ${GATEWAY_DOMAIN}
+      CF_ACCESS_CLIENT_ID: ${CF_ACCESS_CLIENT_ID}
+      CF_ACCESS_CLIENT_SECRET: ${CF_ACCESS_CLIENT_SECRET}
+      NODE_DISPLAY_NAME: local-extension-node
+    ports:
+      - "28790:28790"   # local gateway (socat → 127.0.0.1:28790)
+      - "28793:28793"   # extension relay (socat → 127.0.0.1:28793)
+    volumes:
+      - ./data/openclaw:/home/node/.openclaw
+    restart: unless-stopped
+
+  # Headless mode (no GUI, lighter weight)
+  # Activate with: ./run.sh --profile headless up --build
+  browser-node-headless:
+    profiles: [headless]
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        PROFILE: headless
+    container_name: openclaw-browser-node-headless
+    entrypoint: ["/usr/local/bin/entrypoint-headless.sh"]
+    environment:
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      GATEWAY_DOMAIN: ${GATEWAY_DOMAIN}
+      CF_ACCESS_CLIENT_ID: ${CF_ACCESS_CLIENT_ID}
+      CF_ACCESS_CLIENT_SECRET: ${CF_ACCESS_CLIENT_SECRET}
+      NODE_DISPLAY_NAME: local-browser-node
+    volumes:
+      - ./data/openclaw:/home/node/.openclaw
+    restart: unless-stopped
+    shm_size: '2gb'

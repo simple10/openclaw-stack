@@ -10,7 +10,7 @@
  *   npm run pre-deploy:dry      # Dry run (show what would be generated)
  */
 
-import { readFileSync, writeFileSync, mkdirSync, cpSync, existsSync, rmSync, readdirSync, statSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync, cpSync, existsSync, rmSync, readdirSync, statSync, renameSync } from "fs";
 import { join, resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { spawn, spawnSync } from "child_process";
@@ -81,8 +81,8 @@ function resolveAutoToken(value, cachePath, previousDeploy) {
 }
 
 // ── Protected Vars ───────────────────────────────────────────────────────────
-// Secrets auto-generated into .env.local (not synced to VPS).
-// Resolution order: .env > .env.local > generate.
+// Secrets auto-generated into .env when not already set.
+// Resolution order: .env > generate.
 
 const PROTECTED_VARS = {
   ADMINCLAW_PASSWORD: () => randomBytes(18).toString("base64"),
@@ -90,24 +90,36 @@ const PROTECTED_VARS = {
   AI_WORKER_ADMIN_AUTH_TOKEN: () => randomUUID().replace(/-/g, "") + randomUUID().replace(/-/g, ""),
 };
 
-/** Read .env.local (protected vars cache). Returns {} if missing. */
-function readEnvLocal() {
-  const path = join(ROOT, ".env.local");
-  if (!existsSync(path)) return {};
-  return dotenv.parse(readFileSync(path));
-}
+const AUTO_GENERATED_HEADER = "# ── Auto-generated (managed by pre-deploy — do not edit above this line) ──";
 
-/** Write key=value pairs to .env.local with header comment. */
-function writeEnvLocal(vars) {
-  const lines = [
-    "# .env.local — Auto-generated protected vars (DO NOT COMMIT)",
-    "# Managed by pre-deploy and update-env.mjs",
-    "",
-  ];
-  for (const [key, val] of Object.entries(vars)) {
-    lines.push(`${key}=${val}`);
+/** Upsert auto-generated vars into .env under the auto-generated section. */
+function appendToEnv(vars) {
+  const envPath = join(ROOT, ".env");
+  let content = existsSync(envPath) ? readFileSync(envPath, "utf-8") : "";
+
+  // Split into user section and auto-generated section
+  const headerIdx = content.indexOf(AUTO_GENERATED_HEADER);
+  let userSection = headerIdx >= 0 ? content.slice(0, headerIdx) : content;
+  let autoSection = headerIdx >= 0 ? content.slice(headerIdx + AUTO_GENERATED_HEADER.length) : "";
+
+  // Parse existing auto-generated vars
+  const autoVars = autoSection ? dotenv.parse(autoSection) : {};
+
+  // Merge new vars (new values win)
+  Object.assign(autoVars, vars);
+
+  // Rebuild auto-generated section
+  const autoLines = [AUTO_GENERATED_HEADER, ""];
+  for (const [key, val] of Object.entries(autoVars)) {
+    autoLines.push(`${key}=${val}`);
   }
-  writeFileSync(join(ROOT, ".env.local"), lines.join("\n") + "\n");
+
+  // Ensure user section ends with a newline
+  if (userSection.length > 0 && !userSection.endsWith("\n")) {
+    userSection += "\n";
+  }
+
+  writeFileSync(envPath, userSection + autoLines.join("\n") + "\n");
 }
 
 // ── Step 1: Read .env ────────────────────────────────────────────────────────
@@ -327,7 +339,7 @@ function computeDerivedValues(claws, stack, host, previousDeploy) {
     const gwUrl = claw.ai_gateway?.url || stack.ai_gateway.url;
     const gwToken = claw.ai_gateway?.token || stack.ai_gateway.token;
 
-    // gateway_token already resolved in main() via .env.local
+    // gateway_token already resolved in main() via .env
     claw.anthropic_api_key = gwToken;
     claw.anthropic_base_url = gwUrl + "/anthropic";
     claw.openai_api_key = gwToken;
@@ -344,23 +356,7 @@ function computeDerivedValues(claws, stack, host, previousDeploy) {
   }
 }
 
-// ── Step 8: Collect envsubst whitelist ────────────────────────────────────────
-// These are the $VAR references used in openclaw.jsonc that entrypoint resolves at container startup.
-
-const ENVSUBST_VARS = [
-  "OPENCLAW_DOMAIN_PATH",
-  "OPENCLAW_ALLOWED_ORIGIN",
-  "OPENCLAW_INSTANCE_ID",
-  "VPS_HOSTNAME",
-  "LOG_WORKER_TOKEN",
-  "EVENTS_URL",
-  "LLEMTRY_URL",
-  "ENABLE_EVENTS_LOGGING",
-  "ENABLE_LLEMTRY_LOGGING",
-  "ADMIN_TELEGRAM_ID",
-];
-
-// ── Step 8b: Parse human-readable time → cron expression + IANA timezone ─────
+// ── Step 8: Parse human-readable time → cron expression + IANA timezone ──────
 
 const TZ_ABBREVIATIONS = {
   PST: "America/Los_Angeles", PDT: "America/Los_Angeles",
@@ -505,26 +501,23 @@ async function main() {
   const env = readDotEnv();
   success(`.env loaded (${Object.keys(env).length} vars)`);
 
-  // 1b. Resolve protected vars (.env > .env.local > generate)
+  // 1b. Resolve protected vars (.env > generate)
   info("Resolving protected vars...");
-  const envLocal = readEnvLocal();
   const resolvedProtected = {};
   let generated = 0;
   for (const [name, generator] of Object.entries(PROTECTED_VARS)) {
     if (env[name]) {
       resolvedProtected[name] = env[name];
-    } else if (envLocal[name]) {
-      resolvedProtected[name] = envLocal[name];
     } else {
       resolvedProtected[name] = generator();
       generated++;
     }
   }
-  // writeEnvLocal deferred to step 5a (combined with gateway tokens)
+  // appendToEnv deferred to step 5a (combined with gateway tokens)
   if (generated > 0) {
-    success(`Protected vars: ${generated} generated, cached in .env.local`);
+    success(`Protected vars: ${generated} generated, will append to .env`);
   } else {
-    success("Protected vars: all cached (no new generation)");
+    success("Protected vars: all present in .env");
   }
 
   // 2. Read and resolve stack.yml
@@ -558,17 +551,17 @@ async function main() {
   stack.resources.max_cpu = resolvedResources.max_cpu;
   stack.resources.max_mem = formatMemory(resolvedResources.max_mem_mb);
 
-  // 5a. Resolve per-claw gateway tokens (stack.yml > .env.local > generate)
+  // 5a. Resolve per-claw gateway tokens (stack.yml > .env > generate)
   const gwTokenGenerator = () => randomUUID().replace(/-/g, "") + randomUUID().replace(/-/g, "");
   const gwTokenUpdates = {};
   for (const [name, claw] of Object.entries(claws)) {
     const envKey = name.replace(/-/g, "_").toUpperCase() + "_GATEWAY_TOKEN";
     if (!claw.gateway_token) {
-      claw.gateway_token = envLocal[envKey] || gwTokenGenerator();
+      claw.gateway_token = env[envKey] || gwTokenGenerator();
     }
     gwTokenUpdates[envKey] = claw.gateway_token;
   }
-  writeEnvLocal({ ...envLocal, ...resolvedProtected, ...gwTokenUpdates });
+  appendToEnv({ ...resolvedProtected, ...gwTokenUpdates });
 
   // 5b. Compute derived values for template
   info("Computing derived values...");
@@ -627,6 +620,28 @@ async function main() {
       warn(`Deploy directory not found: deploy/${dir} (skipping)`);
     }
   }
+
+  // 7d-ii. Write list of env vars that are empty in the container environment.
+  // sync-deploy resolves these in openclaw.json before uploading so OpenClaw's
+  // native ${VAR} substitution doesn't throw MissingEnvVarError on hot-reload.
+  // Map: env var name → claw property that determines its value.
+  const potentiallyEmptyVars = {
+    OPENCLAW_DOMAIN_PATH: "domain_path",
+    VPS_HOSTNAME: "vps_hostname",
+    LOG_WORKER_TOKEN: "log_worker_token",
+    EVENTS_URL: "events_url",
+    LLEMTRY_URL: "llemtry_url",
+    ADMIN_TELEGRAM_ID: "telegram.allow_from",
+  };
+  // Check against first claw (these vars are stack-wide, same for all claws)
+  const firstClaw = Object.values(claws)[0];
+  const emptyVars = Object.entries(potentiallyEmptyVars)
+    .filter(([, prop]) => {
+      const val = prop.split(".").reduce((o, k) => o?.[k], firstClaw);
+      return !val && val !== 0 && val !== false;
+    })
+    .map(([envVar]) => envVar);
+  writeFileSync(join(DEPLOY_DIR, "openclaw-stack", "empty-env-vars"), emptyVars.join("\n") + "\n");
 
   // 7d-post. Resolve {{INSTALL_DIR}} in host/ files (cron configs, logrotate)
   const installDir = String(stack.install_dir || "/home/openclaw");
@@ -696,21 +711,66 @@ async function main() {
     success("Generated sandbox-registry/htpasswd");
   }
 
-  // 7h. Process openclaw.jsonc for each claw → .deploy/instances/<name>/.openclaw/openclaw.json
-  // Output mirrors VPS layout so sync-deploy.sh can rsync directly.
+  // 7h. Ensure each claw has its own openclaw.jsonc (source of truth for sync-deploy).
+  // If missing, copies from the default template and updates stack.yml to reference it.
   for (const [name, claw] of Object.entries(claws)) {
-    const templateFile = claw.openclaw_json || "openclaw/default/openclaw.jsonc";
-    info(`Processing openclaw config for ${name} (from ${templateFile})...`);
+    const clawConfigDir = join(ROOT, "openclaw", name);
+    let clawConfigPath = join(clawConfigDir, "openclaw.jsonc");
 
-    const raw = readRoot(templateFile);
-    // Parse JSONC to validate and strip comments, then re-serialize as clean JSON
-    const parsed = parseJsoncFile(raw, templateFile);
-    const cleanJson = JSON.stringify(parsed, null, 2);
+    // Normalize: rename .json → .jsonc if needed
+    const jsonVariant = join(clawConfigDir, "openclaw.json");
+    if (!existsSync(clawConfigPath) && existsSync(jsonVariant)) {
+      renameSync(jsonVariant, clawConfigPath);
+      info(`Renamed openclaw/${name}/openclaw.json → openclaw.jsonc`);
+    }
 
-    const outDir = join(DEPLOY_DIR, "instances", name, ".openclaw");
-    mkdirSync(outDir, { recursive: true });
-    writeFileSync(join(outDir, "openclaw.json"), cleanJson + "\n");
-    success(`Wrote instances/${name}/.openclaw/openclaw.json`);
+    if (!existsSync(clawConfigPath)) {
+      // Copy default template to per-claw location
+      const templateFile = claw.openclaw_json || "openclaw/default/openclaw.jsonc";
+      info(`Creating openclaw/${name}/openclaw.jsonc from ${templateFile}...`);
+
+      const raw = readRoot(templateFile);
+      parseJsoncFile(raw, templateFile);
+
+      mkdirSync(clawConfigDir, { recursive: true });
+      writeFileSync(clawConfigPath, raw);
+      success(`Created openclaw/${name}/openclaw.jsonc`);
+
+      // Update stack.yml to set per-claw openclaw_json
+      const stackYmlPath = join(ROOT, "stack.yml");
+      let stackYml = readFileSync(stackYmlPath, "utf-8");
+      const expectedLine = `    openclaw_json: openclaw/${name}/openclaw.jsonc`;
+
+      if (!stackYml.includes(expectedLine.trim())) {
+        const clawLineRegex = new RegExp(`^(  ${name}:)(.*)$`, "m");
+        const match = stackYml.match(clawLineRegex);
+        if (match) {
+          const clawStart = stackYml.indexOf(match[0]);
+          // Find this claw's section boundary (next line at claw indentation or EOF)
+          const afterClaw = stackYml.slice(clawStart + match[0].length);
+          const nextClawMatch = afterClaw.match(/\n  [a-zA-Z]/);
+          const sectionEnd = nextClawMatch
+            ? clawStart + match[0].length + nextClawMatch.index
+            : stackYml.length;
+          const clawSection = stackYml.slice(clawStart, sectionEnd);
+
+          // Replace existing openclaw_json or insert new one
+          const existingLine = clawSection.match(/^    openclaw_json:.*$/m);
+          if (existingLine) {
+            stackYml = stackYml.replace(existingLine[0], expectedLine);
+          } else {
+            const insertAt = clawStart + match[0].length;
+            stackYml = stackYml.slice(0, insertAt) + "\n" + expectedLine + stackYml.slice(insertAt);
+          }
+          writeFileSync(stackYmlPath, stackYml);
+          success(`Updated stack.yml: ${name}.openclaw_json`);
+        }
+      }
+    } else {
+      const raw = readFileSync(clawConfigPath, "utf-8");
+      parseJsoncFile(raw, `openclaw/${name}/openclaw.jsonc`);
+      success(`Validated openclaw/${name}/openclaw.jsonc`);
+    }
   }
 
   // Summary

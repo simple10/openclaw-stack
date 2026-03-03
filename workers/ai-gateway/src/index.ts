@@ -6,7 +6,13 @@ import { isLlemtryEnabled, isLlmRoute, reportGeneration } from './llemtry'
 import { createLog, logInboundRequest } from './log'
 import { matchProviderRoute } from './routing'
 import { getProviderApiKey } from './keys'
-import { handleAdminRequest, handleTokenRotation, handleGetUserCreds, handleUpdateUserCreds, handleCodexTokenGeneration } from './admin'
+import {
+  handleAdminRequest,
+  handleTokenRotation,
+  handleGetUserCreds,
+  handleUpdateUserCreds,
+  handleCodexTokenGeneration,
+} from './admin'
 import { serveConfigPage } from './config-ui'
 import { proxyOpenAI } from './providers/openai'
 import { proxyAnthropic } from './providers/anthropic'
@@ -91,7 +97,7 @@ export default {
     const route = matchProviderRoute(request.method, pathname)
     if (!route) {
       console.error(`No route match: ${request.method} ${pathname}`)
-      return addCorsHeaders(jsonError('Not found', 404))
+      return addCorsHeaders(jsonError(`Route not implemented in AI Gateway: ${pathname}`, 404))
     }
 
     const apiKey = await getProviderApiKey(route.provider, userId, env.AUTH_KV, log)
@@ -137,12 +143,14 @@ export default {
       if (ct.includes('text/html')) {
         const host = new URL(providerConfig.baseUrl).hostname
         log.error(`[proxy] upstream ${host} returned 403 HTML — likely WAF/bot block`)
-        return addCorsHeaders(jsonError(
-          `Upstream ${host} blocked this request (403). ` +
-          `chatgpt.com blocks requests from Cloudflare Workers. ` +
-          `Set EGRESS_PROXY_URL to route through the VPS egress proxy sidecar.`,
-          502
-        ))
+        return addCorsHeaders(
+          jsonError(
+            `Upstream ${host} blocked this request (403). ` +
+              `chatgpt.com blocks requests from Cloudflare Workers. ` +
+              `Set EGRESS_PROXY_URL to route through the VPS egress proxy sidecar.`,
+            502
+          )
+        )
       }
     }
 

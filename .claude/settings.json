@@ -1,7 +1,4 @@
 {
-  "enabledPlugins": {
-    "claude-mem@thedotmack": true
-  },
   "permissions": {
     "allow": [
       "Bash(source */source-config.sh && ssh *)"

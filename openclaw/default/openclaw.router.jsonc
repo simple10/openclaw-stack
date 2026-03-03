@@ -1,11 +1,12 @@
-// Default openclaw.jsonc Template
+// Skill Router Template
 //
-// This template is used by default when a claw doesn't specify its own
-// openclaw_json path in stack.yml.
+// This template creates main, code, and skills agents. Main runs as "non-main" inside the container.
+// The coordinator plugin auto-discovers routes from agent configs and writes
+// a routing table to AGENTS.md (loaded into system prompt).
+// No duplicate route config needed — the agent "skills" arrays are the source of truth.
+// See deploy/openclaw-stack/plugins/coordinator/README.md for details.
 //
-// It creates main & code agents. Main runs as "non-main" inside the container.
-// This template is a good starting point for most claws if you don't need specific security permissions.
-// OpenClaw Control UI can be used after deployment to customize the openclaw config.
+// Main agent acts as a coordinator and delegates tool related tasks to the code & skills agents.
 //
 // To customize for a specific claw:
 //   1. Copy this file to openclaw/<claw-name>/openclaw.jsonc
@@ -106,8 +107,8 @@
         "scope": "agent",
         "workspaceAccess": "rw", // Enable writes to agent sandbox - remove this here and customize per agent for tighter security controls
         "docker": {
-          // "image": "openclaw-sandbox:bookworm-slim", // sandbox has the minimal base image
-          "image": "openclaw-sandbox-toolkit:bookworm-slim", // sandbox-toolkit has the full toolkit bins
+          "image": "openclaw-sandbox:bookworm-slim", // sandbox has the minimal base image
+          // "image": "openclaw-sandbox-toolkit:bookworm-slim", // sandbox-toolkit has the full toolkit bins
           "containerPrefix": "openclaw-sbx-",
           "workdir": "/workspace",
           "readOnlyRoot": true,
@@ -135,14 +136,9 @@
             // the workspace bind mount chain (VPS → OpenClaw Gateway .openclaw → Sandbox /workspace).
             // This is needed because readOnlyRoot is enabled - bins like codex, claude, etc. need to persist config files
             // Default HOME is /home/sandbox and is read only when readOnlyRoot is enabled
-            "HOME": "/workspace/.home",
+            "HOME": "/workspace/.home"
             // PATH is intentionally not set — sandbox images include the correct PATH
             // (linuxbrew, bun, system bins). Overriding it risks missing entries.
-            //
-            // Disable Chromium's internal sandbox in browser containers — Docker already
-            // provides isolation (capDrop:ALL + no-new-privileges), and Chromium can't create
-            // its own sandbox without SYS_ADMIN or user namespaces. Harmless for toolkit containers.
-            "OPENCLAW_BROWSER_NO_SANDBOX": "1"
           },
           "pidsLimit": 512, // Add fork-bomb protection
           "memory": "2g", // Default agent container RAM - browser containers also inherit this setting
@@ -183,6 +179,14 @@
     "list": [
       // MAIN AGENT
       {
+        // Main runs on host for operator DMs (non-main mode).
+        // It is a pure coordinator — it has no skills of its own and delegates
+        // all skill-based tasks to sub-agents via sessions_spawn.
+        // The coordinator plugin auto-discovers routes from agent configs and writes
+        // a routing table to AGENTS.md (loaded into system prompt).
+        // Per-agent skill filtering ("skills": []) ensures main sees no skill blocks.
+        // If you want a single fully-capable agent, set image: openclaw-sandbox-toolkit:bookworm-slim,
+        // remove "skills": [], and disable the coordinator plugin.
         "id": "main",
         "default": true,
         "sandbox": {
@@ -205,15 +209,19 @@
             ]
           }
         },
+        "skills": [], // Intentionally empty, main delegates skills in this setup
         "tools": {
           // No allow list needed — main runs on host and gets all tools by default.
           // gateway is available because the sandbox deny doesn't apply to host sessions.
-          // Tool bins are not available on the host container, but are available via exec tool
-          // since exec spawns a sandboxed container with the tool bins available.
-          "deny": ["canvas", "nodes", "discord", "group:plugins"]
+          // Deny tools main shouldn't use as a coordinator:
+          // browser: no Chrome in gateway container; OpenClaw defaults to trying host browser relay when running in non-main mode
+          // Main delegates browser tasks to other sandboxed agents with their own browser containers
+          // If main is running in sandbox.mode:"all" then optionally remove "browser" from deny list to allow spawning it's own browser container
+          // non-main -> host browser behavior is currently non-configurable here - can be somewhat controlled with a custom instruction in AGENTS.md
+          "deny": ["browser", "canvas", "nodes", "discord", "group:plugins"]
         },
         "subagents": {
-          "allowAgents": ["code"] // Add other agents here to allow main to spawn them; e.g. "personal", "work"
+          "allowAgents": ["code", "skills"] // Add other agents here to allow main to spawn them; e.g. "personal", "work"
         }
       },
       // CODING AGENT
@@ -223,6 +231,7 @@
         "skills": [
           "coding-agent",
           "github",
+          "clawhub",
           "skill-creator",
           "gemini",
           "mcporter",
@@ -242,12 +251,48 @@
             "maxAgeDays": 30
           }
         }
+      },
+      // MISC SKILLS AGENT — handles all non-coding skills
+      // Add new skills to this agent's "skills" array and restart — the coordinator
+      // plugin reads agent configs via loadConfig() and updates routing automatically.
+      {
+        "id": "skills",
+        "name": "Skills Agent",
+        "skills": [
+          "blogwatcher",
+          "gifgrep",
+          "healthcheck",
+          "himalaya",
+          "nano-pdf",
+          "openai-image-gen",
+          "openai-whisper-api",
+          "oracle",
+          "ordercli",
+          "video-frames",
+          "wacli",
+          "weather"
+        ],
+        "tools": {
+          // Skills agent doesn't need to spawn other agents — that's main's job in this configuration
+          "deny": ["sessions_spawn"]
+        },
+        "sandbox": {
+          "docker": {
+            "image": "openclaw-sandbox-toolkit:bookworm-slim",
+            "network": "bridge",
+            "memory": "1g", // Most skills are API-based, lightweight
+            "memorySwap": "2g",
+            "cpus": 1,
+            "pidsLimit": 256
+          }
+        }
       }
     ]
   },
   "plugins": {
     "enabled": true,
     "allow": [
+      "coordinator", // Coordinator plugin — builds routing table from agent configs
       "telemetry", // Unified telemetry — replaces llm-logger plugin and debug-logger hook
       "memory-core" // File-backed memory search tools
     ],
@@ -258,6 +303,17 @@
       "memory": "memory-core" // Bundled memory plugin — provides memory_search and memory_get tools
     },
     "entries": {
+      // Coordinator Plugin
+      // Auto-discovers routes from agents.list[].skills via loadConfig() and writes
+      // a routing table to the coordinator's AGENTS.md (loaded into system prompt).
+      // No duplicate route config needed — the agent "skills" arrays are the source of truth.
+      // See deploy/openclaw-stack/plugins/coordinator/README.md for details.
+      "coordinator": {
+        "enabled": true,
+        "config": {
+          "coordinatorAgent": "main"
+        }
+      },
       // Telemetry Plugin
       // Unified telemetry — captures LLM, session, tool, message, agent, and gateway events.
       // Replaces both llm-logger plugin and debug-logger hook.

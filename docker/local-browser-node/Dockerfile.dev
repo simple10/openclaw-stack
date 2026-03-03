@@ -1,0 +1,38 @@
+# Dev image: npm install openclaw, no source clone or build.
+# Shared across profiles via PROFILE build arg.
+#   extension — no browser, no GUI (lightest)
+#   headless  — Chromium, no GUI
+#   novnc     — Chromium + display server + desktop
+
+FROM node:22-bookworm
+
+ARG PROFILE=extension
+ARG OPENCLAW_VERSION=latest
+
+# System deps based on profile
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      socat \
+      $([ "$PROFILE" != "headless" ] && [ "$PROFILE" != "novnc" ] || echo "chromium") \
+      $([ "$PROFILE" != "novnc" ] || echo "xvfb x11vnc novnc websockify xfce4 xfce4-terminal dbus-x11 tzdata locales") \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Locale support (novnc only)
+RUN [ "$PROFILE" != "novnc" ] || \
+    (sed -i 's/# en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen && locale-gen)
+
+# Install OpenClaw + ws (needed by ws-proxy.mjs)
+RUN npm install -g "openclaw@${OPENCLAW_VERSION}" ws
+
+# ws-proxy with its own node_modules (ESM can't use NODE_PATH)
+COPY ws-proxy.mjs /opt/ws-proxy/ws-proxy.mjs
+RUN cd /opt/ws-proxy && npm install ws
+
+# Entrypoints
+COPY entrypoint.sh /usr/local/bin/entrypoint-headless.sh
+COPY novnc-entrypoint.sh /usr/local/bin/entrypoint-novnc.sh
+COPY extension-entrypoint.sh /usr/local/bin/entrypoint-extension.sh
+RUN chmod 755 /usr/local/bin/entrypoint-*.sh
+
+ENV NODE_ENV=production
+ENV DISPLAY=:99
+ENV HOME=/home/node
