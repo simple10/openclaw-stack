@@ -65,11 +65,17 @@ claude "start" --dangerously-skip-permissions
   <img src="docs/assets/telegram-host-alerter-report.png" alt="Host Alerter Telegram Report" width="400">
 </p>
 
+<p align="center"><em>Local Browser Relay — docker container to run OpenClaw relay & local browsers</em></p>
+<p align="center">
+  <img src="docs/assets/local-browser-relay.png" alt="Local Browser Automation Relay" width="400">
+</p>
+
 - **Multi-claw Stacks** — Run multiple OpenClaw instances on one VPS, each in its own Sysbox container with dedicated resources, Telegram bot, and subdomain
 - **AI Gateway Proxy** — Cloudflare Worker proxies LLM requests to Anthropic/OpenAI with per-user KV credentials. API keys never touch the VPS. Self-service `/config` UI for credential management
 - **LLM Observability** — Structured logging via Vector to Cloudflare Workers, with optional Langfuse tracing for cost and latency analysis
 - **Egress Proxy** — Optional sidecar that routes requests through the VPS IP to bypass WAF blocks on Cloudflare Worker IPs (e.g., ChatGPT Codex)
 - **Claude-driven Deployment & Maintenance** — Modular playbooks that Claude Code executes step-by-step. First deploy ~30 minutes, mostly hands-off
+- **Local Browser Relay** - docker compose with support for KasmWeb, noVNC, and local browser relay
 
 ## Architecture
 
