@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # Syncs .deploy/ artifacts from local machine to VPS via rsync.
-# Replaces the old .deploy-staging + manual cp workflow.
 #
 # Usage:
 #   ./scripts/sync-deploy.sh                          # Stack-level files only (safe for updates)
@@ -359,9 +358,5 @@ else
     warn "  Run: sudo -u openclaw bash -c 'cd ${INSTALL_DIR} && docker compose up -d --force-recreate'"
   fi
 
-  # Workspace sync reminder (only when instance configs were synced)
-  if [ -n "$SYNC_INSTANCES" ]; then
-    echo ""
-    info "Tip: sync agent workspaces with: scripts/sync-workspaces.sh down"
-  fi
+  # Tip: use scripts/deploy.sh for full deploy (includes workspace sync + auto-restart)
 fi

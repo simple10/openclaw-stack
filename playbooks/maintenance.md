@@ -204,6 +204,37 @@ See [docs/CLOUDFLARE-TUNNEL.md](../docs/CLOUDFLARE-TUNNEL.md#rotating-tunnel-tok
 
 > **Verify:** Run § 7.4 — cloudflared container running, domain routing returns 302/403.
 
+## Deploying Changes
+
+Use `scripts/deploy.sh` to push local changes to the VPS. It runs `npm run pre-deploy`, syncs configs and workspaces, and auto-restarts services when config changes require it.
+
+```bash
+# Standard deploy (all claws)
+scripts/deploy.sh
+
+# Deploy a single claw
+scripts/deploy.sh --instance personal-claw
+
+# Overwrite VPS configs + workspaces (skip drift detection)
+scripts/deploy.sh --force
+
+# Preview without making changes
+scripts/deploy.sh --dry-run
+
+# Skip auto-restart (prints manual restart command instead)
+scripts/deploy.sh --no-restart
+```
+
+After deploying, verify with § 7.1 then tag the successful deploy:
+
+```bash
+scripts/tag-deploy.sh "description of changes"
+```
+
+> **Note:** `deploy.sh` is for iterative updates. Fresh deploys use `sync-deploy.sh --fresh` directly (see `00-fresh-deploy-setup.md`).
+
+---
+
 ## Image Updates
 
 ### Sandbox Images
@@ -252,19 +283,15 @@ Several deploy files are bind-mounted read-only into claw containers. These can 
 **Bind-mounted files:** `dashboard/`, `entrypoint.sh`, `rebuild-sandboxes.sh`, `parse-toolkit.mjs`, `sandbox-toolkit.yaml`, `plugins/`
 
 ```bash
-# From local machine — rebuild and sync (shows diff, auto-commits on VPS)
-npm run pre-deploy
-scripts/sync-deploy.sh
-
-# Restart all claws to pick up changes (restart is fine for bind-mounted file changes)
-ssh -i <SSH_KEY> -p <SSH_PORT> adminclaw@<VPS_IP> \
-  "sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose restart'"
+# From local machine — rebuild, sync, and auto-restart if needed
+scripts/deploy.sh
 
 # Tag successful deploy after verifying services are healthy
 scripts/tag-deploy.sh "updated bind-mounted files"
 ```
 
-> To restart only a specific claw: `docker compose restart <PROJECT_NAME>-openclaw-<CLAW_NAME>`
+> Bind-mounted file changes only need `docker compose restart` (not `up -d`). If `deploy.sh` detects no restart-required config changes, you may still need a manual restart for bind-mounted files:
+> `ssh ... "sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose restart'"`
 
 > **Note:** `sandbox-toolkit.yaml` changes are also auto-detected on container restart via Docker label comparison, triggering a sandbox image rebuild if needed.
 
@@ -290,17 +317,11 @@ Brief downtime (~5-10s) per claw during container swap. The script waits for hea
 To update just one claw's `openclaw.json` without affecting other claws:
 
 ```bash
-# From local machine
-# 1. Rebuild deployment artifacts
-npm run pre-deploy
-
-# 2. Sync the updated claw config to VPS
-scripts/sync-deploy.sh --instance personal-claw
-
-# 3. Restart that claw to pick up new config (restart is fine for bind-mounted file changes)
-ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
-  "sudo -u openclaw bash -c 'cd ${INSTALL_DIR} && docker compose restart openclaw-stack-openclaw-personal-claw'"
+# From local machine — builds, syncs config + workspaces, auto-restarts if needed
+scripts/deploy.sh --instance personal-claw
 ```
+
+Hot-reloadable config changes (agents, skills, models) take effect without restart. Changes that require restart (env vars, ports, gateway settings) trigger auto-restart via `deploy.sh`.
 
 ---
 
@@ -308,17 +329,11 @@ ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
 
 1. Add a new entry under `claws` in `stack.yml` with per-claw overrides (domain, resources, Telegram bot token, etc.)
 2. Add the claw's Telegram bot token to `.env` (e.g., `NEW_CLAW_TELEGRAM_BOT_TOKEN=...`)
-3. Rebuild deployment artifacts and sync to VPS:
+3. Deploy (builds, syncs configs + workspaces, auto-starts the new service):
    ```bash
-   npm run pre-deploy
-   scripts/sync-deploy.sh --all
+   scripts/deploy.sh
    ```
-4. Start the new claw:
-   ```bash
-   ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
-     "sudo -u openclaw bash -c 'cd ${INSTALL_DIR} && docker compose up -d openclaw-stack-openclaw-<name>'"
-   ```
-5. Tag successful deploy after verifying the new claw is healthy:
+4. Tag successful deploy after verifying the new claw is healthy:
    ```bash
    scripts/tag-deploy.sh "added <name> claw"
    ```

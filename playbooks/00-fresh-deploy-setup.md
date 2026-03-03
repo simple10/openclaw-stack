@@ -296,12 +296,14 @@ Deployment Plan:
      a. Deploy Cloudflare Workers (01-workers.md) — local              ~5 min
      b. Base setup & hardening (02-base-setup.md) — VPS               ~10 min
   2. Build + sync deploy artifacts (npm run pre-deploy + sync-deploy.sh --fresh)
+     + Seed workspace files: scripts/sync-workspaces.sh up --force
      Note: First sync won't show a deploy diff (git not yet initialized on VPS).
      After setup-infra.sh runs, subsequent syncs show diffs and auto-commit.
   3. Docker + Sysbox (03-docker.md → 03b-sysbox.md)
   4. OpenClaw deployment (04-vps1-openclaw.md)
   5. Backup + cron verification (06-backup.md)
   6. Reboot & verification (07-verification.md)
+     + Pull back generated files: scripts/sync-workspaces.sh down --all
   7. Post-deploy: AI proxy (08a) → device pairing (08b) → deployment report (08c)
 ```
 
@@ -313,12 +315,12 @@ Ask the user to confirm before proceeding with the deployment.
 
 ### Automation directive
 
-After the user confirms, launch **01-workers and 02-base-setup as parallel subagents** (two Task tool calls in a single message). These have no shared dependencies — workers run locally via wrangler while base setup runs on the VPS via SSH. After both subagents return, run `npm run pre-deploy` + `scripts/sync-deploy.sh --fresh` in the main context (sync needs the openclaw user from 02 and worker URLs from 01). Then execute playbooks 03, 03b, then 04 through 07 **continuously without pausing between steps**. Do not ask for confirmation between playbooks. Only stop if:
+After the user confirms, launch **01-workers and 02-base-setup as parallel subagents** (two Task tool calls in a single message). These have no shared dependencies — workers run locally via wrangler while base setup runs on the VPS via SSH. After both subagents return, run `npm run pre-deploy` + `scripts/sync-deploy.sh --fresh` + `scripts/sync-workspaces.sh up --force` in the main context (sync needs the openclaw user from 02 and worker URLs from 01). Then execute playbooks 03, 03b, then 04 through 07 **continuously without pausing between steps**. Do not ask for confirmation between playbooks. Only stop if:
 
 - A command fails and the error requires user input to resolve
 - A playbook step explicitly says to wait for user input (e.g., a blocking error with multiple resolution paths)
 - **SSH verification (02-base-setup.md § 2.4 Step 3):** You MUST test SSH on port `<SSH_HARDENED_PORT>` from the local machine and confirm it works before proceeding. This is a mandatory stop point — do not skip it during automated deployment.
-- **07-verification.md:** Run in the main context (not a subagent) so the user sees real-time progress and errors can be handled directly. By this point, all heavy steps have been offloaded to subagents and the context window has room. Report the summary table before proceeding to 08a-configure-llm-proxy.md.
+- **07-verification.md:** Run in the main context (not a subagent) so the user sees real-time progress and errors can be handled directly. By this point, all heavy steps have been offloaded to subagents and the context window has room. Report the summary table, then run `scripts/sync-workspaces.sh down --all` to pull back any files OpenClaw generated on first start, before proceeding to 08a-configure-llm-proxy.md.
 
 Normal informational output (progress updates, version notes, check results) should be reported inline without pausing. The first user interaction after confirmation should be device pairing in `08b-pair-devices.md`.
 

@@ -64,48 +64,19 @@ for name in $INSTANCE_LIST; do
     success "Created ${local_source} (no local config existed)"
     CREATED_FILES+=("$name")
   else
-    # Local config exists — save as live-version with diff summary header
+    # Local config exists — save as live-version with annotated drift comments
     local_live="${local_dir}/openclaw.live-version.jsonc"
 
     # Find what we're diffing against (claw-specific or default template)
     if [ -f "$local_source" ]; then
       diff_against="$local_source"
-      diff_label="openclaw/${name}/openclaw.jsonc"
     else
       diff_against="${REPO_ROOT}/openclaw/default/openclaw.jsonc"
-      diff_label="openclaw/default/openclaw.jsonc"
     fi
 
-    # Generate diff summary
-    diff_output=$(diff --unified=0 "$diff_against" "$tmp_file" 2>/dev/null || true)
-
-    # Build header comment with diff summary
-    {
-      echo "// Live config downloaded from VPS: ${name}"
-      echo "// Downloaded: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-      echo "// Compared against: ${diff_label}"
-      echo "//"
-      if [ -z "$diff_output" ]; then
-        echo "// No differences found."
-      else
-        # Count additions and removals (lines starting with + or - after the header)
-        additions=$(echo "$diff_output" | grep -c '^+[^+]' || true)
-        removals=$(echo "$diff_output" | grep -c '^-[^-]' || true)
-        echo "// Differences: +${additions} added, -${removals} removed"
-        echo "//"
-        # Include the actual diff lines as comments
-        echo "$diff_output" | while IFS= read -r line; do
-          # Skip diff file headers (--- and +++ lines)
-          case "$line" in
-            ---*|+++*) continue ;;
-          esac
-          echo "// $line"
-        done
-      fi
-      echo "//"
-      echo ""
-      cat "$tmp_file"
-    } > "$local_live"
+    # Format live version with key-order matching and inline drift annotations
+    FORMAT_SCRIPT="${REPO_ROOT}/deploy/openclaw-stack/format-live-version.mjs"
+    node "$FORMAT_SCRIPT" "$diff_against" "$tmp_file" > "$local_live"
 
     rm -f "$tmp_file"
     success "${local_live}"
