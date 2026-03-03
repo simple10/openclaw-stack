@@ -187,15 +187,17 @@ if [ -n "$SYNC_INSTANCES" ]; then
     fi
 
     info "Syncing instance config: ${name} (→ ${target_filename})..."
-    # Ensure remote directory exists (setup-infra.sh creates these, but be safe)
-    ${SSH_CMD} "${VPS}" "sudo mkdir -p ${INSTALL_DIR}/instances/${name}/.openclaw"
+    # Ensure remote directory exists and fix permissions to match setup-infra.sh:
+    #   instances/<name>/  → openclaw:openclaw 755 (host scripts can traverse)
+    #   .openclaw/         → 1000:1000 700 (container's node user, private data)
+    ${SSH_CMD} "${VPS}" "sudo mkdir -p ${INSTALL_DIR}/instances/${name}/.openclaw && \
+      sudo chown openclaw:openclaw ${INSTALL_DIR}/instances/${name} && \
+      sudo chown 1000:1000 ${INSTALL_DIR}/instances/${name}/.openclaw && \
+      sudo chmod 700 ${INSTALL_DIR}/instances/${name}/.openclaw"
     do_rsync \
       "$local_file" \
       "${VPS}:${INSTALL_DIR}/instances/${name}/.openclaw/${target_filename}"
-    # Instance .openclaw is owned by uid 1000 (container's node user)
-    # Chown both the directory and the target file so setup-infra.sh can create
-    # subdirectories as the openclaw user (which runs as uid 1000 in container)
-    ${SSH_CMD} "${VPS}" "sudo chown 1000:1000 ${INSTALL_DIR}/instances/${name}/.openclaw ${INSTALL_DIR}/instances/${name}/.openclaw/${target_filename}"
+    ${SSH_CMD} "${VPS}" "sudo chown 1000:1000 ${INSTALL_DIR}/instances/${name}/.openclaw/${target_filename}"
     success "instances/${name}/.openclaw/${target_filename} (owner: 1000:1000)"
   done
 fi
