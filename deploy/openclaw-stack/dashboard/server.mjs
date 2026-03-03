@@ -271,18 +271,6 @@ const server = createServer(async (req, res) => {
   const agentId = browserMatch[1]
   const subPath = browserMatch[2] || '/'
 
-  // Bare /browser/<agent-id>/ → redirect to vnc.html with websockify path
-  if (subPath === '/') {
-    const wsPrefix = bp.startsWith('/') ? bp.slice(1) : bp
-    res.writeHead(302, {
-      Location: `${bp}/browser/${agentId}/vnc.html?path=${
-        wsPrefix ? wsPrefix + '/' : ''
-      }browser/${agentId}/websockify`,
-    })
-    res.end()
-    return
-  }
-
   const entry = findEntry(agentId)
   if (!entry) {
     res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' })
@@ -295,6 +283,19 @@ const server = createServer(async (req, res) => {
   if (!containerStatus.running) {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
     res.end(containerDownPage(agentId))
+    return
+  }
+
+  // Bare /browser/<agent-id>/ → redirect to vnc.html with websockify path + password
+  if (subPath === '/') {
+    const wsPrefix = bp.startsWith('/') ? bp.slice(1) : bp
+    const pw = containerStatus.noVncPassword ? `&password=${encodeURIComponent(containerStatus.noVncPassword)}` : ''
+    res.writeHead(302, {
+      Location: `${bp}/browser/${agentId}/vnc.html?path=${
+        wsPrefix ? wsPrefix + '/' : ''
+      }browser/${agentId}/websockify&autoconnect=true&resize=scale${pw}`,
+    })
+    res.end()
     return
   }
 
