@@ -27,9 +27,12 @@ bash <(curl -fsSL https://raw.githubusercontent.com/simple10/openclaw-stack/main
 git clone git@github.com:simple10/openclaw-stack.git openclaw-stack
 cd openclaw-stack
 cp .env.example .env && cp stack.yml.example stack.yml
-# Edit .env and stack.yml with your values, then:
+
+# Edit .env and stack.yml with your values
+
+# Run claude with "start" or "onboard"
+# Both work - "onboard" does more hand-holding to help with configuring missing .env settings
 claude "start"
-# Or claude "onboard" if you need help from claude on setting up the .env
 ```
 
 `npm run pre-deploy` builds `.deploy/` from `.env` + `stack.yml` + `docker-compose.yml.hbs`. Claude reads the playbooks and executes them step-by-step over SSH. First deploy takes ~30 minutes.
