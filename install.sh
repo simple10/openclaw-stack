@@ -278,15 +278,31 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 
 echo ""
 if command -v claude >/dev/null 2>&1; then
+  echo ""
+  info "Claude Code can fully automate the VPS deployment, but it needs"
+  echo "  permission to run commands (SSH, docker, etc.) without prompting."
+  echo ""
+  echo "  --dangerously-skip-permissions lets Claude run all commands automatically"
+  echo "  Without it, you'll need to approve each SSH/docker command manually."
+  echo ""
+  ask "Run Claude with --dangerously-skip-permissions? (y/n) [y]:" SKIP_PERMS
+  SKIP_PERMS="${SKIP_PERMS:-y}"
+
   info "Launching Claude Code for guided configuration..."
   echo ""
-  claude "onboard"
+  if [[ "$SKIP_PERMS" =~ ^[Yy] ]]; then
+    claude --dangerously-skip-permissions "onboard"
+  else
+    claude "onboard"
+  fi
 else
   info "Next: Install Claude Code, then run:"
   echo ""
   echo "    cd $(pwd)"
-  echo "    claude \"onboard\""
+  echo "    claude --dangerously-skip-permissions \"onboard\""
   echo ""
+  echo "  The --dangerously-skip-permissions flag lets Claude fully automate"
+  echo "  the deployment without prompting for each command."
   echo "  This will walk you through domain, Telegram, and stack setup."
   echo ""
 fi

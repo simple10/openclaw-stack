@@ -32,7 +32,10 @@ cp .env.example .env && cp stack.yml.example stack.yml
 
 # Run claude with "start" or "onboard"
 # Both work - "onboard" does more hand-holding to help with configuring missing .env settings
-claude "start"
+claude "start" --dangerously-skip-permissions
+
+# It's recommended to run claude with --dangerously-skip-permissions if you want
+# an automated deployment. Otherwise claude will constantly require approval.
 ```
 
 `npm run pre-deploy` builds `.deploy/` from `.env` + `stack.yml` + `docker-compose.yml.hbs`. Claude reads the playbooks and executes them step-by-step over SSH. First deploy takes ~30 minutes.
