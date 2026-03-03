@@ -98,6 +98,7 @@ tools:
 
   # On-device search engine for markdown notes and docs
   # https://github.com/tobi/qmd
+  # Requires sqlite3 to be installed
   qmd:
     install: npm install -g @tobilu/qmd
 
@@ -110,6 +111,10 @@ tools:
   # Just use `brew install <pkg>` — the build script (rebuild-sandboxes.sh) auto-wraps
   # it to run as the linuxbrew user with HOMEBREW_NO_AUTO_UPDATE=1.
   # /home/linuxbrew/.linuxbrew/bin is on PATH (set in openclaw.json sandbox env).
+
+  sqlite:
+    install: brew install sqlite
+    bins: [sqlite3]
 
   yt-dlp:
     install: brew install yt-dlp
