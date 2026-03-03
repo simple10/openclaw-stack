@@ -18,12 +18,14 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        OPENCLAW_VERSION: ${OPENCLAW_VERSION:-stable}
+        OPENCLAW_VERSION: stable
     container_name: openclaw-browser-node
     network_mode: "service:cloudflared-access"
     depends_on:
       - cloudflared-access
-    env_file: .env
+    environment:
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      NODE_DISPLAY_NAME: local-browser-node
     volumes:
       - ./data/openclaw:/home/node/.openclaw
     restart: unless-stopped
