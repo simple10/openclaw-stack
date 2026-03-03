@@ -344,23 +344,7 @@ function computeDerivedValues(claws, stack, host, previousDeploy) {
   }
 }
 
-// ── Step 8: Collect envsubst whitelist ────────────────────────────────────────
-// These are the $VAR references used in openclaw.jsonc that entrypoint resolves at container startup.
-
-const ENVSUBST_VARS = [
-  "OPENCLAW_DOMAIN_PATH",
-  "OPENCLAW_ALLOWED_ORIGIN",
-  "OPENCLAW_INSTANCE_ID",
-  "VPS_HOSTNAME",
-  "LOG_WORKER_TOKEN",
-  "EVENTS_URL",
-  "LLEMTRY_URL",
-  "ENABLE_EVENTS_LOGGING",
-  "ENABLE_LLEMTRY_LOGGING",
-  "ADMIN_TELEGRAM_ID",
-];
-
-// ── Step 8b: Parse human-readable time → cron expression + IANA timezone ─────
+// ── Step 8: Parse human-readable time → cron expression + IANA timezone ──────
 
 const TZ_ABBREVIATIONS = {
   PST: "America/Los_Angeles", PDT: "America/Los_Angeles",

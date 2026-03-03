@@ -7,6 +7,7 @@
 #   ./scripts/sync-deploy.sh --all                    # Stack files + all instance configs
 #   ./scripts/sync-deploy.sh --instance <name>        # Stack files + one instance's config
 #   ./scripts/sync-deploy.sh --fresh                  # Implies --all, prints post-sync next-steps
+#   ./scripts/sync-deploy.sh --force                  # Skip drift detection, overwrite live configs
 #   ./scripts/sync-deploy.sh -n | --dry-run           # Preview without transferring
 
 set -euo pipefail
@@ -18,6 +19,7 @@ source "$SCRIPT_DIR/lib/source-config.sh"
 
 SYNC_INSTANCES=""      # "" = none, "all" = all, or a specific name
 FRESH=false
+FORCE=false
 DRY_RUN=false
 RSYNC_DRY=""
 
@@ -26,6 +28,7 @@ while [[ $# -gt 0 ]]; do
     --all)        SYNC_INSTANCES="all"; shift ;;
     --instance)   SYNC_INSTANCES="$2"; shift 2 ;;
     --fresh)      SYNC_INSTANCES="all"; FRESH=true; shift ;;
+    --force)      FORCE=true; shift ;;
     -n|--dry-run) DRY_RUN=true; RSYNC_DRY="--dry-run"; shift ;;
     *)            echo "Unknown option: $1" >&2; exit 1 ;;
   esac
@@ -49,6 +52,8 @@ RSYNC_BASE="rsync -avz ${RSYNC_DRY} --rsync-path='sudo rsync'"
 
 info()    { echo -e "\033[36m→ $1\033[0m"; }
 success() { echo -e "\033[32m✓ $1\033[0m"; }
+warn()    { echo -e "\033[33m! $1\033[0m"; }
+err()     { echo -e "\033[31m✗ $1\033[0m"; }
 
 # Helper: run rsync with our SSH config
 do_rsync() {
@@ -171,6 +176,8 @@ if [ -n "$SYNC_INSTANCES" ]; then
     INSTANCE_LIST="$SYNC_INSTANCES"
   fi
 
+  DRIFT_DETECTED=false
+
   for name in $INSTANCE_LIST; do
     local_file="${INSTANCES_DIR}/${name}/.openclaw/openclaw.json"
     if [ ! -f "$local_file" ]; then
@@ -178,28 +185,51 @@ if [ -n "$SYNC_INSTANCES" ]; then
       continue
     fi
 
-    # Stage config for merge at container startup (preserves runtime changes).
-    # --fresh bypasses staging and overwrites directly (clean slate).
-    if $FRESH; then
-      target_filename="openclaw.json"
-    else
-      target_filename="openclaw.json.staged"
-    fi
+    remote_dir="${INSTALL_DIR}/instances/${name}/.openclaw"
 
-    info "Syncing instance config: ${name} (→ ${target_filename})..."
     # Ensure remote directory exists and fix permissions to match setup-infra.sh:
     #   instances/<name>/  → openclaw:openclaw 755 (host scripts can traverse)
     #   .openclaw/         → 1000:1000 700 (container's node user, private data)
-    ${SSH_CMD} "${VPS}" "sudo mkdir -p ${INSTALL_DIR}/instances/${name}/.openclaw && \
+    ${SSH_CMD} "${VPS}" "sudo mkdir -p ${remote_dir} && \
       sudo chown openclaw:openclaw ${INSTALL_DIR}/instances/${name} && \
-      sudo chown 1000:1000 ${INSTALL_DIR}/instances/${name}/.openclaw && \
-      sudo chmod 700 ${INSTALL_DIR}/instances/${name}/.openclaw"
-    do_rsync \
-      "$local_file" \
-      "${VPS}:${INSTALL_DIR}/instances/${name}/.openclaw/${target_filename}"
-    ${SSH_CMD} "${VPS}" "sudo chown 1000:1000 ${INSTALL_DIR}/instances/${name}/.openclaw/${target_filename}"
-    success "instances/${name}/.openclaw/${target_filename} (owner: 1000:1000)"
+      sudo chown 1000:1000 ${remote_dir} && \
+      sudo chmod 700 ${remote_dir}"
+
+    # Check if remote config exists (first deploy detection)
+    remote_exists=$(${SSH_CMD} "${VPS}" "sudo test -f ${remote_dir}/openclaw.json && echo yes || echo no")
+
+    if [ "$remote_exists" = "yes" ] && ! $FRESH && ! $FORCE; then
+      # Drift detection: compare deployed hash vs current live hash
+      deployed_hash=$(${SSH_CMD} "${VPS}" "sudo cat ${remote_dir}/openclaw.json.sha256 2>/dev/null || echo none")
+      if [ "$deployed_hash" != "none" ]; then
+        live_hash=$(${SSH_CMD} "${VPS}" "sudo sha256sum ${remote_dir}/openclaw.json | cut -d' ' -f1")
+        if [ "$deployed_hash" != "$live_hash" ]; then
+          warn "Config drift detected for '${name}'!"
+          warn "  Live config was modified since last deploy."
+          warn "  Run:  scripts/sync-down-configs.sh --instance ${name}"
+          warn "  Then: diff openclaw/${name}/openclaw.jsonc openclaw/${name}/openclaw.live-version.jsonc"
+          warn "  Re-run sync-deploy.sh with --force to overwrite."
+          DRIFT_DETECTED=true
+          continue
+        fi
+      fi
+    fi
+
+    # Upload config (always as openclaw.json — no staging)
+    info "Syncing instance config: ${name}..."
+    do_rsync "$local_file" "${VPS}:${remote_dir}/openclaw.json"
+    ${SSH_CMD} "${VPS}" "sudo chown 1000:1000 ${remote_dir}/openclaw.json"
+
+    # Write deploy hash for future drift detection
+    local_hash=$(sha256sum "$local_file" | cut -d' ' -f1)
+    ${SSH_CMD} "${VPS}" "echo ${local_hash} | sudo tee ${remote_dir}/openclaw.json.sha256 > /dev/null && sudo chown 1000:1000 ${remote_dir}/openclaw.json.sha256"
+    success "instances/${name}/.openclaw/openclaw.json (hash: ${local_hash:0:12}...)"
   done
+
+  if $DRIFT_DETECTED; then
+    err "Deploy aborted — config drift detected (see warnings above)."
+    exit 1
+  fi
 fi
 
 # ── Deploy tracking (diff + auto-commit) ─────────────────────────────────────

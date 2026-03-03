@@ -35,46 +35,35 @@ if [ -d "$openclaw_dir" ]; then
   fi
 fi
 
-# ── 1d. Merge staged config into live (preserves runtime changes) ─────
-# sync-deploy.sh writes openclaw.json.staged instead of overwriting openclaw.json.
-# If a staged file exists, merge it into the live config:
-#   - $VAR fields (template-controlled) → use staged value
-#   - Other fields → preserve live value (potentially user-modified)
-#   - New template keys → added from staged
-# First deploy (no live config) → staged becomes live directly.
-staged_file="/home/node/.openclaw/openclaw.json.staged"
+# ── 1d. Resolve empty env vars in openclaw.json ──────────────────────
+# OpenClaw's native ${VAR} substitution throws MissingEnvVarError for vars
+# that are empty or undefined. These vars are legitimately empty when their
+# feature is unconfigured (no domain path, no logging, etc.).
+# Non-empty vars are left as ${VAR} for OpenClaw to resolve natively in memory.
+POTENTIALLY_EMPTY_VARS="OPENCLAW_DOMAIN_PATH VPS_HOSTNAME LOG_WORKER_TOKEN EVENTS_URL LLEMTRY_URL ADMIN_TELEGRAM_ID"
 config_file="/home/node/.openclaw/openclaw.json"
-if [ -f "$staged_file" ]; then
-  if [ -f "$config_file" ]; then
-    cp "$config_file" "${config_file}.pre-merge.bak"
-    node /app/openclaw-stack/merge-config.mjs \
-      --staged "$staged_file" --live "$config_file" --output "$config_file"
-    echo "[entrypoint] Merged staged config (backup: openclaw.json.pre-merge.bak)"
-  else
-    mv "$staged_file" "$config_file"
-    echo "[entrypoint] No live config — staged file becomes live"
+if [ -f "$config_file" ]; then
+  resolved_count=0
+  for var in $POTENTIALLY_EMPTY_VARS; do
+    # Check if the var reference in openclaw.json resolves to an empty value from env var
+    # If it does, remove the var reference from the file
+    val="${!var:-}"
+    if [ -z "$val" ] && grep -q "\${${var}}" "$config_file"; then
+      sed -i "s/\${${var}}//g" "$config_file"
+      resolved_count=$((resolved_count + 1))
+    fi
+  done
+  if [ "$resolved_count" -gt 0 ]; then
+    chmod 600 "$config_file"
+    chown 1000:1000 "$config_file"
+    # Update deploy hash to match post-resolution state (prevents false drift detection)
+    sha256sum "$config_file" | cut -d' ' -f1 > "${config_file}.sha256"
+    chown 1000:1000 "${config_file}.sha256"
+    echo "[entrypoint] Resolved ${resolved_count} empty env var(s) in openclaw.json"
   fi
-  rm -f "$staged_file"
-  chmod 600 "$config_file"
-  chown 1000:1000 "$config_file"
 fi
 
-# ── 1e. Resolve $VAR references in openclaw.json via envsubst ─────────
-# openclaw.json uses $VAR references for runtime configuration.
-# Docker env vars are set by docker-compose.yml (the single source of truth).
-# Only explicitly listed variables are substituted to avoid accidental replacements
-# of legitimate $ characters in JSON values (e.g. sandbox $HOME references).
-config_file="/home/node/.openclaw/openclaw.json"
-if [ -f "$config_file" ] && grep -q '\$[A-Z_]' "$config_file"; then
-  ENVSUBST_VARS='$OPENCLAW_DOMAIN_PATH $OPENCLAW_ALLOWED_ORIGIN $OPENCLAW_INSTANCE_ID $VPS_HOSTNAME $LOG_WORKER_TOKEN $EVENTS_URL $LLEMTRY_URL $ENABLE_EVENTS_LOGGING $ENABLE_LLEMTRY_LOGGING $ADMIN_TELEGRAM_ID $ANTHROPIC_BASE_URL $OPENAI_BASE_URL $OPENAI_CODEX_BASE_URL'
-  envsubst "$ENVSUBST_VARS" < "$config_file" > "${config_file}.tmp"
-  mv "${config_file}.tmp" "$config_file"
-  chmod 600 "$config_file"
-  chown 1000:1000 "$config_file"
-  echo "[entrypoint] Resolved env vars in openclaw.json"
-fi
-
-# ── 1f. Conditional update support + git-info cache ──────────────────
+# ── 1e. Conditional update support + git-info cache ─────────────────
 if [ -d /app/.git ]; then
   VERSION=$(node -e "console.log(require('/app/package.json').version)" 2>/dev/null || echo "unknown")
 
@@ -119,7 +108,7 @@ if [ -d /app/.git ]; then
   fi
 fi
 
-# ── 1g. Create openclaw CLI symlink ──────────────────────────────────
+# ── 1f. Create openclaw CLI symlink ──────────────────────────────────
 # /app/openclaw.mjs has #!/usr/bin/env node shebang and is executable.
 # Symlink to /usr/local/bin so 'openclaw' works anywhere in the container.
 if [ ! -L /usr/local/bin/openclaw ]; then
@@ -127,7 +116,7 @@ if [ ! -L /usr/local/bin/openclaw ]; then
   echo "[entrypoint] Created /usr/local/bin/openclaw symlink"
 fi
 
-# ── 1h. Configure npm global prefix for skill installs ─────────────
+# ── 1g. Configure npm global prefix for skill installs ─────────────
 # Gateway runs as node (uid 1000) after gosu drops privileges.
 # npm install -g (used by skills.install) needs a writable global prefix.
 # Default /usr/local/lib/node_modules is owned by root — redirect to user dir.
@@ -139,7 +128,7 @@ echo "prefix=$npm_global" > /home/node/.npmrc
 export PATH="$npm_global/bin:$PATH"
 echo "[entrypoint] npm global prefix set to $npm_global"
 
-# ── 1i. Auto-generate gateway shims from sandbox-toolkit.yaml ──────
+# ── 1h. Auto-generate gateway shims from sandbox-toolkit.yaml ──────
 # Shims satisfy the gateway's load-time skill binary preflight checks.
 # Real binaries live in sandbox images — shims are gateway-only (not bind-mounted).
 SKILL_BINS="/opt/skill-bins"

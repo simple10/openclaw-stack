@@ -66,10 +66,10 @@ services:
       - OPENCLAW_DOMAIN_PATH={{this.domain_path}}
       - DASHBOARD_BASE_PATH={{this.dashboard_path}}
       - OPENCLAW_ALLOWED_ORIGIN={{this.allowed_origin}}
-      # ── Identity (used by openclaw.json at runtime via envsubst) ──
+      # ── Identity (resolved by OpenClaw native ${VAR} substitution) ──
       - OPENCLAW_INSTANCE_ID={{@key}}
       - VPS_HOSTNAME={{this.vps_hostname}}
-      # ── Telemetry (used by openclaw.json at runtime via envsubst) ──
+      # ── Telemetry (resolved by OpenClaw native ${VAR} substitution) ──
       - LOG_WORKER_URL={{this.log_worker_url}}
       - LOG_WORKER_TOKEN={{this.log_worker_token}}
       - EVENTS_URL={{this.events_url}}

@@ -29,7 +29,7 @@
 //   - logging
 //   - skills
 //
-// $VAR references are resolved at container startup by entrypoint envsubst.
+// ${VAR} references are resolved at startup by OpenClaw's native env var substitution.
 // Docker env vars are set by docker-compose.yml (the single source of truth).
 //
 {
@@ -52,8 +52,8 @@
       "172.30.0.1"
     ],
     "controlUi": {
-      "basePath": "$OPENCLAW_DOMAIN_PATH",
-      "allowedOrigins": ["$OPENCLAW_ALLOWED_ORIGIN"]
+      "basePath": "${OPENCLAW_DOMAIN_PATH}",
+      "allowedOrigins": ["${OPENCLAW_ALLOWED_ORIGIN}"]
     }
   },
   "channels": {
@@ -128,9 +128,14 @@
             // the workspace bind mount chain (VPS → OpenClaw Gateway .openclaw → Sandbox /workspace).
             // This is needed because readOnlyRoot is enabled - bins like codex, claude, etc. need to persist config files
             // Default HOME is /home/sandbox and is read only when readOnlyRoot is enabled
-            "HOME": "/workspace/.home"
+            "HOME": "/workspace/.home",
             // PATH is intentionally not set — sandbox images include the correct PATH
             // (linuxbrew, bun, system bins). Overriding it risks missing entries.
+            //
+            // Disable Chromium's internal sandbox in browser containers — Docker already
+            // provides isolation (capDrop:ALL + no-new-privileges), and Chromium can't create
+            // its own sandbox without SYS_ADMIN or user namespaces. Harmless for toolkit containers.
+            "OPENCLAW_BROWSER_NO_SANDBOX": "1"
           },
           "pidsLimit": 512, // Add fork-bomb protection
           "memory": "2g", // Default agent container RAM - browser containers also inherit this setting
@@ -254,22 +259,22 @@
       "telemetry": {
         "enabled": true,
         "config": {
-          "instanceId": "$OPENCLAW_INSTANCE_ID",
-          "hostname": "$VPS_HOSTNAME",
+          "instanceId": "${OPENCLAW_INSTANCE_ID}",
+          "hostname": "${VPS_HOSTNAME}",
           "logFile": "telemetry.log", // Set to empty string to disable file logging
           // Remote event shipping to Log Worker /openclaw/events → D1 database
           "events": {
-            "enabled": "$ENABLE_EVENTS_LOGGING",
-            "url": "$EVENTS_URL",
-            "authToken": "$LOG_WORKER_TOKEN",
+            "enabled": "${ENABLE_EVENTS_LOGGING}",
+            "url": "${EVENTS_URL}",
+            "authToken": "${LOG_WORKER_TOKEN}",
             "batchSize": 50,
             "flushIntervalMs": 10000
           },
           // LLM telemetry → Langfuse (via /llemtry endpoint)
           "llemtry": {
-            "enabled": "$ENABLE_LLEMTRY_LOGGING",
-            "url": "$LLEMTRY_URL",
-            "authToken": "$LOG_WORKER_TOKEN"
+            "enabled": "${ENABLE_LLEMTRY_LOGGING}",
+            "url": "${LLEMTRY_URL}",
+            "authToken": "${LOG_WORKER_TOKEN}"
           },
           // Per-category granularity: "full" | "summary" | "metadata" | "off"
           "categories": {
@@ -296,15 +301,15 @@
   "models": {
     "providers": {
       "anthropic": {
-        "baseUrl": "$ANTHROPIC_BASE_URL",
+        "baseUrl": "${ANTHROPIC_BASE_URL}",
         "models": []
       },
       "openai-codex": {
-        "baseUrl": "$OPENAI_CODEX_BASE_URL",
+        "baseUrl": "${OPENAI_CODEX_BASE_URL}",
         "models": []
       },
       "openai": {
-        "baseUrl": "$OPENAI_BASE_URL",
+        "baseUrl": "${OPENAI_BASE_URL}",
         "models": []
       }
     }
@@ -317,7 +322,7 @@
     "elevated": {
       "enabled": true,
       "allowFrom": {
-        "telegram": ["$ADMIN_TELEGRAM_ID"]
+        "telegram": ["${ADMIN_TELEGRAM_ID}"]
         // Add other channels as needed:
         // "discord": ["your-discord-id"],
         // "whatsapp": ["+15555550123"]
