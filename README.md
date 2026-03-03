@@ -62,12 +62,12 @@ claude "start" --dangerously-skip-permissions
 
 <p align="center"><em>Host Alerter — daily health summary and real-time alerts via Telegram</em></p>
 <p align="center">
-  <img src="docs/assets/telegram-host-alerter-report.png" alt="Host Alerter Telegram Report" width="400">
+  <img src="docs/assets/telegram-host-alerter-report.png" alt="Host Alerter Telegram Report" width="700">
 </p>
 
 <p align="center"><em>Local Browser Relay — docker container to run OpenClaw relay & local browsers</em></p>
 <p align="center">
-  <img src="docs/assets/local-browser-relay.png" alt="Local Browser Automation Relay" width="400">
+  <img src="docs/assets/local-browser-relay.png" alt="Local Browser Automation Relay" width="700">
 </p>
 
 - **Multi-claw Stacks** — Run multiple OpenClaw instances on one VPS, each in its own Sysbox container with dedicated resources, Telegram bot, and subdomain
