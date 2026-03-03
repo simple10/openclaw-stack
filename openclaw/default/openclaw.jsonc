@@ -213,7 +213,7 @@
           "deny": ["canvas", "nodes", "discord", "group:plugins"]
         },
         "subagents": {
-          "allowAgents": ["code"] // Add other agents here to allow main to spawn them; e.g. "personal", "work"
+          "allowAgents": ["code", "researcher"] // Add other agents here to allow main to spawn them; e.g. "personal", "work"
         }
       },
       // CODING AGENT
@@ -230,8 +230,6 @@
         ],
         "sandbox": {
           "docker": {
-            "image": "openclaw-sandbox-toolkit:bookworm-slim", // sandbox-toolkit has the full toolkit bins
-            "network": "bridge", // enable network access for claude code, codex, etc. to work
             "memory": "4g", // Coding tasks need more headroom (claude code, LSPs, builds)
             "memorySwap": "8g",
             "cpus": 4
@@ -241,6 +239,19 @@
             "idleHours": 168, // 7 days idle
             "maxAgeDays": 30
           }
+        }
+      },
+      // RESEARCH AGENT
+      // Use research agent's sandboxed browser to login to specific websites for accessing info
+      {
+        "id": "researcher",
+        "name": "Research Agent",
+        // "skills": [
+        //   // List skills here to pre-enable or enable them later in Control UI
+        // ],
+        "tools": {
+          // Agent doesn't need to spawn other agents — that's main's job
+          "deny": ["sessions_spawn"]
         }
       }
     ]
