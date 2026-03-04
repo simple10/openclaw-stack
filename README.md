@@ -181,6 +181,9 @@ Local CLI scripts for common tasks without Claude:
 ./scripts/restart-sandboxes.sh         # Recreate sandbox containers
 ./scripts/start-browser.sh             # Start browser container
 
+# Agents
+./scripts/message-agents.sh <claw> "msg"  # Message all agents (seeds files too)
+
 # Data & config
 ./scripts/openclaw.sh <command>        # Run openclaw CLI via SSH
 ./scripts/sync-media.sh               # Download agent media files

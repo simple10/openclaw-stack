@@ -235,6 +235,19 @@ Start a browser container for an agent and print the dashboard URL.
 scripts/start-browser.sh [agent-name] [--instance <name>]
 ```
 
+### `message-agents.sh`
+
+Send a message to all agents for a given claw. Also seeds agent workspace files (AGENTS.md, SOUL.md, etc.) for any agents that haven't been invoked yet.
+
+```
+scripts/message-agents.sh <claw> "message" [options]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--agent <id>` | Target a single agent instead of all |
+| `--timeout <seconds>` | Per-agent timeout |
+
 ---
 
 ## Data & Config Sync
