@@ -8,7 +8,7 @@ if [ -n "${ENV__SSH_KEY:-}" ]; then
   SSH_ARGS=(-i "${ENV__SSH_KEY}" "${SSH_ARGS[@]}")
 fi
 if [ -n "${ENV__SSH_IDENTITY_AGENT:-}" ]; then
-  SSH_ARGS+=(-o "IdentityAgent=${ENV__SSH_IDENTITY_AGENT}")
+  SSH_ARGS+=(-o "IdentityAgent=${ENV__SSH_IDENTITY_AGENT}" -o "IdentitiesOnly=yes")
 fi
 
 SCP_ARGS=(-P "${ENV__SSH_PORT}" -o StrictHostKeyChecking=accept-new)
@@ -16,7 +16,7 @@ if [ -n "${ENV__SSH_KEY:-}" ]; then
   SCP_ARGS=(-i "${ENV__SSH_KEY}" "${SCP_ARGS[@]}")
 fi
 if [ -n "${ENV__SSH_IDENTITY_AGENT:-}" ]; then
-  SCP_ARGS+=(-o "IdentityAgent=${ENV__SSH_IDENTITY_AGENT}")
+  SCP_ARGS+=(-o "IdentityAgent=${ENV__SSH_IDENTITY_AGENT}" -o "IdentitiesOnly=yes")
 fi
 
 SSH_CMD=(ssh "${SSH_ARGS[@]}")

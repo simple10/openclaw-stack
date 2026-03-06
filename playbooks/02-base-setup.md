@@ -317,6 +317,22 @@ ssh -i <SSH_KEY> -p <SSH_HARDENED_PORT> adminclaw@<VPS_IP> "echo 'Port <SSH_HARD
 2. Change `SSH_PORT=22` to `SSH_PORT=<SSH_HARDENED_PORT>                  # Changed from 22 during hardening`
 3. Delete the `SSH_HARDENED_PORT=` line entirely
 
+If the user relies on a local `~/.ssh/config` host alias or SSH agent-based config, this is also the safe moment to update that host entry to the hardened port. Prompt them explicitly before locking down port 22.
+
+Example `~/.ssh/config` update:
+
+```sshconfig
+Host <alias-or-ip>
+  HostName <VPS_IP>
+  User adminclaw
+  Port <SSH_HARDENED_PORT>
+  IdentityAgent <SSH_IDENTITY_AGENT>
+  IdentitiesOnly yes
+  PreferredAuthentications publickey
+```
+
+Require the user to confirm they updated their local SSH config entry, or that they intentionally do not use one, before continuing to remove port 22.
+
 Then lock down SSH:
 
 ```bash

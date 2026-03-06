@@ -154,7 +154,7 @@ function sshBaseArgs(cfg: Config): string[] {
     'BatchMode=yes',
   ]
   if (cfg.keyPath) args.push('-i', cfg.keyPath)
-  if (cfg.identityAgent) args.push('-o', `IdentityAgent=${cfg.identityAgent}`)
+  if (cfg.identityAgent) args.push('-o', `IdentityAgent=${cfg.identityAgent}`, '-o', 'IdentitiesOnly=yes')
   args.push(`${cfg.user}@${cfg.host}`)
   return args
 }
@@ -185,7 +185,7 @@ export async function uploadScript(cfg: Config): Promise<void> {
       '-o',
       'BatchMode=yes',
       ...(cfg.keyPath ? ['-i', cfg.keyPath] : []),
-      ...(cfg.identityAgent ? ['-o', `IdentityAgent=${cfg.identityAgent}`] : []),
+      ...(cfg.identityAgent ? ['-o', `IdentityAgent=${cfg.identityAgent}`, '-o', 'IdentitiesOnly=yes'] : []),
       cfg.pythonScript,
       `${cfg.user}@${cfg.host}:/tmp/debug-sessions.py`,
     ],

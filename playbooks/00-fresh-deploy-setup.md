@@ -326,6 +326,7 @@ After the user confirms, launch **01-workers and 02-base-setup as parallel subag
 - A command fails and the error requires user input to resolve
 - A playbook step explicitly says to wait for user input (e.g., a blocking error with multiple resolution paths)
 - **SSH verification (02-base-setup.md § 2.4 Step 3):** You MUST test SSH on port `<SSH_HARDENED_PORT>` from the local machine and confirm it works before proceeding. This is a mandatory stop point — do not skip it during automated deployment.
+- **Local SSH config update:** If the user connects via a `~/.ssh/config` host alias or agent-based SSH config, prompt them to update that local entry to port `<SSH_HARDENED_PORT>` immediately after the local hardened-port test passes and before removing port 22.
 - **07-verification.md:** Run in the main context (not a subagent) so the user sees real-time progress and errors can be handled directly. By this point, all heavy steps have been offloaded to subagents and the context window has room. Report the summary table, then run `scripts/sync-workspaces.sh down --all` to pull back any files OpenClaw generated on first start, before proceeding to 08a-configure-llm-proxy.md.
 
 Normal informational output (progress updates, version notes, check results) should be reported inline without pausing. The first user interaction after confirmation should be device pairing in `08b-pair-devices.md`.
