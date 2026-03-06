@@ -42,6 +42,14 @@ set -euo pipefail
 REMOTE
 ```
 
+## Git Ownership
+
+The openclaw source repo at `$INSTALL_DIR/openclaw` is owned by the `openclaw` user. Running git commands as `adminclaw` (the SSH user) will fail with "detected dubious ownership". **Always run git commands as openclaw:**
+
+```bash
+sudo -u openclaw bash -c "cd $INSTALL_DIR/openclaw && git <command>"
+```
+
 ---
 
 ## Prerequisite Check
@@ -68,20 +76,16 @@ Also read `INSTALL_DIR` from the stack config on the VPS. All subsequent command
 
 ## Section 1: Pre-Upgrade Checks
 
-Before upgrading, capture the current state for comparison and rollback.
+Before upgrading, capture the current state for comparison and rollback. Run as openclaw user.
 
 ```bash
-# Record current version
-cd $INSTALL_DIR/openclaw
-CURRENT_VERSION=$(python3 -c "import json; print(json.load(open('package.json'))['version'])" 2>/dev/null || echo "unknown")
-echo "Current version: $CURRENT_VERSION"
-
-# Record current git ref
-git rev-parse HEAD
-git describe --tags --always
-
-# Check for local modifications (should be clean on main)
-git status --short
+sudo -u openclaw bash -c "cd $INSTALL_DIR/openclaw && \
+  echo \"Current version: \$(python3 -c \"import json; print(json.load(open('package.json'))['version'])\" 2>/dev/null || echo unknown)\" && \
+  echo \"Current ref: \$(git rev-parse --short HEAD)\" && \
+  echo \"Current tag: \$(git describe --tags --always 2>/dev/null || echo none)\" && \
+  echo '' && \
+  echo 'Git status:' && \
+  git status --short"
 ```
 
 **If git status shows modifications:** Warn the user. The build script expects a clean repo on the `main` branch. Ask before proceeding.
@@ -92,20 +96,19 @@ git status --short
 
 ## Section 2: Pull Upstream Changes
 
-Fetch upstream changes and show what's new.
+Fetch upstream changes and show what's new. Run as openclaw user.
 
 ```bash
-cd $INSTALL_DIR/openclaw
-
-# Fetch all branches and tags
-git fetch --all --tags --force
-
-# Show available versions
-echo "Latest tags:"
-git tag -l 'v20*' | grep -vE '(beta|rc|alpha)' | sort -V | tail -5
-
-# Show what will change (on main branch)
-git log --oneline HEAD..origin/main | head -20
+sudo -u openclaw bash -c "cd $INSTALL_DIR/openclaw && \
+  git fetch --all --tags --force && \
+  echo '' && \
+  echo 'Latest stable tags:' && \
+  git tag -l 'v20*' | grep -vE '(beta|rc|alpha)' | sort -V | tail -5 && \
+  echo '' && \
+  echo 'New commits on main since current HEAD:' && \
+  git log --oneline HEAD..origin/main | head -20 && \
+  echo '' && \
+  echo \"Total new commits: \$(git rev-list --count HEAD..origin/main)\""
 ```
 
 If the user wants a specific version, note it for the build step. The build script (`build-openclaw.sh`) reads `OPENCLAW_VERSION` from `stack.env` which supports:
@@ -118,8 +121,7 @@ If the user wants to change the version strategy, update `stack.yml` locally and
 **Pull the latest main:**
 
 ```bash
-cd $INSTALL_DIR/openclaw
-git pull
+sudo -u openclaw bash -c "cd $INSTALL_DIR/openclaw && git pull"
 ```
 
 ---
@@ -142,6 +144,7 @@ This script:
 - **Tag not found:** The requested version doesn't exist. Check available tags.
 - **Docker build errors:** Upstream Dockerfile changes may conflict with patches. Check build output.
 - **Disk space:** `docker system df` to check. `docker system prune` if needed (with user confirmation).
+- **Patch false positive:** If the build says "already patched" but containers fail with "gosu not found" or "Docker not installed", the patch detection grep may be matching unrelated text (e.g., `docker.io` in a LABEL vs as an installed package). Check `deploy/host/build-openclaw.sh` patch 4a grep pattern.
 
 ---
 
@@ -175,7 +178,7 @@ Wait for containers to become healthy before declaring success.
 sudo docker inspect -f '{{.State.Health.Status}}' <CONTAINER_NAME>
 ```
 
-Poll every 5 seconds, timeout after 300 seconds. If a container doesn't become healthy:
+Poll every 10 seconds, timeout after 300 seconds. If a container doesn't become healthy:
 
 ```bash
 # Check container logs
@@ -185,10 +188,10 @@ sudo docker logs --tail 50 <CONTAINER_NAME>
 sudo docker ps -a --filter name=<CONTAINER_NAME>
 ```
 
-**If unhealthy after timeout:** Show logs to the user and suggest checking:
-- Entrypoint errors (permissions, missing files)
-- Port conflicts
-- Environment variable issues (`docker compose config` to verify)
+**If containers are in a restart loop:** Check logs immediately — don't wait for timeout. Common crash-loop causes:
+- **"gosu: not found"** — the docker.io/gosu Dockerfile patch was skipped. Check build output for "already patched" false positives.
+- **"Docker not installed"** — same root cause as gosu (both are installed by the same patch).
+- **"tag vX.Y.Z not found"** — .git was not included in the image (check .dockerignore handling) or git commands fail due to ownership (gosu needed to run git as node user).
 
 ---
 
@@ -197,21 +200,14 @@ sudo docker ps -a --filter name=<CONTAINER_NAME>
 After containers are healthy, verify the upgrade succeeded.
 
 ```bash
-# Show new version
-openclaw --instance <CLAW_NAME> --version
-
-# Verify gateway responds
-curl -sf http://localhost:<GATEWAY_PORT>/health || echo "Gateway health check failed"
-
-# Compare versions
-echo "Previous: $CURRENT_VERSION"
-echo "Current:  $(openclaw --instance <CLAW_NAME> --version)"
+# Read version from inside container (avoids openclaw CLI path issues)
+sudo docker exec <CONTAINER> bash -c "cd /app && cat package.json" | python3 -c "import sys,json; print(json.load(sys.stdin)['version'])"
 ```
 
-Print a summary:
+Print a summary table:
 
 - Previous version
-- New version
+- New version per claw
 - Containers recreated
 - Health status (healthy/unhealthy)
 - Any warnings from the upgrade

@@ -86,13 +86,16 @@ HOST_NEEDS_RESTORE=true
 
 # ── 4. Apply patches ────────────────────────────────────────────────
 
-# 4a. Dockerfile: install Docker + gosu for nested Docker
-if ! grep -q "docker.io" Dockerfile; then
+# 4a. Dockerfile: install Docker + gosu for nested Docker (Sysbox)
+# Check for gosu specifically — upstream has "docker.io" in a LABEL which is a false positive.
+# Upstream also offers OPENCLAW_INSTALL_DOCKER_CLI build arg, but that only installs docker-ce-cli
+# (CLI only). We need the full docker.io daemon for Sysbox nested Docker.
+if ! grep -q "gosu" Dockerfile; then
   echo "[build] Patching Dockerfile to install Docker + gosu..."
   sed -i '0,/^USER node/{/^USER node/i RUN apt-get update && apt-get install -y --no-install-recommends docker.io gosu gettext-base && usermod -aG docker node && rm -rf /var/lib/apt/lists/*
 }' Dockerfile
 else
-  echo "[build] Docker already in Dockerfile (already patched)"
+  echo "[build] Docker + gosu already in Dockerfile (already patched)"
 fi
 
 # 4b. Dockerfile: clear build-time jiti cache
