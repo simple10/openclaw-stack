@@ -7,6 +7,8 @@
 # Also exports: OPENCLAW_CONTEXT ("local"|"vps"), REPO_ROOT (local only)
 
 _SC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+OPENCLAW_CONTEXT=""
+REPO_ROOT=""
 _STACK_ENV=""
 _SEARCH="$_SC_DIR"
 _DEPTH=0
