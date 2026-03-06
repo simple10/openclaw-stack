@@ -10,6 +10,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/source-config.sh"
+source "$SCRIPT_DIR/lib/ssh.sh"
 INSTANCE=""
 LOCAL_DIR=""
 
@@ -28,7 +29,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 LOCAL_DIR="${LOCAL_DIR:-$SCRIPT_DIR/../media}"
-SSH_CMD="TERM=xterm-256color ssh -i ${ENV__SSH_KEY} -p ${ENV__SSH_PORT}"
+SSH_RSYNC_CMD="TERM=xterm-256color ${SSH_RSYNC_CMD}"
 
 sync_instance() {
   local name="$1"
@@ -38,7 +39,7 @@ sync_instance() {
   mkdir -p "$dest"
   echo "Syncing ${name} → $dest ..."
   rsync -avz --progress \
-    -e "$SSH_CMD" \
+    -e "$SSH_RSYNC_CMD" \
     --rsync-path="sudo rsync" \
     "${ENV__SSH_USER}@${ENV__VPS_IP}:${remote}" \
     "$dest/"
@@ -49,8 +50,8 @@ if [[ -n "$INSTANCE" ]]; then
   sync_instance "$INSTANCE" "$LOCAL_DIR/$INSTANCE"
 else
   # Discover all instances and sync each
-  INSTANCES=$(ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" -o ConnectTimeout=10 -o BatchMode=yes \
-    "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+  INSTANCES=$("${SSH_CMD[@]}" -o ConnectTimeout=10 -o BatchMode=yes \
+    "$VPS" \
     "sudo ls -1 ${STACK__STACK__INSTALL_DIR}/instances/ 2>/dev/null | grep -v '^\\.'" 2>&1) || {
     echo "Error: Could not list instances on VPS" >&2
     exit 1

@@ -31,11 +31,14 @@ This playbook configures:
 Config variables (read from `.env`):
 
 - `VPS_IP` - Public IP of VPS-1
-- `SSH_KEY` - Path to SSH private key
+- `SSH_KEY` - Optional path to SSH private key
+- `SSH_IDENTITY_AGENT` - Optional path to SSH agent socket
 - `SSH_USER` - Initial SSH user (e.g., ubuntu, root, debian — depends on provider)
 - `SSH_HARDENED_PORT` - Target SSH port for hardening (default: 222 if not set)
 - `CLOUDFLARE_TUNNEL_TOKEN` - Cloudflare Tunnel token
 - `HOSTNAME` - Optional, friendly hostname (replaces provider default)
+
+> **SSH auth convention:** Examples below use `ssh -i <SSH_KEY> ...` for brevity. If you use agent-based auth instead, omit `-i <SSH_KEY>` and add `-o IdentityAgent=<SSH_IDENTITY_AGENT>` when needed.
 
 ## Execution Order
 

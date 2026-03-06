@@ -21,6 +21,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/source-config.sh"
+source "$SCRIPT_DIR/lib/ssh.sh"
 source "$SCRIPT_DIR/lib/resolve-gateway.sh"
 
 SYNC_ONLY=false
@@ -83,7 +84,7 @@ SYNC_REMOTE=(
 printf '\033[32mUpdating sandbox toolkit on %s...\033[0m\n' "$ENV__VPS_IP"
 
 # Check gateway container is running
-if ! ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+if ! "${SSH_CMD[@]}" "$VPS" \
   "sudo docker inspect -f '{{.State.Running}}' $GATEWAY 2>/dev/null" | grep -q true; then
   echo "Error: $GATEWAY container is not running on VPS" >&2
   exit 1
@@ -112,7 +113,7 @@ for i in "${!SYNC_LOCAL[@]}"; do
     echo "  [dry-run] Would sync $local_file -> $remote_path"
   else
     # Write as openclaw user directly — avoids temp files and permission issues
-    cat "$local_path" | ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+    cat "$local_path" | "${SSH_CMD[@]}" "$VPS" \
       "sudo -u openclaw tee $remote_path > /dev/null"
     echo "  Synced $local_file"
   fi
@@ -131,7 +132,7 @@ printf '\033[33m[%d/%d] Regenerating gateway shims...\033[0m\n' "$STEP" "$TOTAL_
 if [ "$DRY_RUN" = true ]; then
   echo "  [dry-run] Would regenerate shims via docker exec --user root"
 else
-  TERM=xterm-256color ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+  TERM=xterm-256color "${SSH_CMD[@]}" "$VPS" \
     "sudo docker exec -i --user root $GATEWAY sh" << 'SHIM_SCRIPT'
 TOOLKIT_CONFIG="/app/openclaw-stack/sandbox-toolkit.yaml"
 TOOLKIT_PARSER="/app/openclaw-stack/parse-toolkit.mjs"
@@ -189,10 +190,10 @@ if [ "$DRY_RUN" = true ]; then
 fi
 
 if [ "$DRY_RUN" = true ]; then
-  TERM=xterm-256color ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+  TERM=xterm-256color "${SSH_CMD[@]}" "$VPS" \
     "sudo docker exec $GATEWAY /app/openclaw-stack/rebuild-sandboxes.sh $REBUILD_FLAGS"
 else
-  TERM=xterm-256color ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" -t "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+  TERM=xterm-256color "${SSH_CMD[@]}" -t "$VPS" \
     "sudo docker exec $GATEWAY /app/openclaw-stack/rebuild-sandboxes.sh $REBUILD_FLAGS"
 fi
 

@@ -28,6 +28,8 @@ This playbook verifies:
 - Workers deployed (01-workers.md)
 - VPS-1 rebooted after configuration
 
+> **SSH auth convention:** Commands below may show `ssh -i <SSH_KEY> ...`. If you use an SSH agent, omit `-i <SSH_KEY>` and use your normal SSH config or add `-o IdentityAgent=<SSH_IDENTITY_AGENT>`.
+
 ## Pre-Verification: Reboot VPS-1
 
 Before running verification tests, reboot VPS-1 to ensure all configuration changes take effect cleanly (especially kernel parameters, SSH config, and systemd services).

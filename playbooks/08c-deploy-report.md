@@ -15,6 +15,8 @@ The report is saved to `.deploy-logs/<timestamp>/08-deploy-report.md` (same time
 
 Collect the following values and present them in a single, neatly formatted report:
 
+> **SSH auth convention:** Examples below may show `ssh -i <SSH_KEY> ...`. If you use agent-based auth, omit `-i <SSH_KEY>` and rely on your SSH config or add `-o IdentityAgent=<SSH_IDENTITY_AGENT>`.
+
 ## Values to collect
 
 1. **User passwords** — source `scripts/lib/source-config.sh` to get `ADMINCLAW_PASSWORD` and `OPENCLAW_PASSWORD`. These are auto-generated and persisted in `.env`.

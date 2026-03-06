@@ -180,6 +180,8 @@ sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d'
 
 #### SSH Keys
 
+If your deployment uses agent-based auth, rotate the underlying key in your agent and update `SSH_IDENTITY_AGENT` only if the socket path changes. The file-based example below applies when `.env` uses `SSH_KEY`.
+
 ```bash
 # 1. Generate new key pair (local machine)
 ssh-keygen -t ed25519 -f ~/.ssh/vps1_openclaw_ed25519_new

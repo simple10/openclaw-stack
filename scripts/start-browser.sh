@@ -17,6 +17,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/source-config.sh"
+source "$SCRIPT_DIR/lib/ssh.sh"
 source "$SCRIPT_DIR/lib/resolve-gateway.sh"
 
 # Extract --instance before positional args
@@ -35,13 +36,13 @@ MAX_WAIT=90  # seconds to wait for browser container
 
 # Helper: run a command inside the gateway container as node
 gw_exec() {
-  TERM=xterm-256color ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+  TERM=xterm-256color "${SSH_CMD[@]}" "$VPS" \
     "sudo docker exec --user node $GATEWAY $*"
 }
 
 # Helper: run a command inside the gateway container as root (for nested docker)
 gw_exec_root() {
-  TERM=xterm-256color ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+  TERM=xterm-256color "${SSH_CMD[@]}" "$VPS" \
     "sudo docker exec $GATEWAY $*"
 }
 
@@ -121,7 +122,7 @@ if [[ -z "$BROWSER_CONTAINER" ]]; then
   printf '\033[33mNo existing browser container. Sending agent message to trigger creation...\033[0m\n'
 
   # Send a message that reliably triggers the browser tool
-  TERM=xterm-256color ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+  TERM=xterm-256color "${SSH_CMD[@]}" "$VPS" \
     "sudo docker exec --user node $GATEWAY openclaw agent --agent $AGENT \
       --message 'Use the browser tool to navigate to about:blank. Do nothing else after that.' \
       --timeout 90" >/dev/null 2>&1 &

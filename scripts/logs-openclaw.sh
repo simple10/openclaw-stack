@@ -11,6 +11,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/source-config.sh"
+source "$SCRIPT_DIR/lib/ssh.sh"
 source "$SCRIPT_DIR/lib/resolve-gateway.sh"
 
 # Extract --instance before other args
@@ -41,5 +42,5 @@ DOCKER_ARGS+=("$CONTAINER")
 
 printf "\033[32mStreaming logs from %s on VPS-1 (%s)\033[0m\n" "$CONTAINER" "$ENV__VPS_IP"
 
-TERM=xterm-256color ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+TERM=xterm-256color "${SSH_CMD[@]}" "$VPS" \
   "sudo docker ${DOCKER_ARGS[*]}"

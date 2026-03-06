@@ -8,6 +8,8 @@ Pair browser and Telegram devices with each claw's gateway.
 - Domain verified as protected by Cloudflare Access (during `00-fresh-deploy-setup.md`)
 - LLM proxy configured (optional but recommended — `08a-configure-llm-proxy.md`)
 
+> **SSH auth convention:** Examples below may show `ssh -i <SSH_KEY> ...`. If you use agent-based auth, omit `-i <SSH_KEY>` and rely on your SSH config or add `-o IdentityAgent=<SSH_IDENTITY_AGENT>`.
+
 ---
 
 ## Open the Claw URLs

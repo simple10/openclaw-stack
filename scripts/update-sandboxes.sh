@@ -13,6 +13,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/source-config.sh"
+source "$SCRIPT_DIR/lib/ssh.sh"
 source "$SCRIPT_DIR/lib/resolve-gateway.sh"
 
 # Pass through flags to rebuild-sandboxes.sh
@@ -46,14 +47,14 @@ GATEWAY=$(resolve_gateway ${INSTANCE_ARGS[@]+"${INSTANCE_ARGS[@]}"}) || exit 1
 printf '\033[32mRebuilding sandbox images on %s...\033[0m\n' "$ENV__VPS_IP"
 
 # Check gateway container is running
-if ! ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+if ! "${SSH_CMD[@]}" "$VPS" \
   "sudo docker inspect -f '{{.State.Running}}' $GATEWAY 2>/dev/null" | grep -q true; then
   echo "Error: $GATEWAY container is not running on VPS" >&2
   exit 1
 fi
 
 # Run rebuild-sandboxes.sh inside the running gateway container
-TERM=xterm-256color ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" -t "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+TERM=xterm-256color "${SSH_CMD[@]}" -t "$VPS" \
   "sudo docker exec $GATEWAY /app/openclaw-stack/rebuild-sandboxes.sh $FLAGS"
 
 echo ""
