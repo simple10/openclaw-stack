@@ -104,7 +104,7 @@ scripts/sync-deploy.sh
 sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d <project_name>-openclaw-personal-claw'
 ```
 
-On first boot, the OpenClaw gateway loads the bundled `@openclaw/matrix` plugin automatically when `MATRIX_ENABLED=true`. No installation step is required — the plugin ships with OpenClaw.
+On first boot, the entrypoint automatically installs `@openclaw/matrix` when `MATRIX_ENABLED=true`. No manual installation step is required — the stack handles it.
 
 ---
 
@@ -201,9 +201,10 @@ openclaw pairing approve matrix <CODE>
 
 ### Plugin not loading
 
-The `@openclaw/matrix` plugin is bundled with OpenClaw. If the channel is enabled but not responding, check that the plugin entry is in `openclaw.json`:
+`@openclaw/matrix` is installed by the entrypoint on first boot when `MATRIX_ENABLED=true`. If the channel is enabled but not responding, check the container logs for install errors and verify the plugin entry is active:
 
 ```bash
+sudo docker logs <project>-openclaw-<name> 2>&1 | grep -i '\[entrypoint\].*matrix'
 sudo docker exec --user node <project>-openclaw-<name> openclaw plugins list
 ```
 

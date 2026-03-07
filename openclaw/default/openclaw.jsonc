@@ -272,8 +272,8 @@
     "enabled": true,
     "allow": [
       "telemetry", // Unified telemetry — replaces llm-logger plugin and debug-logger hook
-      "memory-core" // File-backed memory search tools
-      // @openclaw/matrix is bundled with OpenClaw — no allow entry needed; declare in entries below
+      "memory-core", // File-backed memory search tools
+      "matrix" // @openclaw/matrix channel plugin (external; installed by entrypoint when MATRIX_ENABLED=true)
     ],
     "load": {
       "paths": ["/app/openclaw-stack/plugins"] // Load directly from openclaw-stack mount — avoids copying into OpenClaw's namespace
@@ -325,7 +325,7 @@
         "enabled": true
       },
       // Matrix Channel Plugin
-      // @openclaw/matrix is bundled with OpenClaw — no install step needed.
+      // @openclaw/matrix is an external plugin — installed by entrypoint.sh on first boot when MATRIX_ENABLED=true.
       // Plugin key is "matrix" (unscoped). enabled: "false" → channel inactive.
       "matrix": {
         "enabled": "${MATRIX_ENABLED}"

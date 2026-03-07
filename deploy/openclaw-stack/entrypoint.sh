@@ -100,8 +100,28 @@ echo "prefix=$npm_global" > /home/node/.npmrc
 export PATH="$npm_global/bin:$PATH"
 echo "[entrypoint] npm global prefix set to $npm_global"
 
+# ── 1h. Install @openclaw/matrix plugin (if enabled) ────────────────
+# @openclaw/matrix is an external plugin — not bundled with OpenClaw.
+# Install on first boot; skip if already present (idempotent).
+# Hard-fails (exit 1) if install fails while MATRIX_ENABLED=true — starting
+# the gateway without the plugin would silently drop Matrix messages.
+# Runs as node (uid 1000) so the install lands in node's home dir.
+if [ "${MATRIX_ENABLED:-false}" = "true" ]; then
+  MATRIX_EXT_DIR="/home/node/.openclaw/extensions/@openclaw/matrix"
+  if [ ! -d "$MATRIX_EXT_DIR" ]; then
+    echo "[entrypoint] Installing @openclaw/matrix plugin..."
+    if gosu node openclaw plugins install @openclaw/matrix; then
+      echo "[entrypoint] @openclaw/matrix installed"
+    else
+      echo "[entrypoint] ERROR: @openclaw/matrix install failed — cannot start with MATRIX_ENABLED=true" >&2
+      exit 1
+    fi
+  else
+    echo "[entrypoint] @openclaw/matrix already installed, skipping"
+  fi
+fi
 
-# ── 1h. Auto-generate gateway shims from sandbox-toolkit.yaml ──────
+# ── 1i. Auto-generate gateway shims from sandbox-toolkit.yaml ──────
 # Shims satisfy the gateway's load-time skill binary preflight checks.
 # Real binaries live in sandbox images — shims are gateway-only (not bind-mounted).
 SKILL_BINS="/opt/skill-bins"

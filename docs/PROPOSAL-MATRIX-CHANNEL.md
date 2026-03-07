@@ -21,14 +21,13 @@ OpenClaw supports Matrix via the `@openclaw/matrix` plugin. For this stack, the 
 
 Per the current OpenClaw docs and confirmed against a live installation, Matrix is:
 
-- **Bundled with OpenClaw core** — `~/.openclaw/extensions/` is empty on a working Matrix install; no `plugins install` step needed
-- Plugin key in `plugins.entries` is `"matrix"` (unscoped), not `"@openclaw/matrix"`
+- **Available as an external plugin** — `@openclaw/matrix` is installed via `openclaw plugins install @openclaw/matrix`; plugin key in `plugins.entries` is `"matrix"` (unscoped), not `"@openclaw/matrix"`
 - Configured under `channels.matrix`
 - Compatible with direct messages, rooms, threads, media, reactions, polls, location, and native commands
 - Capable of E2EE when `channels.matrix.encryption: true` and the crypto module is available
 - Able to run multiple Matrix accounts via `channels.matrix.accounts`
 
-Important implication: this stack does not need to invent a Matrix transport layer, and does not need to manage plugin installation. It needs to make Matrix channel configuration first-class deployment concerns.
+Important implication: this stack does not need to invent a Matrix transport layer. It needs to manage plugin installation (via the entrypoint) and make Matrix channel configuration first-class deployment concerns.
 
 ---
 
@@ -36,7 +35,7 @@ Important implication: this stack does not need to invent a Matrix transport lay
 
 Implement Matrix in `openclaw-stack` using OpenClaw's native Matrix plugin and config model:
 
-1. Activate the bundled `@openclaw/matrix` plugin via `plugins.entries.matrix.enabled` — no install step needed.
+1. Install `@openclaw/matrix` via the entrypoint when `MATRIX_ENABLED=true` and activate via `plugins.entries.matrix.enabled`.
 2. Expose Matrix credentials/config through `stack.yml` and `.env`.
 3. Render `channels.matrix` into each instance's `openclaw.json`.
 4. Persist Matrix runtime state so access tokens, sync state, and crypto state survive restarts.
@@ -50,7 +49,7 @@ Implement Matrix through the official plugin and stack-managed configuration.
 
 ### 1. Plugin activation
 
-Matrix is bundled with OpenClaw core — no install step is needed. The `~/.openclaw/extensions/` directory remains empty on a working Matrix installation.
+`@openclaw/matrix` is an external plugin installed via `openclaw plugins install @openclaw/matrix`. The entrypoint handles this automatically when `MATRIX_ENABLED=true`, using a directory-existence check for idempotency. Install failure is a hard error (`exit 1`) — the gateway should not start with Matrix enabled but the plugin missing.
 
 To activate the plugin, declare it in `plugins.entries` using the unscoped key `"matrix"`:
 
@@ -216,9 +215,9 @@ Render `channels.matrix` only when enabled, and pass through supported options s
 
 ### Deploy/install scripts
 
-No plugin install step is needed in the entrypoint or elsewhere. Matrix is bundled and activated through config (`plugins.entries.matrix.enabled`).
+The entrypoint installs `@openclaw/matrix` when `MATRIX_ENABLED=true`, using a directory-existence check so repeat deploys are idempotent. Install failure exits with code 1 — the gateway must not start with Matrix enabled but the plugin absent.
 
-The entrypoint requires no Matrix-specific changes. The plugin is loaded by the OpenClaw gateway process on startup when the `plugins.entries.matrix` entry is enabled.
+The plugin is loaded by the OpenClaw gateway process on startup when the `plugins.entries.matrix` entry is enabled.
 
 ### `docker-compose.yml.hbs`
 
@@ -353,9 +352,7 @@ Clarification:
 
 ### Plugin model
 
-`@openclaw/matrix` is bundled with OpenClaw and does not live in `~/.openclaw/extensions/`. The plugin key in `plugins.entries` is `"matrix"` (unscoped). No version pinning, no install path, no extensions directory management.
-
-If a future OpenClaw version moves Matrix to an external plugin, the entrypoint install pattern can be reintroduced at that time.
+`@openclaw/matrix` is an external plugin installed via `openclaw plugins install @openclaw/matrix`. The plugin key in `plugins.entries` is `"matrix"` (unscoped). The entrypoint handles installation automatically when `MATRIX_ENABLED=true` and checks for an existing install to stay idempotent.
 
 ### Runtime persistence
 
@@ -440,4 +437,4 @@ Reasoning:
 
 ## Conclusion
 
-The implementation integrates Matrix into `openclaw-stack` through config and env-var wiring only. No plugin install step is needed — the plugin is bundled with OpenClaw and activated via `plugins.entries.matrix.enabled`. The stack's job is channel configuration, credential management, and persistence coverage.
+The implementation integrates Matrix into `openclaw-stack` through plugin installation, config wiring, and env-var management. `@openclaw/matrix` is an external plugin — the entrypoint installs it automatically when `MATRIX_ENABLED=true` and activates it via `plugins.entries.matrix.enabled`. The stack's job is plugin install, channel configuration, credential management, and persistence coverage.
