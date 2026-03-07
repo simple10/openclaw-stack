@@ -87,7 +87,9 @@ HOST_NEEDS_RESTORE=true
 # ── 4. Apply patches ────────────────────────────────────────────────
 
 # 4a. Dockerfile: install Docker + gosu for nested Docker
-if ! grep -q "docker.io" Dockerfile; then
+# Note: grep for "gosu" specifically — the upstream Dockerfile contains "docker.io" in
+# its LABEL metadata (docker.io/library/node:...) which would give a false positive.
+if ! grep -q "gosu" Dockerfile; then
   echo "[build] Patching Dockerfile to install Docker + gosu..."
   sed -i '0,/^USER node/{/^USER node/i RUN apt-get update && apt-get install -y --no-install-recommends docker.io gosu gettext-base && usermod -aG docker node && rm -rf /var/lib/apt/lists/*
 }' Dockerfile
