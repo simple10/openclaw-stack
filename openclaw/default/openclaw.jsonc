@@ -73,6 +73,7 @@
       "enabled": "${MATRIX_ENABLED}",
       "homeserver": "${MATRIX_HOMESERVER}",
       "accessToken": "${MATRIX_ACCESS_TOKEN}", // Access token for the Matrix bot account
+      "deviceName": "OPENCLAW_GATEWAY", // Device name shown in Matrix clients' device list
       "encryption": false, // Set to true for E2EE (requires crypto module — see docs/MATRIX.md)
       "dm": { "policy": "pairing" }, // Require device pairing for DMs
       "groupPolicy": "allowlist" // Only respond in explicitly listed rooms
