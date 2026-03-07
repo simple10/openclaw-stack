@@ -129,6 +129,7 @@ cat <INSTALL_DIR>/logs/session-prune.log
 | `instances/<name>/.openclaw/openclaw.json` | OpenClaw configuration (per-claw) |
 | `instances/<name>/.openclaw/credentials/` | API keys and tokens (per-claw) |
 | `instances/<name>/.openclaw/workspace/` | User workspaces and data (per-claw) |
+| `instances/<name>/.openclaw/matrix/` | Matrix sync state and E2EE crypto keys (per-claw, when present) |
 | `docker-compose.yml` | Docker Compose deployment config |
 
 ---
