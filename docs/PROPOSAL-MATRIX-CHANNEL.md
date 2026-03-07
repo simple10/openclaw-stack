@@ -77,7 +77,7 @@ The stack should render OpenClaw's native Matrix config into `openclaw.json`, fo
     "matrix": {
       "enabled": true,
       "homeserver": "$MATRIX_HOMESERVER",
-      "accessToken": "$MATRIX_ACCESS_TOKEN",
+      "accessToken": "$MATRIX_ACCESS_TOKEN", // Access token for the Matrix account this claw uses as its bot-style identity
       "encryption": false,
       "dm": { "policy": "pairing" },
       "groupPolicy": "allowlist"
@@ -137,7 +137,7 @@ For v1, the intended model is:
 
 This is not a "one Matrix account per human user" design. Multiple people can use the same claw through the same bot account, subject to the claw's pairing and room policy.
 
-Upstream supports multiple Matrix accounts per claw, but that is a phase-2 feature and is not needed for the basic model above.
+Upstream supports multiple Matrix accounts per claw. In this stack, the normal and intended relationship is one Matrix account per claw, and that is the model used by this proposal.
 
 ---
 
@@ -168,7 +168,7 @@ claws:
   main:
     matrix:
       enabled: true
-      access_token: ${MAIN_CLAW_MATRIX_ACCESS_TOKEN}
+      access_token: ${MAIN_CLAW_MATRIX_ACCESS_TOKEN} # Access token for the Matrix account this claw logs in as
 ```
 
 This matches the repo's current config style and deep-merge behavior. The render step can translate it into upstream fields such as `dm.policy`, `groupPolicy`, `groupAllowFrom`, and `autoJoin`.
@@ -194,9 +194,12 @@ MAIN_CLAW_MATRIX_ACCESS_TOKEN=
 # MAIN_CLAW_MATRIX_HOMESERVER=https://matrix.org
 ```
 
-Use access-token auth only in this stack. The rendered container env can still expose `MATRIX_HOMESERVER` and `MATRIX_ACCESS_TOKEN`, but stack inputs should follow the per-claw naming pattern already used elsewhere in this repo. If multi-account support is added later, it belongs in `stack.yml`, not as a flat env-var scheme.
+Use access-token auth only in this stack. The rendered container env can still expose `MATRIX_HOMESERVER` and `MATRIX_ACCESS_TOKEN`, but stack inputs should follow the per-claw naming pattern already used elsewhere in this repo. Multi-account support is not part of this stack model and does not need a flat env-var scheme.
 
 `MAIN_CLAW_MATRIX_ACCESS_TOKEN` is only an example. The actual env var name depends on the claw name, such as `ALERTS_CLAW_MATRIX_ACCESS_TOKEN`.
+This token belongs to the Matrix account the claw uses as its bot-style identity, not to the homeserver itself.
+
+This proposal is about the claw's interactive Matrix identity. If Matrix is later used for host/infrastructure alerts, that should use a separate Matrix sender identity, separate access token, and likely a separate room configuration rather than reusing the claw's chat identity.
 
 ### `openclaw.jsonc` template
 
@@ -259,6 +262,7 @@ Add operator documentation covering:
 
 - Creating a Matrix bot account
 - Obtaining an access token
+- Understanding that the claw's Matrix access token is for interactive chat, not for a separate infra-alert sender
 - DM pairing approval with `openclaw pairing list matrix` and `openclaw pairing approve matrix <CODE>`
 - Inviting the bot to a room before room usage
 - How `auto_join` and `auto_join_allowlist` affect room invites
@@ -341,9 +345,9 @@ Release gate for production E2EE:
 
 ### Multi-account
 
-Upstream supports multiple Matrix accounts per claw, but that should remain out of scope for v1.
+Upstream supports multiple Matrix accounts per claw, but that is not part of this stack's intended model.
 
-For this stack, the v1 model is one Matrix bot account per claw. Multi-account support would only be useful later for cases such as separate assistant and alerts bots or account-specific routing/policy.
+For this stack, the normal model is one Matrix account per claw, and that is the model used in this proposal. Multi-account support is optional and remains out of scope for v1.
 
 ---
 
@@ -446,7 +450,7 @@ Reasoning:
 
 ### Multi-account scope
 
-Initial implementation should expose only the default Matrix account. Support for multiple Matrix accounts per claw should be deferred.
+Initial implementation should expose only the default Matrix account. Multiple Matrix accounts per claw are possible upstream, but that is not part of this stack's intended model.
 
 Reasoning:
 

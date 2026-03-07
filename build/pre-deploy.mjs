@@ -297,6 +297,16 @@ function validateClaw(name, claw) {
   if (!telegram?.bot_token) {
     warn(`Claw '${name}' has no telegram.bot_token — Telegram will be disabled`);
   }
+
+  const matrix = claw.matrix;
+  if (matrix?.enabled) {
+    if (!matrix.homeserver) {
+      fatal(`Claw '${name}' has matrix.enabled: true but matrix.homeserver is not set`);
+    }
+    if (!matrix.access_token) {
+      fatal(`Claw '${name}' has matrix.enabled: true but matrix.access_token is empty — set the access token env var in .env`);
+    }
+  }
 }
 
 // ── Step 7: Compute derived values per claw ──────────────────────────────────
@@ -356,6 +366,9 @@ function computeDerivedValues(claws, stack, host, previousDeploy) {
     claw.llemtry_url = logUrl ? logUrl + "/llemtry" : "";
     claw.enable_events_logging = stack.logging?.events || false;
     claw.enable_llemtry_logging = stack.logging?.llemtry || false;
+    // matrix_enabled is a flat boolean for Handlebars — avoids empty-string output
+    // when matrix: is absent from stack.yml ({{this.matrix.enabled}} would be empty).
+    claw.matrix_enabled = claw.matrix?.enabled === true;
   }
 
   return autoTokens;
@@ -641,6 +654,11 @@ async function main() {
     EVENTS_URL: "events_url",
     LLEMTRY_URL: "llemtry_url",
     ADMIN_TELEGRAM_ID: "telegram.allow_from",
+    // Matrix vars: always present in env (openclaw.jsonc references them via ${VAR}).
+    // When Matrix is disabled, they are empty — pre-resolved here so OpenClaw's
+    // ${VAR} substitution doesn't throw MissingEnvVarError on the matrix channel block.
+    MATRIX_HOMESERVER: "matrix.homeserver",
+    MATRIX_ACCESS_TOKEN: "matrix.access_token",
   };
   // Check against first claw (these vars are stack-wide, same for all claws)
   const firstClaw = Object.values(claws)[0];

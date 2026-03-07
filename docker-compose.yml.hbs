@@ -61,6 +61,14 @@ services:
       # ── Telegram ──
       - TELEGRAM_BOT_TOKEN={{this.telegram.bot_token}}
       - ADMIN_TELEGRAM_ID={{this.telegram.allow_from}}
+      # ── Matrix ──
+      # MATRIX_ENABLED is always emitted so openclaw.jsonc ${MATRIX_ENABLED} resolves cleanly.
+      # Sensitive vars (homeserver, token) are only emitted when Matrix is enabled.
+      - MATRIX_ENABLED={{this.matrix_enabled}}
+{{#if this.matrix_enabled}}
+      - MATRIX_HOMESERVER={{this.matrix.homeserver}}
+      - MATRIX_ACCESS_TOKEN={{this.matrix.access_token}}
+{{/if}}
       # ── Domain & UI ──
       - OPENCLAW_DOMAIN={{this.domain}}
       - OPENCLAW_DOMAIN_PATH={{this.domain_path}}

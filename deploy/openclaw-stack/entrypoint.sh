@@ -100,6 +100,23 @@ echo "prefix=$npm_global" > /home/node/.npmrc
 export PATH="$npm_global/bin:$PATH"
 echo "[entrypoint] npm global prefix set to $npm_global"
 
+# ── Matrix plugin install (if enabled) ──────────────────────────────
+# Fast filesystem check — if @openclaw/matrix is already installed, skip entirely.
+# Only runs when MATRIX_ENABLED=true (controlled by matrix.enabled in stack.yml).
+# Runs as node (uid 1000) so plugin files under ~/.openclaw/extensions keep the
+# same ownership as the rest of the persisted .openclaw state.
+if [ "${MATRIX_ENABLED:-false}" = "true" ]; then
+  MATRIX_EXT_DIR="/home/node/.openclaw/extensions/@openclaw/matrix"
+  if [ ! -d "$MATRIX_EXT_DIR" ]; then
+    echo "[entrypoint] Installing @openclaw/matrix plugin..."
+    gosu node openclaw plugins install @openclaw/matrix && \
+      echo "[entrypoint] @openclaw/matrix installed" || \
+      echo "[entrypoint] WARNING: @openclaw/matrix install failed — Matrix channel will not be available"
+  else
+    echo "[entrypoint] @openclaw/matrix already installed"
+  fi
+fi
+
 # ── 1h. Auto-generate gateway shims from sandbox-toolkit.yaml ──────
 # Shims satisfy the gateway's load-time skill binary preflight checks.
 # Real binaries live in sandbox images — shims are gateway-only (not bind-mounted).

@@ -64,6 +64,18 @@
       "streamMode": "partial" // Stream partial responses to Telegram
       // botToken read from TELEGRAM_BOT_TOKEN env var (set in docker-compose.yml)
       // WARNING: Each claw MUST use a unique bot token. Sharing tokens causes getUpdates 409 conflicts.
+    },
+    // Matrix channel — enabled via MATRIX_ENABLED env var (controlled by matrix.enabled in stack.yml).
+    // Configure matrix: in stack.yml, set access token in .env, then run npm run pre-deploy.
+    // Full config reference: https://docs.openclaw.ai/channels/matrix
+    // Setup guide: docs/MATRIX.md
+    "matrix": {
+      "enabled": "${MATRIX_ENABLED}",
+      "homeserver": "${MATRIX_HOMESERVER}",
+      "accessToken": "${MATRIX_ACCESS_TOKEN}", // Access token for the Matrix bot account
+      "encryption": false, // Set to true for E2EE (requires crypto module — see docs/MATRIX.md)
+      "dm": { "policy": "pairing" }, // Require device pairing for DMs
+      "groupPolicy": "allowlist" // Only respond in explicitly listed rooms
     }
   },
   "logging": {
