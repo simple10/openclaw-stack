@@ -72,19 +72,19 @@ fi
 
 source "$SCRIPT_DIR/lib/source-config.sh"
 source "$SCRIPT_DIR/lib/select-claw.sh"
+source "$SCRIPT_DIR/lib/ssh.sh"
 
 # Common SSH/SCP options (scp uses -P for port, ssh uses -p)
-SSH_COMMON=(-i "${ENV__SSH_KEY}" -o ConnectTimeout=10)
-SSH_OPTS=("${SSH_COMMON[@]}" -p "${ENV__SSH_PORT}")
-SCP_OPTS=("${SSH_COMMON[@]}" -P "${ENV__SSH_PORT}")
+SSH_OPTS=("${SSH_ARGS[@]}" -o ConnectTimeout=10)
+SCP_OPTS=("${SCP_ARGS[@]}" -o ConnectTimeout=10)
 
 # Resolve instance if not specified
 if [[ -z "$INSTANCE" ]]; then
   # adminclaw can't traverse /home/openclaw (750), so use sudo ls
   INSTANCES=$(ssh "${SSH_OPTS[@]}" -o BatchMode=yes \
-    "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+    "$VPS" \
     "sudo ls -1 ${STACK__STACK__INSTALL_DIR}/instances/ 2>/dev/null | grep -v '^\\.'" 2>&1) || {
-    echo "Error: SSH connection failed. Check ENV__SSH_KEY, ENV__SSH_PORT, ENV__SSH_USER, ENV__VPS_IP in stack.env" >&2
+    echo "Error: SSH connection failed. Check ENV__SSH_KEY/agent, ENV__SSH_PORT, ENV__SSH_USER, ENV__VPS_IP in stack.env" >&2
     echo "  ENV__SSH_USER=${ENV__SSH_USER} ENV__SSH_PORT=${ENV__SSH_PORT} ENV__VPS_IP=${ENV__VPS_IP}" >&2
     exit 1
   }
@@ -109,7 +109,7 @@ if [[ ! -f "$PYTHON_SCRIPT" ]]; then
 fi
 
 # Copy script to VPS
-if ! scp -q "${SCP_OPTS[@]}" "$PYTHON_SCRIPT" "${ENV__SSH_USER}@${ENV__VPS_IP}:${REMOTE_SCRIPT}"; then
+if ! scp -q "${SCP_OPTS[@]}" "$PYTHON_SCRIPT" "${VPS}:${REMOTE_SCRIPT}"; then
   echo "Error: Failed to copy debug script to VPS" >&2
   exit 1
 fi

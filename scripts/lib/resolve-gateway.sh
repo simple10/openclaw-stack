@@ -9,10 +9,13 @@
 #      if exactly one, use it; if multiple, show interactive picker;
 #      if zero, error with guidance.
 #
-# Requires ENV__SSH_KEY, ENV__SSH_PORT, ENV__SSH_USER, ENV__VPS_IP to be set (from stack.env).
+# Requires ENV__SSH_PORT, ENV__SSH_USER, ENV__VPS_IP, and optionally
+# ENV__SSH_KEY / ENV__SSH_IDENTITY_AGENT from stack.env.
 
 # shellcheck source=select-claw.sh
 source "$(dirname "${BASH_SOURCE[0]}")/select-claw.sh"
+# shellcheck source=ssh.sh
+source "$(dirname "${BASH_SOURCE[0]}")/ssh.sh"
 
 resolve_gateway() {
   local instance=""
@@ -44,8 +47,8 @@ resolve_gateway() {
 
   # Auto-detect: find running claw containers (match -openclaw- substring, exclude sandbox containers)
   local containers
-  containers=$(ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" -o ConnectTimeout=10 -o BatchMode=yes \
-    "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+  containers=$("${SSH_CMD[@]}" -o ConnectTimeout=10 -o BatchMode=yes \
+    "$VPS" \
     "sudo docker ps --format '{{.Names}}' --filter 'name=openclaw-'" 2>/dev/null \
     | grep -v 'sbx-' \
     || true)

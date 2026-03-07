@@ -44,6 +44,7 @@ export interface Config {
   port: string
   user: string
   keyPath: string
+  identityAgent: string
   pythonScript: string
   baseDir: string
   llmLogPath: string
@@ -101,7 +102,8 @@ export function loadConfig(): Config {
     host: envVars.ENV__VPS_IP ?? '',
     port: envVars.ENV__SSH_PORT ?? '222',
     user: envVars.ENV__SSH_USER ?? 'adminclaw',
-    keyPath: expandHome(envVars.ENV__SSH_KEY ?? '~/.ssh/vps1_openclaw_ed25519'),
+    keyPath: envVars.ENV__SSH_KEY ? expandHome(envVars.ENV__SSH_KEY) : '',
+    identityAgent: envVars.ENV__SSH_IDENTITY_AGENT ? expandHome(envVars.ENV__SSH_IDENTITY_AGENT) : '',
     pythonScript: resolve(scriptDir, 'debug-sessions.py'),
     baseDir: '', // resolved by resolveInstance()
     llmLogPath: '', // resolved by resolveInstance()
@@ -142,18 +144,19 @@ export async function resolveInstance(cfg: Config): Promise<Config> {
 }
 
 function sshBaseArgs(cfg: Config): string[] {
-  return [
+  const args = [
     'ssh',
-    '-i',
-    cfg.keyPath,
     '-p',
     cfg.port,
     '-o',
     'StrictHostKeyChecking=no',
     '-o',
     'BatchMode=yes',
-    `${cfg.user}@${cfg.host}`,
   ]
+  if (cfg.keyPath) args.push('-i', cfg.keyPath)
+  if (cfg.identityAgent) args.push('-o', `IdentityAgent=${cfg.identityAgent}`, '-o', 'IdentitiesOnly=yes')
+  args.push(`${cfg.user}@${cfg.host}`)
+  return args
 }
 
 export async function sshExec(cfg: Config, cmd: string): Promise<string> {
@@ -175,14 +178,14 @@ export async function uploadScript(cfg: Config): Promise<void> {
     [
       'scp',
       '-q',
-      '-i',
-      cfg.keyPath,
       '-P',
       cfg.port,
       '-o',
       'StrictHostKeyChecking=no',
       '-o',
       'BatchMode=yes',
+      ...(cfg.keyPath ? ['-i', cfg.keyPath] : []),
+      ...(cfg.identityAgent ? ['-o', `IdentityAgent=${cfg.identityAgent}`, '-o', 'IdentitiesOnly=yes'] : []),
       cfg.pythonScript,
       `${cfg.user}@${cfg.host}:/tmp/debug-sessions.py`,
     ],

@@ -197,18 +197,28 @@ async function queryVpsCapacity(env) {
   const ip = env.VPS_IP;
   const user = env.SSH_USER || "adminclaw";
   const port = env.SSH_PORT || "222";
-  const keyPath = env.SSH_KEY || "~/.ssh/vps1_openclaw_ed25519";
+  const keyPath = env.SSH_KEY?.trim() || "";
+  const identityAgent = env.SSH_IDENTITY_AGENT?.trim() || "";
 
   if (!ip) fatal("VPS_IP not set in .env — cannot query VPS capacity for resource % resolution");
 
-  const expandedKey = keyPath.replace(/^~/, process.env.HOME || "");
   info(`Querying VPS capacity at ${user}@${ip}:${port}...`);
 
   const sshArgs = [
     "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10",
-    "-i", expandedKey, "-p", port, `${user}@${ip}`,
-    "nproc && grep MemTotal /proc/meminfo | awk '{print $2}'"
   ];
+
+  if (keyPath) {
+    sshArgs.push("-i", keyPath.replace(/^~/, process.env.HOME || ""));
+  }
+  if (identityAgent) {
+    sshArgs.push("-o", `IdentityAgent=${identityAgent.replace(/^~/, process.env.HOME || "")}`);
+  }
+
+  sshArgs.push(
+    "-p", port, `${user}@${ip}`,
+    "nproc && grep MemTotal /proc/meminfo | awk '{print $2}'"
+  );
 
   const { stdout, stderr, exitCode } = await spawnAsync("ssh", sshArgs);
 
@@ -421,7 +431,7 @@ function generateStackEnv(env, config, claws) {
 
   // Source: .env
   const envVars = [
-    "VPS_IP", "SSH_KEY", "SSH_PORT", "SSH_USER",
+    "VPS_IP", "SSH_KEY", "SSH_IDENTITY_AGENT", "SSH_PORT", "SSH_USER",
     "HOSTALERT_TELEGRAM_BOT_TOKEN", "HOSTALERT_TELEGRAM_CHAT_ID",
     "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_TUNNEL_TOKEN",
   ];

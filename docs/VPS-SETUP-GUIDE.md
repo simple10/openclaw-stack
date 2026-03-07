@@ -99,8 +99,9 @@ Record it in `.env`:
 
 VPS_IP=x.x.x.x
 
-# SSH Configuration (required)
-SSH_KEY=~/.ssh/vps1_openclaw_ed25519 # Path to your ssh key generated in Step 2
+# SSH Configuration (use SSH_KEY, SSH_IDENTITY_AGENT, or your normal ssh config)
+SSH_KEY=~/.ssh/vps1_openclaw_ed25519 # Optional: path to your ssh key file
+SSH_IDENTITY_AGENT=                  # Optional: ssh agent socket path if you use an agent instead of a key file
 SSH_USER=ubuntu # Initial user created by OVH, changed to adminclaw during hardening
 SSH_PORT=22 # Initial SSH port, changed to 222 during hardening
 ```
@@ -117,6 +118,8 @@ ssh-add ~/.ssh/vps1_openclaw_ed25519
 
 # Test VPS-1 (OpenClaw)
 ssh -i ~/.ssh/vps1_openclaw_ed25519 ubuntu@<VPS-1-IP>
+# Or, if your key is already available through your SSH agent/config:
+ssh ubuntu@<VPS-1-IP>
 ```
 
 On first connection, accept the host key fingerprint.
@@ -187,9 +190,13 @@ ssh-add ~/.ssh/vps1_openclaw_ed25519
 
 # SSH to OpenClaw VPS (before deployment - default port 22)
 ssh -i ~/.ssh/vps1_openclaw_ed25519 ubuntu@<VPS-1-IP>
+# Or with agent-based auth:
+ssh ubuntu@<VPS-1-IP>
 
 # After claude deployment and hardening - use port 222 and adminclaw user
 ssh -i ~/.ssh/vps1_openclaw_ed25519 -p 222 adminclaw@<VPS-1-IP>
+# Or with agent-based auth:
+ssh -p 222 adminclaw@<VPS-1-IP>
 ```
 
 ### OVHCloud Control Panel Links

@@ -16,6 +16,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/source-config.sh"
+source "$SCRIPT_DIR/lib/ssh.sh"
 source "$SCRIPT_DIR/lib/resolve-gateway.sh"
 
 # Extract --instance before passing remaining args to openclaw
@@ -42,5 +43,5 @@ GATEWAY=$(resolve_gateway ${INSTANCE_ARGS[@]+"${INSTANCE_ARGS[@]}"}) || exit 1
 PROJECT_NAME="${STACK__STACK__PROJECT_NAME:-openclaw-stack}"
 INSTANCE_NAME="${GATEWAY#${PROJECT_NAME}-openclaw-}"
 
-TERM=xterm-256color ssh -t -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+TERM=xterm-256color "${SSH_CMD[@]}" -t "$VPS" \
   "openclaw --instance $INSTANCE_NAME ${REMAINING_ARGS[*]}"

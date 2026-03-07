@@ -9,7 +9,7 @@ This playbook validates the configuration needed to deploy OpenClaw on a fresh U
 ## Prerequisites
 
 - A fresh Ubuntu VPS (>= 24.04) with root/sudo access
-- An SSH key pair for VPS access
+- SSH access to the VPS, either via a private key file or an SSH agent
 - A Cloudflare account with a domain
 - Cloudflare Tunnel token (`CLOUDFLARE_TUNNEL_TOKEN`, manual) OR Cloudflare API token (`CLOUDFLARE_API_TOKEN`, automated)
 - Cloudflare Access application protecting the domain
@@ -47,7 +47,8 @@ echo "VPS_IP=${VPS_IP:-EMPTY}" && \
 echo "CF_TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:+SET}" && \
 echo "CF_API_TOKEN=${CLOUDFLARE_API_TOKEN:+SET}" && \
 echo "ADMIN_TELEGRAM_ID=${ADMIN_TELEGRAM_ID:-EMPTY}" && \
-echo "SSH_KEY=${SSH_KEY:-~/.ssh/vps1_openclaw_ed25519}" && \
+echo "SSH_KEY=${SSH_KEY:-EMPTY}" && \
+echo "SSH_IDENTITY_AGENT=${SSH_IDENTITY_AGENT:-EMPTY}" && \
 grep '_TELEGRAM_BOT_TOKEN=' .env | grep -v '^#' && \
 echo "=== stack.yml ===" && \
 grep '^\s*domain:' stack.yml | head -1 && \
@@ -64,6 +65,7 @@ grep -A1 '^claws:' stack.yml | tail -n +2 | grep '^\s\+[a-z]' | sed 's/://;s/^\s
 5. **`ADMIN_TELEGRAM_ID`** — Must be numeric. If empty: "Send a message to @userinfobot on Telegram to get your numeric user ID."
 6. **Bot tokens** — Each claw name needs a matching `<NAME>_TELEGRAM_BOT_TOKEN` line in `.env` (uppercased, hyphens→underscores). If missing: "Create a Telegram bot via @BotFather and paste the token. See `docs/TELEGRAM.md`."
 7. **Claws** — The `claws` section lists claw names. Single claw = standard deploy. Multiple claws: inform user each gets its own container/domain.
+8. **SSH auth** — Use `SSH_KEY`, `SSH_IDENTITY_AGENT`, or a compatible local SSH config/agent setup. `SSH_KEY` is a file path; `SSH_IDENTITY_AGENT` is an agent socket path such as `~/.bitwarden-ssh-agent.sock`. If both env vars are empty, confirm your normal `ssh` config can reach the VPS without extra flags.
 
 ### If any fields are invalid or missing
 
@@ -117,11 +119,13 @@ When `CF_API_TOKEN` is set, automate tunnel creation, route configuration, and D
 
 ## 0.3 SSH Check
 
-1. Validate `SSH_KEY` exists on the local system (default: `~/.ssh/vps1_openclaw_ed25519`).
-2. Test SSH connectivity using values from `.env` (`SSH_USER`, `SSH_PORT`):
+1. If `SSH_KEY` is set, validate the file exists on the local system.
+2. If `SSH_IDENTITY_AGENT` is set, validate the socket exists on the local system.
+3. Test SSH connectivity using values from `.env` (`SSH_USER`, `SSH_PORT`):
 
 ```bash
-ssh -i <SSH_KEY> -o ConnectTimeout=10 -o BatchMode=yes -p <SSH_PORT> <SSH_USER>@<VPS_IP> echo "VPS OK"
+ssh [ -i <SSH_KEY> ] [ -o IdentityAgent=<SSH_IDENTITY_AGENT> ] \
+  -o ConnectTimeout=10 -o BatchMode=yes -p <SSH_PORT> <SSH_USER>@<VPS_IP> echo "VPS OK"
 ```
 
 **If SSH fails — diagnose by error type:**
@@ -152,7 +156,8 @@ Then retry the SSH test.
 >
 > - The key at `<SSH_KEY>` wasn't added to the VPS during provisioning
 > - The key file doesn't exist — check: `ls -la <SSH_KEY>`
-> - The SSH agent doesn't have the key loaded — try: `ssh-add <SSH_KEY>`"
+> - The SSH agent socket is wrong — check: `ls -l <SSH_IDENTITY_AGENT>`
+> - The SSH agent doesn't have the key loaded — try: `ssh-add <SSH_KEY>` if you use a file-backed key"
 
 ---
 
@@ -163,7 +168,8 @@ After SSH is confirmed working, query the VPS hardware to verify gateway contain
 ### Query VPS Resources
 
 ```bash
-ssh -i <SSH_KEY> -p <SSH_PORT> <SSH_USER>@<VPS_IP> "nproc && free -b | awk '/^Mem:/{print \$2}'"
+ssh [ -i <SSH_KEY> ] [ -o IdentityAgent=<SSH_IDENTITY_AGENT> ] \
+  -p <SSH_PORT> <SSH_USER>@<VPS_IP> "nproc && free -b | awk '/^Mem:/{print \$2}'"
 ```
 
 This returns two lines: CPU count (e.g., `6`) and total memory in bytes (e.g., `11811160064`).
@@ -320,6 +326,7 @@ After the user confirms, launch **01-workers and 02-base-setup as parallel subag
 - A command fails and the error requires user input to resolve
 - A playbook step explicitly says to wait for user input (e.g., a blocking error with multiple resolution paths)
 - **SSH verification (02-base-setup.md § 2.4 Step 3):** You MUST test SSH on port `<SSH_HARDENED_PORT>` from the local machine and confirm it works before proceeding. This is a mandatory stop point — do not skip it during automated deployment.
+- **Local SSH config update:** If the user connects via a `~/.ssh/config` host alias or agent-based SSH config, prompt them to update that local entry to port `<SSH_HARDENED_PORT>` immediately after the local hardened-port test passes and before removing port 22.
 - **07-verification.md:** Run in the main context (not a subagent) so the user sees real-time progress and errors can be handled directly. By this point, all heavy steps have been offloaded to subagents and the context window has room. Report the summary table, then run `scripts/sync-workspaces.sh down --all` to pull back any files OpenClaw generated on first start, before proceeding to 08a-configure-llm-proxy.md.
 
 Normal informational output (progress updates, version notes, check results) should be reported inline without pausing. The first user interaction after confirmation should be device pairing in `08b-pair-devices.md`.
@@ -349,7 +356,7 @@ A full deployment consumes significant context. To avoid mid-deploy compaction, 
 
 ```
 Read playbooks/04-vps1-openclaw.md §4.2 and execute the infrastructure setup.
-SSH: ssh -i <key> -p <port> <user>@<ip>
+SSH: ssh [ -i <key> ] [ -o IdentityAgent=<agent-socket> ] -p <port> <user>@<ip>
 Log: Write detailed execution log (all commands, full output, errors, recovery steps)
   to .deploy-logs/<timestamp>/04-infra-config.md
 Return: pass/fail.

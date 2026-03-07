@@ -31,11 +31,14 @@ This playbook configures:
 Config variables (read from `.env`):
 
 - `VPS_IP` - Public IP of VPS-1
-- `SSH_KEY` - Path to SSH private key
+- `SSH_KEY` - Optional path to SSH private key
+- `SSH_IDENTITY_AGENT` - Optional path to SSH agent socket
 - `SSH_USER` - Initial SSH user (e.g., ubuntu, root, debian — depends on provider)
 - `SSH_HARDENED_PORT` - Target SSH port for hardening (default: 222 if not set)
 - `CLOUDFLARE_TUNNEL_TOKEN` - Cloudflare Tunnel token
 - `HOSTNAME` - Optional, friendly hostname (replaces provider default)
+
+> **SSH auth convention:** Examples below use `ssh -i <SSH_KEY> ...` for brevity. If you use agent-based auth instead, omit `-i <SSH_KEY>` and add `-o IdentityAgent=<SSH_IDENTITY_AGENT>` when needed.
 
 ## Execution Order
 
@@ -313,6 +316,22 @@ ssh -i <SSH_KEY> -p <SSH_HARDENED_PORT> adminclaw@<VPS_IP> "echo 'Port <SSH_HARD
 1. Change `SSH_USER=ubuntu` to `SSH_USER=adminclaw            # Changed from ubuntu during hardening`
 2. Change `SSH_PORT=22` to `SSH_PORT=<SSH_HARDENED_PORT>                  # Changed from 22 during hardening`
 3. Delete the `SSH_HARDENED_PORT=` line entirely
+
+If the user relies on a local `~/.ssh/config` host alias or SSH agent-based config, this is also the safe moment to update that host entry to the hardened port. Prompt them explicitly before locking down port 22.
+
+Example `~/.ssh/config` update:
+
+```sshconfig
+Host <alias-or-ip>
+  HostName <VPS_IP>
+  User adminclaw
+  Port <SSH_HARDENED_PORT>
+  IdentityAgent <SSH_IDENTITY_AGENT>
+  IdentitiesOnly yes
+  PreferredAuthentications publickey
+```
+
+Require the user to confirm they updated their local SSH config entry, or that they intentionally do not use one, before continuing to remove port 22.
 
 Then lock down SSH:
 

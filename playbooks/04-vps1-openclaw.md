@@ -33,6 +33,8 @@ Config values are read from `.env` and `stack.yml` (resolved by `npm run pre-dep
 - `defaults.install_dir` (`stack.yml`) - Base installation directory on VPS (default: `/home/openclaw`)
 - Per-claw overrides in `stack.yml` under `claws.<name>`
 
+> **SSH auth convention:** Commands below may show `ssh -i ${SSH_KEY} ...`. If the stack uses agent-based auth, omit `-i ${SSH_KEY}` and rely on your SSH config or add `-o IdentityAgent=${SSH_IDENTITY_AGENT}`.
+
 ---
 
 ## 4.2 Infrastructure Setup

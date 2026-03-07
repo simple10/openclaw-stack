@@ -15,6 +15,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/source-config.sh"
+source "$SCRIPT_DIR/lib/ssh.sh"
 source "$SCRIPT_DIR/lib/resolve-gateway.sh"
 
 # Extract --instance before positional args
@@ -36,12 +37,12 @@ MAX_WAIT=60  # seconds to wait for sandbox to appear
 
 # Helper: run a command on the VPS inside the gateway container as node
 gw_exec() {
-  TERM=xterm-256color ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+  TERM=xterm-256color "${SSH_CMD[@]}" "$VPS" \
     "sudo docker exec --user node $GATEWAY $*"
 }
 
 # Fetch agents list and sandbox status in one SSH call
-COMBINED_JSON=$(TERM=xterm-256color ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+COMBINED_JSON=$(TERM=xterm-256color "${SSH_CMD[@]}" "$VPS" \
   "sudo docker exec --user node $GATEWAY sh -c '
     echo \"===AGENTS===\"
     openclaw agents list --json 2>/dev/null
@@ -155,7 +156,7 @@ if [[ "$CONTAINER_STATUS" == "none" ]]; then
   # Send a message to the agent to trigger sandbox creation.
   # The agent loop creates the sandbox container when a tool is needed (requires sandbox.mode = "all" per agent).
   # Stdout suppressed (agent response not needed); stderr preserved so errors are visible.
-  TERM=xterm-256color ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+  TERM=xterm-256color "${SSH_CMD[@]}" "$VPS" \
     "sudo docker exec --user node $GATEWAY openclaw agent --agent $AGENT --message ping --timeout 60" \
     >/dev/null &
   AGENT_PID=$!
@@ -202,15 +203,15 @@ fi
 # Start container if stopped — if it fails (stale registry entry), trigger recreation
 if [[ "$CONTAINER_STATUS" == "stopped" ]]; then
   printf '\033[33mContainer %s is stopped — starting...\033[0m\n' "$CONTAINER_NAME"
-  if ! ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+  if ! "${SSH_CMD[@]}" "$VPS" \
     "sudo docker exec $GATEWAY docker start $CONTAINER_NAME" >/dev/null 2>&1; then
     # Container was removed but registry still had an entry (e.g. after restart-sandboxes.sh).
     # Clean the stale entry and trigger fresh sandbox creation via agent message.
     printf '\033[33mContainer no longer exists — cleaning stale entry and recreating...\033[0m\n'
-    TERM=xterm-256color ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+    TERM=xterm-256color "${SSH_CMD[@]}" "$VPS" \
       "sudo docker exec --user node $GATEWAY openclaw sandbox recreate --all --force" >/dev/null 2>&1 || true
 
-    TERM=xterm-256color ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+    TERM=xterm-256color "${SSH_CMD[@]}" "$VPS" \
       "sudo docker exec --user node $GATEWAY openclaw agent --agent $AGENT --message ping --timeout 60" \
       >/dev/null &
     AGENT_PID=$!
@@ -249,5 +250,5 @@ if [[ "$CONTAINER_STATUS" == "stopped" ]]; then
 fi
 
 printf '\033[32mExec into %s (%s agent)\033[0m\n' "$CONTAINER_NAME" "$AGENT"
-TERM=xterm-256color ssh -t -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+TERM=xterm-256color "${SSH_CMD[@]}" -t "$VPS" \
   "sudo docker exec -it $GATEWAY docker exec -it -u 1000:1000 -w /workspace $CONTAINER_NAME bash"

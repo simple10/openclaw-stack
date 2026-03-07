@@ -14,7 +14,8 @@ source deploy/host/source-config.sh
 This exports `ENV__*` vars (from `.env`) and `STACK__*` vars (from `stack.yml`). Key variables used in tests below:
 
 - `ENV__VPS_IP` - OpenClaw VPS
-- `ENV__SSH_KEY` - SSH key location
+- `ENV__SSH_KEY` - Optional SSH key location
+- `ENV__SSH_IDENTITY_AGENT` - Optional SSH agent socket path
 - `ENV__SSH_USER` - SSH username (should be `adminclaw`)
 - `ENV__SSH_PORT` - SSH port (should be `222`)
 - `STACK__STACK__INSTALL_DIR` - VPS install base (default: `/home/openclaw`)
@@ -174,7 +175,16 @@ For a rapid health check, run this single command. Source config first for varia
 ```bash
 source deploy/host/source-config.sh
 echo "=== VPS-1 Health ===" && \
-ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+if [ -n "${ENV__SSH_KEY:-}" ]; then
+  SSH_KEY_ARGS=(-i "${ENV__SSH_KEY}")
+else
+  SSH_KEY_ARGS=()
+fi
+if [ -n "${ENV__SSH_IDENTITY_AGENT:-}" ]; then
+  SSH_KEY_ARGS+=(-o "IdentityAgent=${ENV__SSH_IDENTITY_AGENT}")
+fi
+
+ssh "${SSH_KEY_ARGS[@]}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
   "sudo -u openclaw bash -c 'cd ${INSTALL_DIR} && docker compose ps --format \"{{.Name}}: {{.Status}}\"' && \
    echo && \
    echo '=== Claw Instances ===' && \

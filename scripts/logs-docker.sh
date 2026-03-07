@@ -10,6 +10,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/source-config.sh"
+source "$SCRIPT_DIR/lib/ssh.sh"
 
 COMPOSE_DIR="${STACK__STACK__INSTALL_DIR}"
 COMPOSE_ARGS=("logs")
@@ -25,7 +26,7 @@ fi
 
 printf "\033[32mStreaming logs from all containers on VPS-1 (%s)\033[0m\n" "$ENV__VPS_IP"
 
-TERM=xterm-256color ssh -t -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
+TERM=xterm-256color "${SSH_CMD[@]}" -t "$VPS" \
   "sudo -u openclaw bash -c 'cd $COMPOSE_DIR && docker compose ${COMPOSE_ARGS[*]}'"
 
 # Alternate if multiple compose files:

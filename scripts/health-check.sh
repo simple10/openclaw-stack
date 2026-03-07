@@ -9,6 +9,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/source-config.sh"
+source "$SCRIPT_DIR/lib/ssh.sh"
 
 QUIET=false
 while [[ $# -gt 0 ]]; do
@@ -36,7 +37,6 @@ while [[ $# -gt 0 ]]; do
 done
 
 export TERM=xterm-256color
-SSH_CMD="ssh -i ${ENV__SSH_KEY} -p ${ENV__SSH_PORT} ${ENV__SSH_USER}@${ENV__VPS_IP}"
 FAILURES=0
 
 log() {
@@ -61,7 +61,7 @@ warn() {
 # --- SSH connectivity ---
 log ""
 log "Checking VPS connectivity..."
-if ! $SSH_CMD "true" 2>/dev/null; then
+if ! "${SSH_CMD[@]}" "$VPS" "true" 2>/dev/null; then
   fail "Cannot reach VPS at ${ENV__VPS_IP}:${ENV__SSH_PORT}"
   log ""
   log "$(printf '\033[31m%s check(s) failed.\033[0m')" "$FAILURES"
@@ -97,7 +97,7 @@ CONTAINERS=("${CLAW_CONTAINERS[@]}" "${INFRA_CONTAINERS[@]}")
 log ""
 log "Checking Docker containers..."
 for CONTAINER in "${CONTAINERS[@]}"; do
-  STATUS=$($SSH_CMD "sudo docker inspect -f '{{.State.Status}}' $CONTAINER 2>/dev/null" 2>/dev/null || echo "not_found")
+  STATUS=$("${SSH_CMD[@]}" "$VPS" "sudo docker inspect -f '{{.State.Status}}' $CONTAINER 2>/dev/null" 2>/dev/null || echo "not_found")
 
   if [ "$STATUS" = "running" ]; then
     pass "$CONTAINER is running"
@@ -110,7 +110,7 @@ for CONTAINER in "${CONTAINERS[@]}"; do
   fi
 
   # Check Docker healthcheck status if the container defines one
-  HEALTH=$($SSH_CMD "sudo docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' $CONTAINER 2>/dev/null" 2>/dev/null || echo "unknown")
+  HEALTH=$("${SSH_CMD[@]}" "$VPS" "sudo docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' $CONTAINER 2>/dev/null" 2>/dev/null || echo "unknown")
 
   case "$HEALTH" in
     healthy)   pass "$CONTAINER healthcheck: healthy" ;;
@@ -125,7 +125,7 @@ done
 log ""
 log "Checking for recent container restarts..."
 for CONTAINER in "${CONTAINERS[@]}"; do
-  RESTART_COUNT=$($SSH_CMD "sudo docker inspect -f '{{.RestartCount}}' $CONTAINER 2>/dev/null" 2>/dev/null || echo "unknown")
+  RESTART_COUNT=$("${SSH_CMD[@]}" "$VPS" "sudo docker inspect -f '{{.RestartCount}}' $CONTAINER 2>/dev/null" 2>/dev/null || echo "unknown")
   if [ "$RESTART_COUNT" = "unknown" ]; then
     continue
   elif [ "$RESTART_COUNT" -gt 0 ] 2>/dev/null; then
@@ -141,7 +141,7 @@ log "Checking OpenClaw gateway health..."
 
 for CLAW_CONTAINER in "${CLAW_CONTAINERS[@]}"; do
   INSTANCE_NAME="${CLAW_CONTAINER#${PROJECT_NAME}-openclaw-}"
-  HEALTH_OUTPUT=$($SSH_CMD "openclaw --instance $INSTANCE_NAME health 2>&1" 2>/dev/null) && HEALTH_EXIT=0 || HEALTH_EXIT=$?
+  HEALTH_OUTPUT=$("${SSH_CMD[@]}" "$VPS" "openclaw --instance $INSTANCE_NAME health 2>&1" 2>/dev/null) && HEALTH_EXIT=0 || HEALTH_EXIT=$?
 
   if [ "$HEALTH_EXIT" -eq 0 ]; then
     pass "openclaw health ($INSTANCE_NAME): OK"

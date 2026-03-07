@@ -90,7 +90,8 @@ See [00-fresh-deploy-setup.md](playbooks/00-fresh-deploy-setup.md) § 0.7 for ex
 
 ```bash
 # After base setup, SSH as adminclaw (not ubuntu)
-ssh -i <SSH_KEY:~/.ssh/vps1_openclaw_ed25519> -p <SSH_PORT:222> <SSH_USER:adminclaw>@<VPS_IP>
+# If using an SSH agent, omit -i and rely on your normal ssh config.
+ssh [-i <SSH_KEY>] -p <SSH_PORT:222> <SSH_USER:adminclaw>@<VPS_IP>
 
 # Run commands as openclaw
 sudo -u openclaw <command>

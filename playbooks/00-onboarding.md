@@ -10,12 +10,13 @@ Triggered when the user says **"onboard"**. Walk through each configuration deci
 
 Before starting, verify that `install.sh` was run:
 
-1. Check `.env` exists and has `VPS_IP`, `SSH_USER`, `SSH_KEY` populated (non-empty values)
+1. Check `.env` exists and has `VPS_IP`, `SSH_USER`, and either SSH auth env vars populated or a compatible local SSH config/agent setup
 2. Check `stack.yml` exists
 3. Verify SSH connectivity:
 
 ```bash
-ssh -i <SSH_KEY> -o BatchMode=yes -o ConnectTimeout=5 -p <SSH_PORT:22> <SSH_USER>@<VPS_IP> echo "ok"
+ssh [ -i <SSH_KEY> ] [ -o IdentityAgent=<SSH_IDENTITY_AGENT> ] \
+  -o BatchMode=yes -o ConnectTimeout=5 -p <SSH_PORT:22> <SSH_USER>@<VPS_IP> echo "ok"
 ```
 
 **If `.env` is missing or VPS fields are empty:** Tell the user to run `bash install.sh` first and stop here.
