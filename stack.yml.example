@@ -92,8 +92,6 @@ defaults:
   matrix:
     enabled: false
     homeserver: "https://matrix.org"
-    # Per-claw fields (rendered):
-    # access_token: ${CLAW_NAME_MATRIX_ACCESS_TOKEN}
     # Not rendered — configure in per-claw openclaw.jsonc or via Control UI:
     # dm_policy: pairing        # pairing | open | closed
     # group_policy: allowlist   # allowlist | open | closed
@@ -117,7 +115,7 @@ claws:
       bot_token: ${PERSONAL_CLAW_TELEGRAM_BOT_TOKEN}
     # matrix:
     #   enabled: true
-    #   access_token: ${PERSONAL_CLAW_MATRIX_ACCESS_TOKEN}  # Access token for the Matrix bot account
+    #   access_token: ${CLAW_NAME_MATRIX_ACCESS_TOKEN}  # Access token for the Matrix bot account, set per claw
     #   # homeserver: "https://matrix.org"                  # Override stack-wide default if needed
     health_check_cron: true  # Enable health check cron on the main claw - not needed on each claw
 
