@@ -12,6 +12,7 @@
 import { readFileSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import yaml from "js-yaml";
+import { parse as parseJsonc } from "jsonc-parser";
 
 const [configFile, clawName] = process.argv.slice(2);
 if (!configFile || !clawName) {
@@ -75,5 +76,21 @@ content = content.replace(/"(\$\{([^}]+)\})"/g, (_match, _fullRef, expr) => {
 
 // Resolve remaining ${VAR} refs (inside longer strings, unquoted positions)
 content = content.replace(/\$\{([^}]+)\}/g, (_match, expr) => resolveExpr(expr));
+
+// Strip disabled channel blocks from the resolved config.
+// Removing the block entirely prevents the channel from appearing in the Control UI
+// (same as unconfigured channels like WhatsApp, iMessage, etc.).
+// The local .jsonc source of truth retains the full config with comments.
+const stripTelegram = env.TELEGRAM_ENABLED === "false";
+const stripMatrix = env.MATRIX_ENABLED === "false";
+
+if (stripTelegram || stripMatrix) {
+  const config = parseJsonc(content, [], { allowTrailingComma: true });
+  if (config?.channels) {
+    if (stripTelegram) delete config.channels.telegram;
+    if (stripMatrix) delete config.channels.matrix;
+  }
+  content = JSON.stringify(config, null, 2) + "\n";
+}
 
 process.stdout.write(content);

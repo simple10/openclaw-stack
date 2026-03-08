@@ -59,8 +59,11 @@ services:
       - OPENAI_BASE_URL={{this.openai_base_url}}
       - OPENAI_CODEX_BASE_URL={{this.openai_codex_base_url}}
       # ── Telegram ──
+      - TELEGRAM_ENABLED={{this.telegram_enabled}}
+{{#if this.telegram_enabled}}
       - TELEGRAM_BOT_TOKEN={{this.telegram.bot_token}}
       - ADMIN_TELEGRAM_ID={{this.telegram.allow_from}}
+{{/if}}
       # ── Matrix ──
       # MATRIX_ENABLED is always emitted so openclaw.jsonc ${MATRIX_ENABLED} resolves cleanly.
       # Sensitive vars (homeserver, token) are only emitted when Matrix is enabled.

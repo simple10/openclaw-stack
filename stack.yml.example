@@ -79,6 +79,7 @@ defaults:
   domain_path: ""
   dashboard_path: /dashboard
   telegram:
+    enabled: true
     allow_from: ${ADMIN_TELEGRAM_ID}
   # Matrix channel (optional — alternative or complement to Telegram)
   # Enable per-claw by setting matrix.enabled: true and providing an access token.

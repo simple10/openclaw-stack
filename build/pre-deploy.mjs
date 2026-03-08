@@ -294,8 +294,8 @@ function validateClaw(name, claw) {
   }
 
   const telegram = claw.telegram;
-  if (!telegram?.bot_token) {
-    warn(`Claw '${name}' has no telegram.bot_token — Telegram will be disabled`);
+  if (telegram?.enabled && !telegram?.bot_token) {
+    warn(`Claw '${name}' has telegram.enabled: true but no bot_token — Telegram may not work without a token (env var fallback allowed)`);
   }
 
   const matrix = claw.matrix;
@@ -366,8 +366,9 @@ function computeDerivedValues(claws, stack, host, previousDeploy) {
     claw.llemtry_url = logUrl ? logUrl + "/llemtry" : "";
     claw.enable_events_logging = stack.logging?.events || false;
     claw.enable_llemtry_logging = stack.logging?.llemtry || false;
-    // matrix_enabled is a flat boolean for Handlebars — avoids empty-string output
-    // when matrix: is absent from stack.yml ({{this.matrix.enabled}} would be empty).
+    // telegram_enabled / matrix_enabled are flat booleans for Handlebars — avoids
+    // empty-string output when the section is absent from stack.yml.
+    claw.telegram_enabled = claw.telegram?.enabled === true;
     claw.matrix_enabled = claw.matrix?.enabled === true;
   }
 
@@ -653,7 +654,6 @@ async function main() {
     LOG_WORKER_TOKEN: "log_worker_token",
     EVENTS_URL: "events_url",
     LLEMTRY_URL: "llemtry_url",
-    ADMIN_TELEGRAM_ID: "telegram.allow_from",
   };
   // Check against first claw (these vars are stack-wide, same for all claws)
   const firstClaw = Object.values(claws)[0];
@@ -663,12 +663,12 @@ async function main() {
       return !val && val !== 0 && val !== false;
     })
     .map(([envVar]) => envVar);
-  // Matrix vars are per-claw: only emitted in docker-compose.yml when matrix.enabled=true.
-  // Always pre-resolve them regardless of any claw's config, so openclaw.jsonc ${MATRIX_*}
-  // substitution succeeds on claws where matrix is disabled and these env vars are absent
+  // Channel vars are per-claw: only emitted in docker-compose.yml when the channel is enabled.
+  // Always pre-resolve them regardless of any claw's config, so openclaw.jsonc ${VAR}
+  // substitution succeeds on claws where the channel is disabled and these env vars are absent
   // from the container environment. Checking only the first claw would break multi-claw
-  // stacks where claws have heterogeneous Matrix config.
-  const alwaysResolveVars = ["MATRIX_HOMESERVER", "MATRIX_ACCESS_TOKEN"];
+  // stacks where claws have heterogeneous channel config.
+  const alwaysResolveVars = ["ADMIN_TELEGRAM_ID", "MATRIX_HOMESERVER", "MATRIX_ACCESS_TOKEN"];
   writeFileSync(join(DEPLOY_DIR, "openclaw-stack", "empty-env-vars"), [...emptyVars, ...alwaysResolveVars].join("\n") + "\n");
 
   // 7d-post. Resolve {{INSTALL_DIR}} in host/ files (cron configs, logrotate)

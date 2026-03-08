@@ -118,7 +118,7 @@ Ask:
 > Do you want **one** OpenClaw instance or **multiple**?
 >
 > - **One** (default) — A single claw named `personal-claw`. Good for most users.
-> - **Multiple** — Separate claws for different contexts (e.g., personal + work). Each gets its own container, Telegram bot, and subdomain.
+> - **Multiple** — Separate claws for different contexts (e.g., personal + work). Each gets its own container, subdomain, and optionally its own Telegram bot.
 >
 > You can always add more later.
 
@@ -147,7 +147,18 @@ For each additional claw beyond `personal-claw`:
 
 4. Add the corresponding env var to `.env`: `<UPPER_NAME>_TELEGRAM_BOT_TOKEN=`
 
-### 3.2 Telegram Bot(s)
+### 3.2 Telegram Channel
+
+Ask:
+
+> Do you want to use **Telegram** to chat with your claws?
+>
+> - **Yes** (default) — Set up a Telegram bot for each claw
+> - **No** — Disable Telegram (you can still use the browser Control UI)
+
+#### Yes (Telegram enabled)
+
+`telegram.enabled` defaults to `true` in `stack.yml.example` — no config change needed.
 
 For **each claw**, walk through bot creation:
 
@@ -166,9 +177,7 @@ Write to `.env` as the claw's bot token variable (e.g., `PERSONAL_CLAW_TELEGRAM_
 
 > Each claw **must** have a unique bot token — sharing tokens causes polling conflicts.
 
-### 3.3 Admin Telegram ID
-
-Ask:
+Then ask for Admin Telegram ID:
 
 > Now we need your Telegram user ID so OpenClaw knows who you are.
 >
@@ -180,6 +189,18 @@ Ask:
 Validate: positive integer.
 
 Write to `.env` as `ADMIN_TELEGRAM_ID`.
+
+#### No (Telegram disabled)
+
+Set `telegram.enabled: false` in `stack.yml` under `defaults`:
+
+```yaml
+defaults:
+  telegram:
+    enabled: false
+```
+
+Skip bot token and Admin Telegram ID setup. The Telegram channel won't appear in the Control UI.
 
 ---
 

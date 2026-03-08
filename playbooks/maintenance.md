@@ -17,7 +17,7 @@ All secrets should be rotated on a regular cadence. If a token is suspected comp
 | Provider API keys (Anthropic, OpenAI, etc.) | AI Gateway KV (`creds:*`) — managed via `/config` UI | Per provider policy |
 | `EGRESS_PROXY_AUTH_TOKEN` | Local `.env` + AI Gateway Worker secret + VPS egress proxy container | 90 days |
 | `EGRESS_PROXY_URL` | AI Gateway Worker secret | Only if hostname changes |
-| `HOSTALERT_TELEGRAM_BOT_TOKEN` | Local `.env` (deployed via `npm run pre-deploy`) | As needed |
+| `HOSTALERT_TELEGRAM_BOT_TOKEN` | Local `.env` (deployed via `npm run pre-deploy`) | As needed (only if host alerter uses Telegram) |
 | `SANDBOX_REGISTRY_TOKEN` | Local `.env` + VPS `sandbox-registry/htpasswd` | 90 days |
 | SSH keys (`~/.ssh/vps1_openclaw_ed25519`) | Local machine + VPS `authorized_keys` | Annual |
 
@@ -327,8 +327,8 @@ Hot-reloadable config changes (agents, skills, models) take effect without resta
 
 ## Adding a New Claw
 
-1. Add a new entry under `claws` in `stack.yml` with per-claw overrides (domain, resources, Telegram bot token, etc.)
-2. Add the claw's Telegram bot token to `.env` (e.g., `NEW_CLAW_TELEGRAM_BOT_TOKEN=...`)
+1. Add a new entry under `claws` in `stack.yml` with per-claw overrides (domain, resources, etc.)
+2. If `telegram.enabled` is `true` (the default), add the claw's Telegram bot token to `.env` (e.g., `NEW_CLAW_TELEGRAM_BOT_TOKEN=...`)
 3. Deploy (builds, syncs configs + workspaces, auto-starts the new service):
    ```bash
    scripts/deploy.sh

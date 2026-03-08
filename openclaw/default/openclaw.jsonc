@@ -58,7 +58,7 @@
   },
   "channels": {
     "telegram": {
-      "enabled": true,
+      "enabled": "${TELEGRAM_ENABLED}",
       "dmPolicy": "pairing", // Require device pairing for DMs
       "groupPolicy": "allowlist", // Only respond in explicitly allowed groups
       "streamMode": "partial" // Stream partial responses to Telegram

@@ -61,8 +61,8 @@ grep -A1 '^claws:' stack.yml | tail -n +2 | grep '^\s\+[a-z]' | sed 's/://;s/^\s
 2. **`VPS_IP`** — Must not be `EMPTY` or contain `<`.
 3. **`CF_TUNNEL_TOKEN`** or **`CF_API_TOKEN`** — At least one must show `SET`. If both missing: "Set `CLOUDFLARE_TUNNEL_TOKEN` (manual — create tunnel in CF Dashboard) or `CLOUDFLARE_API_TOKEN` (automated). See [`docs/CLOUDFLARE-TUNNEL.md`](../docs/CLOUDFLARE-TUNNEL.md)."
 4. **`domain`** — The `stack.yml` domain line must not contain angle brackets (e.g., `<example>`). `${VAR}` references are OK — verify the referenced `.env` variable (e.g., `ROOT_DOMAIN`) is set.
-5. **`ADMIN_TELEGRAM_ID`** — Must be numeric. If empty: "Send a message to @userinfobot on Telegram to get your numeric user ID."
-6. **Bot tokens** — Each claw name needs a matching `<NAME>_TELEGRAM_BOT_TOKEN` line in `.env` (uppercased, hyphens→underscores). If missing: "Create a Telegram bot via @BotFather and paste the token. See `docs/TELEGRAM.md`."
+5. **`ADMIN_TELEGRAM_ID`** — Required if `telegram.enabled` is `true` for any claw (the default). Must be numeric. If empty: "Send a message to @userinfobot on Telegram to get your numeric user ID." Skip if Telegram is disabled for all claws.
+6. **Bot tokens** — Each claw with `telegram.enabled: true` (the default) needs a matching `<NAME>_TELEGRAM_BOT_TOKEN` line in `.env` (uppercased, hyphens→underscores). If missing: "Create a Telegram bot via @BotFather and paste the token. See `docs/TELEGRAM.md`." Skip for claws with `telegram.enabled: false`.
 7. **Claws** — The `claws` section lists claw names. Single claw = standard deploy. Multiple claws: inform user each gets its own container/domain.
 
 ### If any fields are invalid or missing
