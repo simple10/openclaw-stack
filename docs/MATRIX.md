@@ -78,19 +78,9 @@ By default:
 - Group rooms require explicit allowlisting (`groupPolicy: allowlist`)
 - The bot auto-joins any room it's invited to (`auto_join: always`)
 
-To allow specific rooms, add them to `stack.yml`:
-
-```yaml
-matrix:
-  enabled: true
-  access_token: ${PERSONAL_CLAW_MATRIX_ACCESS_TOKEN}
-  groups:
-    "!roomid:matrix.org":
-      enabled: true
-      mention_only: false   # true = only respond when @mentioned
-```
-
 Room IDs look like `!abc123:matrix.org`. Find yours in Element under **Room Settings** → **Advanced** → **Internal Room ID**.
+
+Room allowlisting is configured directly in `openclaw.jsonc` — see **Rooms and Mention Gating** below.
 
 ---
 
@@ -134,7 +124,7 @@ After approval, the bot responds to your DMs normally.
 Rooms use `groupPolicy: allowlist` by default — the bot only responds in rooms explicitly listed in `matrix.groups`. Room allowlisting and mention gating are configured directly in the per-claw `openclaw.jsonc` (they are not rendered from `stack.yml`). To respond in a room:
 
 1. Invite the bot account to the room from your Matrix client
-1. Edit `openclaw/<claw-name>/openclaw.jsonc` and add the room under `channels.matrix.groups`:
+2. Edit `openclaw/<claw-name>/openclaw.jsonc` and add the room under `channels.matrix.groups`:
 
 ```jsonc
 "matrix": {
@@ -176,7 +166,7 @@ If you need to rotate the Matrix access token:
 1. Generate a new token for the bot account (via Element Settings or the login API)
 2. Update `.env` with the new token
 3. Run `npm run pre-deploy` → `scripts/sync-deploy.sh`
-4. Restart the claw: `docker compose up -d <claw-name>`
+4. Restart the claw: `sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d <project_name>-openclaw-<claw-name>'`
 
 Token rotation does not affect OpenClaw device pairings, but may require Matrix-side device re-verification in encrypted rooms.
 
