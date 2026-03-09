@@ -84,16 +84,11 @@ async function generateAndStoreCodexToken(
   // Store new token hash → userId mapping in KV (no TTL)
   await kv.put(`token:${hash}`, userId)
 
-  // Track current codex hash for future expiration
+  // Track current codex hash for future expiration.
+  // Codex hashes are NOT added to user.tokens — their lifecycle is managed
+  // entirely by the codex:{userId} tracking key. Adding them to user.tokens
+  // would cause handleTokenRotation to re-put expired hashes with a fresh TTL.
   await kv.put(`codex:${userId}`, hash)
-
-  // Add hash to user's tokens list in registry
-  const registry = await getRegistry(kv)
-  const user = registry[userId]
-  if (user) {
-    user.tokens.push(hash)
-    await putRegistry(kv, registry)
-  }
 
   log.info(`[admin] generated codex paste token for user ${userId}`)
   return jwt
