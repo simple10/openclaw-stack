@@ -147,11 +147,13 @@ If the device shows as approved but the browser still can't connect, ask the use
 
 ## Telegram Pairing
 
-If the claw's Telegram bot token is configured in `.env`, the claws are already connected to Telegram. Tell the user:
+> **Skip this section** if `telegram.enabled` is `false` for all claws in `stack.yml`.
+
+If the claw has `telegram.enabled: true` and a bot token configured in `.env`, the claws are already connected to Telegram. Tell the user:
 
 > **Telegram:** Your bot is live. Open Telegram and send a message to your bot. If the claw prompts for device approval, run `openclaw --instance <CLAW_NAME> devices approve <requestId>` the same way you approved the browser. Repeat for each claw if needed.
 
-If the bot token is empty, skip this step — Telegram was not configured.
+If Telegram is disabled or the bot token is empty, skip this step.
 
 ---
 

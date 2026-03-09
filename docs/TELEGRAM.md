@@ -2,10 +2,10 @@
 
 OpenClaw uses Telegram in two ways:
 
-1. **OpenClaw channel** — chat with your AI agent via a Telegram bot (required)
+1. **OpenClaw channel** — chat with your AI agent via a Telegram bot (optional per-claw)
 2. **Host alerter** — VPS health alerts sent to Telegram (optional)
 
-Both can use the same bot, or you can create separate bots.
+Both are optional. If you don't use Telegram, set `telegram.enabled: false` in `stack.yml` (under `defaults` or per-claw) and skip this guide. Both can use the same bot, or you can create separate bots.
 
 ## 1. Create a Telegram Bot
 
@@ -21,16 +21,35 @@ Send any message to [@userinfobot](https://t.me/userinfobot) — it replies with
 
 ## 3. Configure
 
-Add both values to `stack.yml` under your claw config, and the bot token to `.env`:
+Telegram is controlled by the `telegram.enabled` toggle in `stack.yml`. It defaults to `true` in `stack.yml.example`, so existing deployments continue working. To disable Telegram for a claw (or globally via `defaults`), set `enabled: false`:
 
 ```yaml
-# stack.yml — under claws.<name>
-telegram_bot_token: "123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
-your_telegram_id: "123456789"
+# stack.yml — defaults (applies to all claws unless overridden)
+defaults:
+  telegram:
+    enabled: true                          # false to disable Telegram for all claws
+    allow_from: ${ADMIN_TELEGRAM_ID}
+
+# stack.yml — per-claw
+claws:
+  personal-claw:
+    telegram:
+      bot_token: ${PERSONAL_CLAW_TELEGRAM_BOT_TOKEN}
+    # telegram:
+    #   enabled: false                     # override default to disable for this claw only
 ```
 
-- `YOUR_TELEGRAM_ID` gates elevated mode — only this Telegram user can activate `/elevated` commands
-- `OPENCLAW_TELEGRAM_BOT_TOKEN` connects the gateway to Telegram as a messaging channel
+Add the bot token to `.env`:
+
+```env
+PERSONAL_CLAW_TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz
+ADMIN_TELEGRAM_ID=123456789
+```
+
+- `ADMIN_TELEGRAM_ID` gates elevated mode — only this Telegram user can activate `/elevated` commands
+- The per-claw bot token connects the gateway to Telegram as a messaging channel
+
+When `telegram.enabled: false`, the Telegram channel block is stripped from the deployed `openclaw.json` entirely — it won't appear in the Control UI.
 
 After deployment, the gateway connects to Telegram automatically. Message your bot to start chatting — the gateway may prompt you to approve the device via `openclaw devices approve` (same flow as browser pairing).
 

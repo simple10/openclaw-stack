@@ -100,7 +100,42 @@ echo "prefix=$npm_global" > /home/node/.npmrc
 export PATH="$npm_global/bin:$PATH"
 echo "[entrypoint] npm global prefix set to $npm_global"
 
-# ── 1h. Auto-generate gateway shims from sandbox-toolkit.yaml ──────
+
+# ── 1h. Patch matrix plugin: keyed-async-queue subpath regression ──
+# TODO: remove once openclaw/openclaw#32772 is fixed
+# OpenClaw 2026.3.2 broke the matrix plugin — send-queue.ts imports
+# "openclaw/plugin-sdk/keyed-async-queue" but jiti doesn't resolve the
+# subpath. Patch to use the barrel export. Version-gated so it no-ops
+# once upstream ships a fix.
+SEND_QUEUE="/app/extensions/matrix/src/matrix/send-queue.ts"
+OPENCLAW_VERSION=$(node -e "console.log(require('/app/package.json').version)" 2>/dev/null || echo "unknown")
+if [ "$OPENCLAW_VERSION" = "2026.3.2" ] && [ -f "$SEND_QUEUE" ] && grep -q '"openclaw/plugin-sdk/keyed-async-queue"' "$SEND_QUEUE"; then
+  sed -i 's|"openclaw/plugin-sdk/keyed-async-queue"|"openclaw/plugin-sdk"|' "$SEND_QUEUE"
+  echo "[entrypoint] Patched matrix plugin keyed-async-queue import (openclaw/openclaw#32772)"
+elif [ "$OPENCLAW_VERSION" != "2026.3.2" ] && [ -f "$SEND_QUEUE" ]; then
+  echo "[entrypoint] OpenClaw $OPENCLAW_VERSION — matrix keyed-async-queue patch no longer needed, consider removing"
+fi
+
+# ── 1i. Install matrix plugin dependencies ─────────────────────────
+# TODO: remove once openclaw/openclaw#16031 is fixed
+# The bundled matrix plugin at /app/extensions/matrix declares deps in
+# package.json but they aren't installed in the Docker image. Install
+# them on first boot if the node_modules dir is missing.
+MATRIX_EXT="/app/extensions/matrix"
+if [ "${MATRIX_ENABLED:-false}" = "true" ] && [ -f "$MATRIX_EXT/package.json" ] && \
+   { [ ! -d "$MATRIX_EXT/node_modules" ] || [ ! -d "$MATRIX_EXT/node_modules/@vector-im/matrix-bot-sdk" ]; }; then
+  echo "[entrypoint] Installing matrix plugin dependencies..."
+  cd "$MATRIX_EXT"
+  if npm install --omit=dev 2>&1; then
+    echo "[entrypoint] Matrix plugin dependencies installed"
+  else
+    echo "[entrypoint] WARNING: matrix plugin dependency install failed" >&2
+  fi
+  cd /app
+fi
+
+
+# ── 1j. Auto-generate gateway shims from sandbox-toolkit.yaml ──────
 # Shims satisfy the gateway's load-time skill binary preflight checks.
 # Real binaries live in sandbox images — shims are gateway-only (not bind-mounted).
 SKILL_BINS="/opt/skill-bins"

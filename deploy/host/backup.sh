@@ -32,13 +32,16 @@ while IFS= read -r install_dir; do
 
     # Create backup of this claw's config and data.
     # Include all workspace dirs (main=workspace, agents=workspace-<id>).
+    # Include matrix/ when present — contains sync state and E2EE crypto keys.
     # || true: continue to other instances if one fails (error still printed)
     workspace_dirs=$(cd "${inst_dir}" && ls -d .openclaw/workspace .openclaw/workspace-* 2>/dev/null || true)
+    matrix_dir=$(cd "${inst_dir}" && ls -d .openclaw/matrix 2>/dev/null || true)
     tar -czf "${BACKUP_FILE}" \
         -C "${inst_dir}" \
         .openclaw/openclaw.json \
         .openclaw/credentials \
         ${workspace_dirs} \
+        ${matrix_dir} \
         || true
 
     # Set ownership so container can also access backups if needed

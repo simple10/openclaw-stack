@@ -79,7 +79,26 @@ defaults:
   domain_path: ""
   dashboard_path: /dashboard
   telegram:
+    enabled: true
     allow_from: ${ADMIN_TELEGRAM_ID}
+  # Matrix channel (optional — alternative or complement to Telegram)
+  # Enable per-claw by setting matrix.enabled: true and providing an access token.
+  # Full config reference: https://docs.openclaw.ai/channels/matrix
+  # Setup guide: docs/MATRIX.md
+  #
+  # Rendered into docker-compose.yml (controlled via stack.yml + .env):
+  #   enabled, homeserver, access_token
+  # Requires direct openclaw.jsonc edit or Control UI (not rendered from stack.yml):
+  #   encryption, dm_policy, group_policy, auto_join, groups (room allowlist)
+  matrix:
+    enabled: false
+    homeserver: "https://matrix.org"
+    # Not rendered — configure in per-claw openclaw.jsonc or via Control UI:
+    # dm_policy: pairing        # pairing | open | closed
+    # group_policy: allowlist   # allowlist | open | closed
+    # encryption: false         # true requires E2EE crypto — see docs/MATRIX.md §E2EE
+    # auto_join: always         # always | allowlist | never
+    # groups: {}                # room allowlist — see docs/MATRIX.md §Rooms
   resources:
     cpus: 6
     memory: 12G
@@ -95,6 +114,10 @@ claws:
     dashboard_port: 6090
     telegram:
       bot_token: ${PERSONAL_CLAW_TELEGRAM_BOT_TOKEN}
+    # matrix:
+    #   enabled: true
+    #   access_token: ${CLAW_NAME_MATRIX_ACCESS_TOKEN}  # Access token for the Matrix bot account, set per claw
+    #   # homeserver: "https://matrix.org"                  # Override stack-wide default if needed
     health_check_cron: true  # Enable health check cron on the main claw - not needed on each claw
 
   # work-claw:

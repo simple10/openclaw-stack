@@ -419,10 +419,12 @@ openclaw cron list
 
 **Expected:** Both scripts exit 0 with no errors. `health.json` and `maintenance.json` contain valid JSON with current timestamps. Workspace copies exist. Both host cron entries exist. `openclaw cron list` shows "Daily VPS Health Check" with status `ok`.
 
-### Telegram Delivery Test
+### Telegram Delivery Test (Host Alerter)
+
+> **Skip** if `host_alerter` is not configured in `stack.yml` or its Telegram credentials are empty.
 
 ```bash
-# Test Telegram delivery (if configured)
+# Test Telegram delivery (if host alerter configured)
 TELEGRAM_TOKEN=$(sudo grep -oP 'ENV__HOSTALERT_TELEGRAM_BOT_TOKEN=\K.+' <INSTALL_DIR>/stack.env)
 TELEGRAM_CHAT=$(sudo grep -oP 'ENV__HOSTALERT_TELEGRAM_CHAT_ID=\K.+' <INSTALL_DIR>/stack.env)
 

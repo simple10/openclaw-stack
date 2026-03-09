@@ -58,12 +58,25 @@
   },
   "channels": {
     "telegram": {
-      "enabled": true,
+      "enabled": "${TELEGRAM_ENABLED}",
       "dmPolicy": "pairing", // Require device pairing for DMs
       "groupPolicy": "allowlist", // Only respond in explicitly allowed groups
       "streamMode": "partial" // Stream partial responses to Telegram
       // botToken read from TELEGRAM_BOT_TOKEN env var (set in docker-compose.yml)
       // WARNING: Each claw MUST use a unique bot token. Sharing tokens causes getUpdates 409 conflicts.
+    },
+    // Matrix channel — enabled via MATRIX_ENABLED env var (controlled by matrix.enabled in stack.yml).
+    // Configure matrix: in stack.yml, set access token in .env, then run npm run pre-deploy.
+    // Full config reference: https://docs.openclaw.ai/channels/matrix
+    // Setup guide: docs/MATRIX.md
+    "matrix": {
+      "enabled": "${MATRIX_ENABLED}",
+      "homeserver": "${MATRIX_HOMESERVER}",
+      "accessToken": "${MATRIX_ACCESS_TOKEN}", // Access token for the Matrix bot account
+      "deviceName": "OPENCLAW_GATEWAY", // Device name shown in Matrix clients' device list
+      "encryption": false, // Set to true for E2EE (requires crypto module — see docs/MATRIX.md)
+      "dm": { "policy": "pairing" }, // Require device pairing for DMs
+      "groupPolicy": "open" // Respond in any room when @mentioned
     }
   },
   "logging": {
@@ -261,6 +274,7 @@
     "allow": [
       "telemetry", // Unified telemetry — replaces llm-logger plugin and debug-logger hook
       "memory-core" // File-backed memory search tools
+      // @openclaw/matrix is bundled with OpenClaw — no allow entry needed; declare in entries below
     ],
     "load": {
       "paths": ["/app/openclaw-stack/plugins"] // Load directly from openclaw-stack mount — avoids copying into OpenClaw's namespace
@@ -309,6 +323,13 @@
       // Bundled file-backed memory — provides memory_search and memory_get tools.
       // Loaded from /app/extensions/memory-core/ (ships with OpenClaw).
       "memory-core": {
+        "enabled": true
+      },
+      // Matrix Channel Plugin
+      // @openclaw/matrix is bundled with OpenClaw — no install step needed.
+      // Plugin key is "matrix" (unscoped). Always loaded; channel activation
+      // is controlled by channels.matrix.enabled, not this field.
+      "matrix": {
         "enabled": true
       }
     }
