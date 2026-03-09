@@ -278,6 +278,12 @@ async function deleteUser(
     await kv.delete(`token:${token}`)
   }
 
+  // Delete active codex token (managed outside user.tokens)
+  const codexHash = await kv.get(`codex:${userId}`)
+  if (codexHash) {
+    await kv.delete(`token:${codexHash}`)
+  }
+
   // Delete credentials and codex tracking key
   await kv.delete(`creds:${userId}`)
   await kv.delete(`codex:${userId}`)
