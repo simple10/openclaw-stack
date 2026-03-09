@@ -23,9 +23,9 @@ export function buildCodexHeaders(vars: {
 }): Record<string, string> | undefined {
   const h: Record<string, string> = {}
   if (vars.EGRESS_PROXY_AUTH_TOKEN) h['X-Proxy-Auth'] = `Bearer ${vars.EGRESS_PROXY_AUTH_TOKEN}`
-  if (vars.CF_ACCESS_CLIENT_ID) {
+  if (vars.CF_ACCESS_CLIENT_ID && vars.CF_ACCESS_CLIENT_SECRET) {
     h['CF-Access-Client-Id'] = vars.CF_ACCESS_CLIENT_ID
-    h['CF-Access-Client-Secret'] = vars.CF_ACCESS_CLIENT_SECRET!
+    h['CF-Access-Client-Secret'] = vars.CF_ACCESS_CLIENT_SECRET
   }
   return Object.keys(h).length > 0 ? h : undefined
 }
