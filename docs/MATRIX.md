@@ -75,12 +75,10 @@ npm run pre-deploy
 By default:
 
 - DMs require pairing approval (`dm.policy: pairing`)
-- Group rooms require explicit allowlisting (`groupPolicy: allowlist`)
+- Group rooms respond to @mentions in any joined room (`groupPolicy: open`)
 - The bot auto-joins any room it's invited to (`auto_join: always`)
 
-Room IDs look like `!abc123:matrix.org`. Find yours in Element under **Room Settings** → **Advanced** → **Internal Room ID**.
-
-Room allowlisting is configured directly in `openclaw.jsonc` — see **Rooms and Mention Gating** below.
+To restrict to specific rooms, change `groupPolicy` to `allowlist` in `openclaw.jsonc` — see **Rooms and Mention Gating** below.
 
 ---
 
@@ -121,7 +119,7 @@ After approval, the bot responds to your DMs normally.
 
 ## Rooms and Mention Gating
 
-Rooms use `groupPolicy: allowlist` by default — the bot only responds in rooms explicitly listed in `matrix.groups`. Room allowlisting and mention gating are configured directly in the per-claw `openclaw.jsonc` (they are not rendered from `stack.yml`). To respond in a room:
+Rooms use `groupPolicy: open` by default — the bot responds when @mentioned in any room it has joined. To restrict to specific rooms, set `groupPolicy: "allowlist"` in the per-claw `openclaw.jsonc` and add rooms under `channels.matrix.groups`. To add a room to the allowlist:
 
 1. Invite the bot account to the room from your Matrix client
 2. Edit `openclaw/<claw-name>/openclaw.jsonc` and add the room under `channels.matrix.groups`:
