@@ -17,6 +17,11 @@ export async function proxyOpenAI(
   // Replace auth token with OpenAI API key
   headers.set('Authorization', `Bearer ${apiKey}`)
 
+  // Strip Cloudflare-injected metadata headers that shouldn't reach upstream providers
+  for (const key of [...headers.keys()]) {
+    if (key.startsWith('cf-')) headers.delete(key)
+  }
+
   // Set provider-config headers (e.g. cf-aig-authorization for gateway mode,
   // X-Proxy-Auth for egress proxy)
   if (config.headers) {
@@ -26,16 +31,13 @@ export async function proxyOpenAI(
   }
 
   // When egress proxy is configured, wrap the target URL in the proxy URL
-  // and strip CF-injected headers that shouldn't reach the upstream
+  // and strip additional proxy-revealing headers
   const url = config.egressProxyUrl
     ? `${config.egressProxyUrl}?_proxyUpstreamURL_=${encodeURIComponent(targetUrl)}`
     : targetUrl
 
   if (config.egressProxyUrl) {
-    for (const h of [
-      'host', 'cf-connecting-ip', 'cf-ipcountry', 'cf-ray', 'cf-visitor',
-      'x-real-ip', 'x-forwarded-proto', 'x-forwarded-for',
-    ]) {
+    for (const h of ['host', 'x-real-ip', 'x-forwarded-proto', 'x-forwarded-for']) {
       headers.delete(h)
     }
   }
@@ -48,6 +50,6 @@ export async function proxyOpenAI(
   return fetch(url, {
     method: request.method,
     headers,
-    body,
+    body: request.method !== 'GET' ? body : undefined,
   })
 }
