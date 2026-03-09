@@ -122,7 +122,7 @@ export default {
       let response = await proxyGeneric(
         apiKey,
         request,
-        providerConfig.baseUrl,
+        providerConfig,
         genericRoute.directPath,
         log,
         genericRoute.provider,
@@ -154,7 +154,7 @@ export default {
     const apiKey = await getProviderApiKey(route!.provider, userId, env.AUTH_KV, log)
     if (!apiKey) {
       console.error(`No API key configured for ${route!.provider}: ${request.method} ${route}`)
-      return addCorsHeaders(jsonError(`No API key configured for ${route!.provider}`, 500))
+      return addCorsHeaders(jsonError(`No API key configured for ${route!.provider}`, 401))
     }
 
     if (env.LOG_LEVEL === 'debug') {

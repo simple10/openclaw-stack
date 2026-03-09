@@ -79,7 +79,22 @@ const PROVIDER_DEFAULTS: Record<string, { baseUrl: string }> = {
   xai:        { baseUrl: 'https://api.x.ai' },
 }
 
-/** Look up the base URL config for a generic provider. Returns null for unknown providers. */
-export function getGenericProviderConfig(provider: string): { baseUrl: string } | null {
-  return PROVIDER_DEFAULTS[provider] ?? null
+/** Look up the config for a generic provider. Includes egress proxy if configured. Returns null for unknown providers. */
+export function getGenericProviderConfig(provider: string): ProviderConfig | null {
+  const defaults = PROVIDER_DEFAULTS[provider]
+  if (!defaults) return null
+
+  return {
+    baseUrl: defaults.baseUrl,
+    egressProxyUrl: env.EGRESS_PROXY_URL || undefined,
+    headers: env.EGRESS_PROXY_AUTH_TOKEN
+      ? {
+          'X-Proxy-Auth': `Bearer ${env.EGRESS_PROXY_AUTH_TOKEN}`,
+          ...(env.CF_ACCESS_CLIENT_ID && {
+            'CF-Access-Client-Id': env.CF_ACCESS_CLIENT_ID,
+            'CF-Access-Client-Secret': env.CF_ACCESS_CLIENT_SECRET,
+          }),
+        }
+      : undefined,
+  }
 }
