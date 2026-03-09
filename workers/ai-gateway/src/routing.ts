@@ -8,6 +8,13 @@ export interface RouteMatch {
   directPath: string
 }
 
+/** Route match for generic OpenAI-compatible providers via /proxy/{provider}/... */
+export interface GenericRouteMatch {
+  provider: string
+  /** Direct API path including v1/ prefix (e.g. "v1/chat/completions") */
+  directPath: string
+}
+
 /** Method allowed per provider-prefixed route (pathname without leading slash). */
 const ROUTES: Record<string, string> = {
   // Anthropic
@@ -63,4 +70,56 @@ export function matchProviderRoute(method: string, pathname: string): RouteMatch
     gatewayPath: toGatewayPath(key),
     directPath: override?.directPath ?? toDirectPath(key),
   }
+}
+
+// --- Generic provider routing (OpenAI-compatible) ---
+
+/** Known generic providers. Requests to unknown providers are rejected. */
+export const GENERIC_PROVIDERS = new Set([
+  'cohere',
+  'deepseek',
+  'fireworks',
+  'groq',
+  'minimax',
+  'mistral',
+  'moonshot',
+  'openrouter',
+  'perplexity',
+  'together',
+  'xai',
+])
+
+/** Whitelisted endpoints for generic providers: directPath → allowed method. */
+const GENERIC_ENDPOINTS: Record<string, string> = {
+  'v1/chat/completions': 'POST',
+  'v1/embeddings': 'POST',
+  'v1/models': 'GET',
+}
+
+/**
+ * Match a /proxy/{provider}/{rest} request to a generic provider route.
+ * Returns null if the provider is unknown or the endpoint is not whitelisted.
+ */
+export function matchGenericRoute(method: string, pathname: string): GenericRouteMatch | null {
+  // Strip leading slash, split into segments: ["proxy", provider, ...rest]
+  const path = pathname.startsWith('/') ? pathname.slice(1) : pathname
+  const firstSlash = path.indexOf('/')
+  if (firstSlash === -1) return null
+
+  const prefix = path.slice(0, firstSlash)
+  if (prefix !== 'proxy') return null
+
+  const rest = path.slice(firstSlash + 1)
+  const secondSlash = rest.indexOf('/')
+  if (secondSlash === -1) return null
+
+  const provider = rest.slice(0, secondSlash)
+  const directPath = rest.slice(secondSlash + 1)
+
+  if (!GENERIC_PROVIDERS.has(provider)) return null
+
+  const allowed = GENERIC_ENDPOINTS[directPath]
+  if (!allowed || allowed !== method) return null
+
+  return { provider, directPath }
 }

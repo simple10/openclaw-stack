@@ -1,4 +1,4 @@
-import type { Log, Provider } from './types'
+import type { Log } from './types'
 
 const MAX_OUTPUT_BYTES = 100 * 1024 // 100KB
 
@@ -265,7 +265,7 @@ async function parseOpenAIStream(stream: ReadableStream<Uint8Array>): Promise<Pa
 // ---------------------------------------------------------------------------
 
 export interface ReportOptions {
-  provider: Provider
+  provider: string
   requestBody: string
   responseStream: ReadableStream<Uint8Array>
   responseHeaders: Headers

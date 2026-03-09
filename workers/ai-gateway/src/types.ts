@@ -1,5 +1,6 @@
 export type { Log } from './log'
 export type { Provider, RouteMatch } from './routing'
+export type { GenericRouteMatch } from './routing'
 export type { ProviderConfig } from './config'
 
 // Use `wrangler types --env-file .dev.vars.example` to generate Env var types
@@ -9,6 +10,9 @@ export type { ProviderConfig } from './config'
 // }
 
 // --- KV schema types ---
+
+/** The 3 original providers with dedicated route handling. */
+export type LegacyProvider = 'anthropic' | 'openai' | 'openai-codex'
 
 export interface UserCredentials {
   anthropic?: {
@@ -23,6 +27,8 @@ export interface UserCredentials {
       expiresAt: number   // epoch ms
     }
   }
+  /** Generic OpenAI-compatible providers (deepseek, groq, mistral, etc.) */
+  providers?: Record<string, { apiKey: string }>
 }
 
 export interface UserEntry {

@@ -1,5 +1,4 @@
-import type { Log, Provider } from './types'
-import type { UserCredentials } from './types'
+import type { Log, Provider, UserCredentials } from './types'
 import { refreshOpenAIToken } from './openai-oauth'
 
 const REFRESH_BUFFER_MS = 5 * 60 * 1000 // refresh 5 min before expiry
@@ -82,5 +81,31 @@ async function resolveOpenAIKey(
 
   const key = creds.openai?.apiKey
   if (!key) log.warn('[keys] no OpenAI credentials found for user')
+  return key
+}
+
+/** Resolve the API key for a generic provider from the user's KV credentials. */
+export async function getGenericApiKey(
+  provider: string,
+  userId: string,
+  kv: KVNamespace,
+  log: Log
+): Promise<string | undefined> {
+  const raw = await kv.get(`creds:${userId}`)
+  if (!raw) {
+    log.warn(`[keys] no credentials in KV for user ${userId}`)
+    return undefined
+  }
+
+  let creds: UserCredentials
+  try {
+    creds = JSON.parse(raw)
+  } catch {
+    log.error(`[keys] failed to parse credentials for user ${userId}`)
+    return undefined
+  }
+
+  const key = creds.providers?.[provider]?.apiKey
+  if (!key) log.warn(`[keys] no ${provider} credentials found for user ${userId}`)
   return key
 }
