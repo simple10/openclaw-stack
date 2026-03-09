@@ -65,7 +65,7 @@ export function getProviderConfig(provider: string): ProviderConfig {
 /** Verified base URLs for generic OpenAI-compatible providers.
  *  Base URLs do NOT include /v1 — the directPath from route matching provides it.
  *  e.g. Groq: baseUrl="https://api.groq.com/openai" + "/v1/chat/completions" */
-const PROVIDER_DEFAULTS: Record<string, { baseUrl: string }> = {
+export const PROVIDER_DEFAULTS: Record<string, { baseUrl: string }> = {
   cohere:     { baseUrl: 'https://api.cohere.ai/compatibility' },
   deepseek:   { baseUrl: 'https://api.deepseek.com' },
   fireworks:  { baseUrl: 'https://api.fireworks.ai/inference' },

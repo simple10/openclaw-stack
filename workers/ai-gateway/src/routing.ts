@@ -74,20 +74,10 @@ export function matchProviderRoute(method: string, pathname: string): RouteMatch
 
 // --- Generic provider routing (OpenAI-compatible) ---
 
-/** Known generic providers. Requests to unknown providers are rejected. */
-export const GENERIC_PROVIDERS = new Set([
-  'cohere',
-  'deepseek',
-  'fireworks',
-  'groq',
-  'minimax',
-  'mistral',
-  'moonshot',
-  'openrouter',
-  'perplexity',
-  'together',
-  'xai',
-])
+import { PROVIDER_DEFAULTS } from './config'
+
+/** Known generic providers (derived from PROVIDER_DEFAULTS). Requests to unknown providers are rejected. */
+export const GENERIC_PROVIDERS = new Set(Object.keys(PROVIDER_DEFAULTS))
 
 /** Whitelisted endpoints for generic providers: directPath → allowed method. */
 const GENERIC_ENDPOINTS: Record<string, string> = {

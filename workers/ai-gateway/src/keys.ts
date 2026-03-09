@@ -3,6 +3,26 @@ import { refreshOpenAIToken } from './openai-oauth'
 
 const REFRESH_BUFFER_MS = 5 * 60 * 1000 // refresh 5 min before expiry
 
+/** Load and parse user credentials from KV. Returns undefined on missing or invalid data. */
+async function loadCredentials(
+  userId: string,
+  kv: KVNamespace,
+  log: Log
+): Promise<UserCredentials | undefined> {
+  const raw = await kv.get(`creds:${userId}`)
+  if (!raw) {
+    log.warn(`[keys] no credentials in KV for user ${userId}`)
+    return undefined
+  }
+
+  try {
+    return JSON.parse(raw)
+  } catch {
+    log.error(`[keys] failed to parse credentials for user ${userId}`)
+    return undefined
+  }
+}
+
 /** Resolve the upstream API key for a provider from the user's KV credentials. */
 export async function getProviderApiKey(
   provider: Provider,
@@ -10,19 +30,8 @@ export async function getProviderApiKey(
   kv: KVNamespace,
   log: Log
 ): Promise<string | undefined> {
-  const raw = await kv.get(`creds:${userId}`)
-  if (!raw) {
-    log.warn(`[keys] no credentials in KV for user ${userId}`)
-    return undefined
-  }
-
-  let creds: UserCredentials
-  try {
-    creds = JSON.parse(raw)
-  } catch {
-    log.error(`[keys] failed to parse credentials for user ${userId}`)
-    return undefined
-  }
+  const creds = await loadCredentials(userId, kv, log)
+  if (!creds) return undefined
 
   if (provider === 'anthropic') {
     return resolveAnthropicKey(creds, log)
@@ -91,19 +100,8 @@ export async function getGenericApiKey(
   kv: KVNamespace,
   log: Log
 ): Promise<string | undefined> {
-  const raw = await kv.get(`creds:${userId}`)
-  if (!raw) {
-    log.warn(`[keys] no credentials in KV for user ${userId}`)
-    return undefined
-  }
-
-  let creds: UserCredentials
-  try {
-    creds = JSON.parse(raw)
-  } catch {
-    log.error(`[keys] failed to parse credentials for user ${userId}`)
-    return undefined
-  }
+  const creds = await loadCredentials(userId, kv, log)
+  if (!creds) return undefined
 
   const key = creds.providers?.[provider]?.apiKey
   if (!key) log.warn(`[keys] no ${provider} credentials found for user ${userId}`)
