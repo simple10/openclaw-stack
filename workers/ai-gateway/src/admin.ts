@@ -74,8 +74,18 @@ async function generateAndStoreCodexToken(
   const jwt = await generateCodexJwt()
   const hash = await sha256Hex(jwt)
 
-  // Store token hash → userId mapping in KV
+  // Expire previous codex token (1-hour grace period, matches handleTokenRotation)
+  const previousHash = await kv.get(`codex:${userId}`)
+  if (previousHash) {
+    const expireAt = Math.floor(Date.now() / 1000) + 3600
+    await kv.put(`token:${previousHash}`, userId, { expiration: expireAt })
+  }
+
+  // Store new token hash → userId mapping in KV (no TTL)
   await kv.put(`token:${hash}`, userId)
+
+  // Track current codex hash for future expiration
+  await kv.put(`codex:${userId}`, hash)
 
   // Add hash to user's tokens list in registry
   const registry = await getRegistry(kv)
@@ -273,8 +283,9 @@ async function deleteUser(
     await kv.delete(`token:${token}`)
   }
 
-  // Delete credentials
+  // Delete credentials and codex tracking key
   await kv.delete(`creds:${userId}`)
+  await kv.delete(`codex:${userId}`)
 
   // Remove from registry
   delete registry[userId]
