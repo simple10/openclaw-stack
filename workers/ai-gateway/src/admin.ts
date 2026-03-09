@@ -352,13 +352,13 @@ export async function handleCodexTokenGeneration(
 // --- Mask / Merge helpers ---
 
 /** Mask a string to show first 8 + last 4 chars: "sk-ant-api...4f2a" */
-function maskString(s: string): string {
+export function maskString(s: string): string {
   if (s.length <= 16) return '***'
   return s.slice(0, 8) + '...' + s.slice(-4)
 }
 
 /** Return a masked copy of credentials (safe for client display). */
-function maskCredentials(creds: UserCredentials): Record<string, unknown> {
+export function maskCredentials(creds: UserCredentials): Record<string, unknown> {
   const result: Record<string, unknown> = {}
 
   if (creds.anthropic) {
@@ -389,7 +389,7 @@ function maskCredentials(creds: UserCredentials): Record<string, unknown> {
  * - Field present with null → delete
  * - Field absent → keep existing
  */
-function mergeCredentials(
+export function mergeCredentials(
   existing: UserCredentials,
   update: Record<string, unknown>
 ): UserCredentials {
