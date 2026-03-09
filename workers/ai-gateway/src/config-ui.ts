@@ -124,6 +124,67 @@ const CONFIG_HTML = /* html */ `<!DOCTYPE html>
         </div>
       </div>
 
+      <details style="margin-top:1rem;">
+        <summary style="cursor:pointer; font-size:0.95rem; font-weight:600; color:var(--dim); padding:0.5rem 0;">Additional Providers</summary>
+        <div style="margin-top:0.75rem;">
+          <div class="field" data-field="providers.cohere.apiKey">
+            <label>Cohere API Key</label>
+            <div class="existing" style="display:none"></div>
+            <div class="field-row"><input type="text" placeholder="API key" autocomplete="off" spellcheck="false"></div>
+          </div>
+          <div class="field" data-field="providers.deepseek.apiKey">
+            <label>DeepSeek API Key</label>
+            <div class="existing" style="display:none"></div>
+            <div class="field-row"><input type="text" placeholder="API key" autocomplete="off" spellcheck="false"></div>
+          </div>
+          <div class="field" data-field="providers.fireworks.apiKey">
+            <label>Fireworks API Key</label>
+            <div class="existing" style="display:none"></div>
+            <div class="field-row"><input type="text" placeholder="API key" autocomplete="off" spellcheck="false"></div>
+          </div>
+          <div class="field" data-field="providers.groq.apiKey">
+            <label>Groq API Key</label>
+            <div class="existing" style="display:none"></div>
+            <div class="field-row"><input type="text" placeholder="API key" autocomplete="off" spellcheck="false"></div>
+          </div>
+          <div class="field" data-field="providers.minimax.apiKey">
+            <label>MiniMax API Key</label>
+            <div class="existing" style="display:none"></div>
+            <div class="field-row"><input type="text" placeholder="API key" autocomplete="off" spellcheck="false"></div>
+          </div>
+          <div class="field" data-field="providers.mistral.apiKey">
+            <label>Mistral API Key</label>
+            <div class="existing" style="display:none"></div>
+            <div class="field-row"><input type="text" placeholder="API key" autocomplete="off" spellcheck="false"></div>
+          </div>
+          <div class="field" data-field="providers.moonshot.apiKey">
+            <label>Moonshot API Key</label>
+            <div class="existing" style="display:none"></div>
+            <div class="field-row"><input type="text" placeholder="API key" autocomplete="off" spellcheck="false"></div>
+          </div>
+          <div class="field" data-field="providers.openrouter.apiKey">
+            <label>OpenRouter API Key</label>
+            <div class="existing" style="display:none"></div>
+            <div class="field-row"><input type="text" placeholder="API key" autocomplete="off" spellcheck="false"></div>
+          </div>
+          <div class="field" data-field="providers.perplexity.apiKey">
+            <label>Perplexity API Key</label>
+            <div class="existing" style="display:none"></div>
+            <div class="field-row"><input type="text" placeholder="API key" autocomplete="off" spellcheck="false"></div>
+          </div>
+          <div class="field" data-field="providers.together.apiKey">
+            <label>Together API Key</label>
+            <div class="existing" style="display:none"></div>
+            <div class="field-row"><input type="text" placeholder="API key" autocomplete="off" spellcheck="false"></div>
+          </div>
+          <div class="field" data-field="providers.xai.apiKey">
+            <label>xAI API Key</label>
+            <div class="existing" style="display:none"></div>
+            <div class="field-row"><input type="text" placeholder="API key" autocomplete="off" spellcheck="false"></div>
+          </div>
+        </div>
+      </details>
+
       <div class="actions">
         <button class="btn-primary" id="save-btn">Save Changes</button>
       </div>
@@ -239,6 +300,10 @@ const CONFIG_HTML = /* html */ `<!DOCTYPE html>
 
     try {
       const update = buildUpdate();
+      if (!update) {
+        btn.disabled = false;
+        return;
+      }
       if (Object.keys(update).length === 0) {
         showStatus('#save-status', 'No changes to save', 'error');
         btn.disabled = false;
@@ -274,38 +339,58 @@ const CONFIG_HTML = /* html */ `<!DOCTYPE html>
 
   function buildUpdate() {
     const update = {};
+    let hasError = false;
 
     document.querySelectorAll('[data-field]').forEach(el => {
+      if (hasError) return;
       const path = el.dataset.field;
       const input = el.querySelector('input, textarea');
       const state = fieldState[path] || {};
       const newVal = input.value.trim();
 
-      const [provider, key] = path.split('.');
-      if (!update[provider]) update[provider] = {};
+      const segments = path.split('.');
 
-      if (state.cleared) {
-        // Send null to delete
-        update[provider][key] = null;
-      } else if (newVal) {
-        // Parse Codex auth JSON for openai.oauth
-        if (path === 'openai.oauth') {
-          const parsed = parseCodexAuth(newVal);
-          if (parsed.error) {
-            showStatus('#save-status', parsed.error, 'error');
-            return;
+      if (segments.length === 3) {
+        // 3-segment path: providers.{name}.apiKey
+        const [root, name, key] = segments;
+        if (!update[root]) update[root] = {};
+        if (!update[root][name]) update[root][name] = {};
+        if (state.cleared) {
+          update[root][name][key] = null;
+        } else if (newVal) {
+          update[root][name][key] = newVal;
+        }
+        // Clean up empty nested objects
+        if (Object.keys(update[root][name]).length === 0) delete update[root][name];
+        if (Object.keys(update[root]).length === 0) delete update[root];
+      } else {
+        // 2-segment path: {provider}.{key}
+        const [provider, key] = segments;
+        if (!update[provider]) update[provider] = {};
+
+        if (state.cleared) {
+          update[provider][key] = null;
+        } else if (newVal) {
+          if (path === 'openai.oauth') {
+            const parsed = parseCodexAuth(newVal);
+            if (parsed.error) {
+              showStatus('#save-status', parsed.error, 'error');
+              hasError = true;
+              return;
+            }
+            update[provider][key] = parsed.value;
+          } else {
+            update[provider][key] = newVal;
           }
-          update[provider][key] = parsed.value;
-        } else {
-          update[provider][key] = newVal;
         }
       }
-      // Absent = no change (omit from update)
     });
+
+    if (hasError) return null;
 
     // Remove provider keys with no actual changes
     for (const provider of Object.keys(update)) {
-      if (Object.keys(update[provider]).length === 0) {
+      if (typeof update[provider] === 'object' && Object.keys(update[provider]).length === 0) {
         delete update[provider];
       }
     }

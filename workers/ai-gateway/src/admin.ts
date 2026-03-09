@@ -380,6 +380,14 @@ function maskCredentials(creds: UserCredentials): Record<string, unknown> {
     if (Object.keys(o).length > 0) result.openai = o
   }
 
+  if (creds.providers) {
+    const p: Record<string, unknown> = {}
+    for (const [name, entry] of Object.entries(creds.providers)) {
+      if (entry.apiKey) p[name] = { apiKey: maskString(entry.apiKey) }
+    }
+    if (Object.keys(p).length > 0) result.providers = p
+  }
+
   return result
 }
 
@@ -433,6 +441,33 @@ function mergeCredentials(
       // Clean up empty provider section
       if (!result.openai.apiKey && !result.openai.oauth) {
         delete result.openai
+      }
+    }
+  }
+
+  if ('providers' in update) {
+    if (update.providers === null) {
+      delete result.providers
+    } else {
+      const u = update.providers as Record<string, unknown>
+      if (!result.providers) result.providers = {}
+      for (const [name, value] of Object.entries(u)) {
+        if (value === null) {
+          delete result.providers[name]
+        } else {
+          const entry = value as Record<string, unknown>
+          if ('apiKey' in entry) {
+            if (entry.apiKey === null) {
+              delete result.providers[name]
+            } else {
+              result.providers[name] = { apiKey: entry.apiKey as string }
+            }
+          }
+        }
+      }
+      // Clean up empty providers section
+      if (Object.keys(result.providers).length === 0) {
+        delete result.providers
       }
     }
   }

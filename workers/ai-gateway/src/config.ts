@@ -16,6 +16,20 @@ export interface ProviderConfig {
  * Change these to any upstream provider or proxy endpoints: Azure, AWS Bedrock, etc.
  * Defaults to using Cloudflare AI Gateway if env vars are configured.
  */
+export function buildCodexHeaders(vars: {
+  EGRESS_PROXY_AUTH_TOKEN?: string
+  CF_ACCESS_CLIENT_ID?: string
+  CF_ACCESS_CLIENT_SECRET?: string
+}): Record<string, string> | undefined {
+  const h: Record<string, string> = {}
+  if (vars.EGRESS_PROXY_AUTH_TOKEN) h['X-Proxy-Auth'] = `Bearer ${vars.EGRESS_PROXY_AUTH_TOKEN}`
+  if (vars.CF_ACCESS_CLIENT_ID && vars.CF_ACCESS_CLIENT_SECRET) {
+    h['CF-Access-Client-Id'] = vars.CF_ACCESS_CLIENT_ID
+    h['CF-Access-Client-Secret'] = vars.CF_ACCESS_CLIENT_SECRET
+  }
+  return Object.keys(h).length > 0 ? h : undefined
+}
+
 export function getProviderConfig(provider: string): ProviderConfig {
   // Cloudflare AI Gateway (optional):
   // Provides observability and token cost estimates, LLM routing, and more.
@@ -43,19 +57,47 @@ export function getProviderConfig(provider: string): ProviderConfig {
       return {
         baseUrl: 'https://chatgpt.com/backend-api',
         egressProxyUrl: env.EGRESS_PROXY_URL || undefined,
-        headers: env.EGRESS_PROXY_AUTH_TOKEN
-          ? {
-              'X-Proxy-Auth': `Bearer ${env.EGRESS_PROXY_AUTH_TOKEN}`,
-              // CF Access service token — authenticates to Cloudflare Zero Trust
-              ...(env.CF_ACCESS_CLIENT_ID && {
-                'CF-Access-Client-Id': env.CF_ACCESS_CLIENT_ID,
-                'CF-Access-Client-Secret': env.CF_ACCESS_CLIENT_SECRET,
-              }),
-            }
-          : undefined,
+        headers: buildCodexHeaders(env),
       }
 
     default:
       return { baseUrl: '' }
   }
+}
+
+// --- Generic provider defaults ---
+
+/** Verified base URLs for generic OpenAI-compatible providers.
+ *  Base URLs do NOT include /v1 — the directPath from route matching provides it.
+ *  e.g. Groq: baseUrl="https://api.groq.com/openai" + "/v1/chat/completions" */
+export const PROVIDER_DEFAULTS: Record<string, { baseUrl: string }> = {
+  cohere:     { baseUrl: 'https://api.cohere.ai/compatibility' },
+  deepseek:   { baseUrl: 'https://api.deepseek.com' },
+  fireworks:  { baseUrl: 'https://api.fireworks.ai/inference' },
+  groq:       { baseUrl: 'https://api.groq.com/openai' },
+  minimax:    { baseUrl: 'https://api.minimax.io' },
+  mistral:    { baseUrl: 'https://api.mistral.ai' },
+  moonshot:   { baseUrl: 'https://api.moonshot.ai' },
+  openrouter: { baseUrl: 'https://openrouter.ai/api' },
+  perplexity: { baseUrl: 'https://api.perplexity.ai' },
+  together:   { baseUrl: 'https://api.together.xyz' },
+  xai:        { baseUrl: 'https://api.x.ai' },
+}
+
+/** Look up the config for a generic provider. Returns null for unknown providers.
+ *  Uses CF AI Gateway when configured (same as legacy providers).
+ *  Does NOT inherit the egress proxy — EGRESS_PROXY_URL is scoped to openai-codex. */
+export function getGenericProviderConfig(provider: string): ProviderConfig | null {
+  const defaults = PROVIDER_DEFAULTS[provider]
+  if (!defaults) return null
+
+  const useCfGateway = env.CF_AI_GATEWAY_TOKEN && env.CF_AI_GATEWAY_ID && env.CF_AI_GATEWAY_ACCOUNT_ID
+  if (useCfGateway) {
+    return {
+      baseUrl: `https://gateway.ai.cloudflare.com/v1/${env.CF_AI_GATEWAY_ACCOUNT_ID}/${env.CF_AI_GATEWAY_ID}`,
+      headers: { 'cf-aig-authorization': `Bearer ${env.CF_AI_GATEWAY_TOKEN}` },
+    }
+  }
+
+  return { baseUrl: defaults.baseUrl }
 }

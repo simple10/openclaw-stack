@@ -1,6 +1,6 @@
 # AI Gateway Proxy — Configuration Guide
 
-The AI Gateway Worker proxies LLM requests from the OpenClaw gateway to Anthropic and OpenAI. Provider credentials are stored per-user in Cloudflare KV and managed via the self-service `/config` UI.
+The AI Gateway Worker proxies LLM requests from the OpenClaw gateway to upstream LLM providers. Supports Anthropic, OpenAI, and 11 additional OpenAI-compatible providers (DeepSeek, Groq, Mistral, Together, xAI, OpenRouter, Perplexity, Cohere, Fireworks, MiniMax, Moonshot). Provider credentials are stored per-user in Cloudflare KV and managed via the self-service `/config` UI.
 
 The worker supports two upstream routing modes, auto-detected based on which secrets are configured.
 
@@ -32,7 +32,7 @@ The worker auto-detects which mode to use: if `CF_AI_GATEWAY_TOKEN`, `CF_AI_GATE
 
 Visit the config UI at `https://<AI_GATEWAY_WORKER_URL>/config` and authenticate with your gateway token.
 
-The config page supports four credential types:
+The config page supports four credential types for the legacy providers, plus API key fields for 11 additional providers under the collapsible "Additional Providers" section:
 
 | Provider | Credential | Field | Notes |
 |----------|-----------|-------|-------|
@@ -40,10 +40,13 @@ The config page supports four credential types:
 | Anthropic | OAuth Token | `sk-ant-oat-*` | Claude Code subscription token (takes priority over API key) |
 | OpenAI | API Key | `sk-*` | Standard API key |
 | OpenAI | Codex OAuth | Paste `.codex/auth.json` | Codex subscription (takes priority over API key, auto-refreshes) |
+| Additional | API Key | Per-provider | Cohere, DeepSeek, Fireworks, Groq, MiniMax, Mistral, Moonshot, OpenRouter, Perplexity, Together, xAI |
 
 Credentials are stored in Cloudflare KV — they never touch the VPS. Changes take effect immediately.
 
-For each provider, OAuth/subscription credentials take priority over static API keys. You can have both configured as a fallback.
+For Anthropic and OpenAI, OAuth/subscription credentials take priority over static API keys. You can have both configured as a fallback.
+
+Additional providers use `/proxy/{provider}/v1/...` routes (e.g., `/proxy/deepseek/v1/chat/completions`).
 
 ---
 
@@ -114,6 +117,15 @@ curl -s https://<AI_GATEWAY_WORKER_URL>/openai/v1/chat/completions \
   -H "Authorization: Bearer <AI_GATEWAY_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{"model":"gpt-4o-mini","max_tokens":10,"messages":[{"role":"user","content":"Say hi"}]}'
+```
+
+### Test a generic provider (e.g., DeepSeek)
+
+```bash
+curl -s https://<AI_GATEWAY_WORKER_URL>/proxy/deepseek/v1/chat/completions \
+  -H "Authorization: Bearer <AI_GATEWAY_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"deepseek-chat","max_tokens":10,"messages":[{"role":"user","content":"Say hi"}]}'
 ```
 
 ### Verify CF AI Gateway analytics (CF AI Gateway mode only)

@@ -1,13 +1,13 @@
 # AI Gateway Proxy Worker
 
-Cloudflare Worker that proxies LLM API calls to Anthropic and OpenAI. Sits between the OpenClaw gateway and providers without changing request/response formats. Routes directly to provider APIs by default, or optionally through [Cloudflare AI Gateway](https://developers.cloudflare.com/ai-gateway/) for observability, caching, and rate limiting.
+Cloudflare Worker that proxies LLM API calls to upstream providers. Supports 3 legacy providers (Anthropic, OpenAI, OpenAI-Codex) on static routes and 11 generic OpenAI-compatible providers (DeepSeek, Groq, Mistral, Together, xAI, OpenRouter, Perplexity, Cohere, Fireworks, MiniMax, Moonshot) via `/proxy/{provider}/...` routes. Routes directly to provider APIs by default, or optionally through [Cloudflare AI Gateway](https://developers.cloudflare.com/ai-gateway/) for observability, caching, and rate limiting.
 
 ```
 Direct mode (default):
-  OpenClaw Gateway → Worker (auth, key swap) → Anthropic / OpenAI
+  OpenClaw Gateway → Worker (auth, key swap) → Provider API
 
 CF AI Gateway mode (optional):
-  OpenClaw Gateway → Worker (auth, URL rewrite) → Cloudflare AI Gateway → Anthropic / OpenAI
+  OpenClaw Gateway → Worker (auth, URL rewrite) → Cloudflare AI Gateway → Provider API
 ```
 
 Streaming works transparently — request and response bodies are passed through as `ReadableStream` without parsing.
@@ -29,6 +29,9 @@ Streaming works transparently — request and response bodies are passed through
 | `/openai/v1/embeddings` | POST | User token | OpenAI proxy |
 | `/openai/v1/models` | GET | User token | OpenAI proxy |
 | `/anthropic/v1/messages` | POST | User token | Anthropic proxy |
+| `/proxy/{provider}/v1/chat/completions` | POST | User token | Generic provider proxy |
+| `/proxy/{provider}/v1/embeddings` | POST | User token | Generic provider proxy |
+| `/proxy/{provider}/v1/models` | GET | User token | Generic provider proxy |
 
 ## Auth
 

@@ -1,11 +1,11 @@
 import { authenticateRequest, validateAdminToken } from './auth'
-import { getProviderConfig } from './config'
+import { getProviderConfig, getGenericProviderConfig } from './config'
 import { handlePreflight, addCorsHeaders } from './cors'
 import { jsonError } from './errors'
 import { isLlemtryEnabled, isLlmRoute, reportGeneration } from './llemtry'
 import { createLog, logInboundRequest } from './log'
-import { matchProviderRoute } from './routing'
-import { getProviderApiKey } from './keys'
+import { matchProviderRoute, matchGenericRoute } from './routing'
+import { getProviderApiKey, getGenericApiKey } from './keys'
 import {
   handleAdminRequest,
   handleTokenRotation,
@@ -16,6 +16,7 @@ import {
 import { serveConfigPage } from './config-ui'
 import { proxyOpenAI } from './providers/openai'
 import { proxyAnthropic } from './providers/anthropic'
+import { proxyGeneric } from './providers/generic'
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -93,37 +94,92 @@ export default {
       return addCorsHeaders(jsonError('Invalid or missing auth credentials', 401))
     }
 
-    // Route to provider
+    // Route to provider — try legacy routes first, then generic /proxy/{provider}/...
     const route = matchProviderRoute(request.method, pathname)
-    if (!route) {
+    const genericRoute = route ? null : matchGenericRoute(request.method, pathname)
+
+    if (!route && !genericRoute) {
       console.error(`No route match: ${request.method} ${pathname}`)
       return addCorsHeaders(jsonError(`Route not implemented in AI Gateway: ${pathname}`, 404))
     }
 
-    const apiKey = await getProviderApiKey(route.provider, userId, env.AUTH_KV, log)
+    // --- Generic provider route ---
+    if (genericRoute) {
+      const apiKey = await getGenericApiKey(genericRoute.provider, userId, env.AUTH_KV, log)
+      if (!apiKey) {
+        return addCorsHeaders(jsonError(`No API key configured for ${genericRoute.provider}`, 401))
+      }
+
+      const providerConfig = getGenericProviderConfig(genericRoute.provider)
+      if (!providerConfig) {
+        return addCorsHeaders(jsonError(`Unknown provider: ${genericRoute.provider}`, 404))
+      }
+
+      // CF AI Gateway uses a different path format: {provider}/chat/completions (no /v1/)
+      const isGateway = providerConfig.baseUrl.includes('gateway.ai.cloudflare.com')
+      const upstreamPath = isGateway
+        ? `${genericRoute.provider}/${genericRoute.directPath.replace('v1/', '')}`
+        : genericRoute.directPath
+
+      const llemtryActive = isLlemtryEnabled(env, log) && isLlmRoute(genericRoute.directPath)
+      const startTime = llemtryActive ? new Date() : undefined
+      const requestBody = llemtryActive ? await request.text() : undefined
+
+      let response = await proxyGeneric(
+        apiKey,
+        request,
+        providerConfig,
+        upstreamPath,
+        log,
+        genericRoute.provider,
+        requestBody
+      )
+
+      if (llemtryActive && response.ok && response.body) {
+        const statusCode = response.status
+        const responseHeaders = new Headers(response.headers)
+        const [clientStream, reportStream] = response.body.tee()
+        response = new Response(clientStream, response)
+
+        ctx.waitUntil(
+          reportGeneration(env, log, {
+            provider: genericRoute.provider,
+            requestBody: requestBody!,
+            responseStream: reportStream,
+            responseHeaders,
+            statusCode,
+            startTime: startTime!,
+          })
+        )
+      }
+
+      return addCorsHeaders(response)
+    }
+
+    // --- Legacy provider route ---
+    const apiKey = await getProviderApiKey(route!.provider, userId, env.AUTH_KV, log)
     if (!apiKey) {
-      console.error(`No API key configured for ${route.provider}: ${request.method} ${route}`)
-      return addCorsHeaders(jsonError(`No API key configured for ${route.provider}`, 500))
+      return addCorsHeaders(jsonError(`No API key configured for ${route!.provider}`, 401))
     }
 
     if (env.LOG_LEVEL === 'debug') {
-      logInboundRequest(log, request, route, apiKey)
+      logInboundRequest(log, request, route!, apiKey)
     }
 
-    const providerConfig = getProviderConfig(route.provider)
+    const providerConfig = getProviderConfig(route!.provider)
 
     // CF AI Gateway uses a different path format (strips /v1/, adds provider prefix)
     const isGateway = providerConfig.baseUrl.includes('gateway.ai.cloudflare.com')
-    const upstreamPath = isGateway ? route.gatewayPath : route.directPath
+    const upstreamPath = isGateway ? route!.gatewayPath : route!.directPath
 
     // When llemtry is enabled for an LLM route, pre-read the request body
     // so it can be shared with both the proxy function and llemtry reporting
-    const llemtryActive = isLlemtryEnabled(env, log) && isLlmRoute(route.directPath)
+    const llemtryActive = isLlemtryEnabled(env, log) && isLlmRoute(route!.directPath)
     const startTime = llemtryActive ? new Date() : undefined
     const requestBody = llemtryActive ? await request.text() : undefined
 
     let response: Response
-    if (route.provider === 'anthropic') {
+    if (route!.provider === 'anthropic') {
       response = await proxyAnthropic(
         apiKey,
         request,
@@ -163,7 +219,7 @@ export default {
 
       ctx.waitUntil(
         reportGeneration(env, log, {
-          provider: route.provider,
+          provider: route!.provider,
           requestBody: requestBody!,
           responseStream: reportStream,
           responseHeaders,

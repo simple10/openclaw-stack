@@ -23,6 +23,8 @@ export interface UserCredentials {
       expiresAt: number   // epoch ms
     }
   }
+  /** Generic OpenAI-compatible providers (deepseek, groq, mistral, etc.) */
+  providers?: Record<string, { apiKey: string }>
 }
 
 export interface UserEntry {
