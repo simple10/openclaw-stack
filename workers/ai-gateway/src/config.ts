@@ -16,6 +16,20 @@ export interface ProviderConfig {
  * Change these to any upstream provider or proxy endpoints: Azure, AWS Bedrock, etc.
  * Defaults to using Cloudflare AI Gateway if env vars are configured.
  */
+export function buildCodexHeaders(vars: {
+  EGRESS_PROXY_AUTH_TOKEN?: string
+  CF_ACCESS_CLIENT_ID?: string
+  CF_ACCESS_CLIENT_SECRET?: string
+}): Record<string, string> | undefined {
+  const h: Record<string, string> = {}
+  if (vars.EGRESS_PROXY_AUTH_TOKEN) h['X-Proxy-Auth'] = `Bearer ${vars.EGRESS_PROXY_AUTH_TOKEN}`
+  if (vars.CF_ACCESS_CLIENT_ID) {
+    h['CF-Access-Client-Id'] = vars.CF_ACCESS_CLIENT_ID
+    h['CF-Access-Client-Secret'] = vars.CF_ACCESS_CLIENT_SECRET!
+  }
+  return Object.keys(h).length > 0 ? h : undefined
+}
+
 export function getProviderConfig(provider: string): ProviderConfig {
   // Cloudflare AI Gateway (optional):
   // Provides observability and token cost estimates, LLM routing, and more.
@@ -43,16 +57,7 @@ export function getProviderConfig(provider: string): ProviderConfig {
       return {
         baseUrl: 'https://chatgpt.com/backend-api',
         egressProxyUrl: env.EGRESS_PROXY_URL || undefined,
-        headers: env.EGRESS_PROXY_AUTH_TOKEN
-          ? {
-              'X-Proxy-Auth': `Bearer ${env.EGRESS_PROXY_AUTH_TOKEN}`,
-              // CF Access service token — authenticates to Cloudflare Zero Trust
-              ...(env.CF_ACCESS_CLIENT_ID && {
-                'CF-Access-Client-Id': env.CF_ACCESS_CLIENT_ID,
-                'CF-Access-Client-Secret': env.CF_ACCESS_CLIENT_SECRET,
-              }),
-            }
-          : undefined,
+        headers: buildCodexHeaders(env),
       }
 
     default:

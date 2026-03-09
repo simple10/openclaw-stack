@@ -300,6 +300,10 @@ const CONFIG_HTML = /* html */ `<!DOCTYPE html>
 
     try {
       const update = buildUpdate();
+      if (!update) {
+        btn.disabled = false;
+        return;
+      }
       if (Object.keys(update).length === 0) {
         showStatus('#save-status', 'No changes to save', 'error');
         btn.disabled = false;
@@ -335,8 +339,10 @@ const CONFIG_HTML = /* html */ `<!DOCTYPE html>
 
   function buildUpdate() {
     const update = {};
+    let hasError = false;
 
     document.querySelectorAll('[data-field]').forEach(el => {
+      if (hasError) return;
       const path = el.dataset.field;
       const input = el.querySelector('input, textarea');
       const state = fieldState[path] || {};
@@ -369,6 +375,7 @@ const CONFIG_HTML = /* html */ `<!DOCTYPE html>
             const parsed = parseCodexAuth(newVal);
             if (parsed.error) {
               showStatus('#save-status', parsed.error, 'error');
+              hasError = true;
               return;
             }
             update[provider][key] = parsed.value;
@@ -378,6 +385,8 @@ const CONFIG_HTML = /* html */ `<!DOCTYPE html>
         }
       }
     });
+
+    if (hasError) return null;
 
     // Remove provider keys with no actual changes
     for (const provider of Object.keys(update)) {
