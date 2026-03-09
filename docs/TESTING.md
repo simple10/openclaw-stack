@@ -2,6 +2,8 @@
 
 This document provides comprehensive testing instructions for verifying an existing OpenClaw single-VPS deployment. It combines SSH-based verification (delegated to the verification playbook) with browser UI tests via Chrome DevTools MCP.
 
+> **Pre-deploy tests:** Run `npm test` before deploying to catch config resolution, routing, and build-patch regressions locally. See test suite in `test/` and `workers/ai-gateway/test/`.
+
 ## For Claude Code Agents
 
 When asked to test the OpenClaw deployment, follow both phases below. Source the config first for connection details and variable values used throughout.
