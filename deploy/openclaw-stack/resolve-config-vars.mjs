@@ -93,4 +93,16 @@ if (stripTelegram || stripMatrix) {
   content = JSON.stringify(config, null, 2) + "\n";
 }
 
+// Drop blank IDs introduced by env substitution, e.g. [""] when
+// ADMIN_TELEGRAM_ID is unset. The live config UI normalizes these to [].
+const config = parseJsonc(content, [], { allowTrailingComma: true });
+const allowFrom = config?.tools?.elevated?.allowFrom;
+if (allowFrom && typeof allowFrom === "object") {
+  for (const [channel, ids] of Object.entries(allowFrom)) {
+    if (!Array.isArray(ids)) continue;
+    allowFrom[channel] = ids.filter((id) => typeof id !== "string" || id.trim() !== "");
+  }
+  content = JSON.stringify(config, null, 2) + "\n";
+}
+
 process.stdout.write(content);
