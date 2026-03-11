@@ -2,7 +2,7 @@ import { validateAuth } from './auth'
 import { handlePreflight, addCorsHeaders } from './cors'
 import { jsonError } from './errors'
 import { handleEvents } from './events'
-import { handleLlemtry } from './llemtry'
+import { handleLlmetry } from './llmetry'
 
 export default {
   // Cron trigger: prune old events from D1
@@ -68,14 +68,14 @@ export default {
       return addCorsHeaders(await handleLogs(request, env))
     }
 
-    // POST /llemtry — receive LLM telemetry spans from telemetry plugin
-    if (request.method === 'POST' && pathname === '/llemtry') {
+    // POST /llmetry — receive LLM telemetry spans from telemetry plugin
+    if (request.method === 'POST' && pathname === '/llmetry') {
       const authError = await validateAuth(request, env.AUTH_TOKEN)
       if (authError) {
         return addCorsHeaders(jsonError(authError, 401))
       }
 
-      return addCorsHeaders(await handleLlemtry(request, env, ctx))
+      return addCorsHeaders(await handleLlmetry(request, env, ctx))
     }
 
     // POST /openclaw/events — receive batched telemetry events for D1 storage

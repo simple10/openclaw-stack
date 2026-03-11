@@ -13,7 +13,7 @@
 // Output destinations (all independently configurable):
 //   1. Local file (~/.openclaw/logs/telemetry.log) — JSONL
 //   2. Log Worker /openclaw/events — batched event shipping for D1 storage
-//   3. Log Worker /llemtry — existing Langfuse span format (LLM events only)
+//   3. Log Worker /llmetry — existing Langfuse span format (LLM events only)
 //
 // Configuration: openclaw.json → plugins.entries.telemetry.config
 // Requires gateway restart after config changes (plugins.* not hot-reloadable).
@@ -121,9 +121,9 @@ function truncateContent(data) {
   return result
 }
 
-// ── Llemtry span assembly (carried over from llm-logger) ────────────
+// ── Llmetry span assembly (carried over from llm-logger) ────────────
 
-function buildLlemtrySpan(input, outputEvent, ctx) {
+function buildLlmetrySpan(input, outputEvent, ctx) {
   const startNano = input ? String(input.timestamp * 1_000_000) : String(Date.now() * 1_000_000)
   const endNano = String(Date.now() * 1_000_000)
 
@@ -261,7 +261,7 @@ export default {
   register(api) {
     const cfg = api.pluginConfig ?? {}
     const eventsCfg = cfg.events ?? {}
-    const llemtryCfg = cfg.llemtry ?? {}
+    const llmetryCfg = cfg.llmetry ?? {}
     const categories = cfg.categories ?? {}
 
     // Category granularity defaults
@@ -322,30 +322,30 @@ export default {
       }
     }
 
-    // ── Llemtry output (/llemtry endpoint) ──────────────────────
-    const llemtryWanted = llemtryCfg.enabled === true || llemtryCfg.enabled === 'true'
-    const llemtryUrl = llemtryCfg.url || undefined
-    const llemtryToken = llemtryCfg.authToken || undefined
-    let llemtryEnabled = false
+    // ── Llmetry output (/llmetry endpoint) ──────────────────────
+    const llmetryWanted = llmetryCfg.enabled === true || llmetryCfg.enabled === 'true'
+    const llmetryUrl = llmetryCfg.url || undefined
+    const llmetryToken = llmetryCfg.authToken || undefined
+    let llmetryEnabled = false
     let sendSpan = null
 
-    if (llemtryWanted) {
-      if (!llemtryUrl || !llemtryToken) {
+    if (llmetryWanted) {
+      if (!llmetryUrl || !llmetryToken) {
         api.logger.error?.(
-          '[telemetry] llemtry.enabled is true but url or authToken is missing. ' +
+          '[telemetry] llmetry.enabled is true but url or authToken is missing. ' +
             'LLM telemetry will NOT be sent.'
         )
       } else {
-        api.logger.debug?.(`[telemetry] LLM telemetry enabled → ${llemtryUrl}`)
-        llemtryEnabled = true
-        sendSpan = makeSendSpan(llemtryUrl, llemtryToken, INSTANCE_ID, HOSTNAME)
+        api.logger.debug?.(`[telemetry] LLM telemetry enabled → ${llmetryUrl}`)
+        llmetryEnabled = true
+        sendSpan = makeSendSpan(llmetryUrl, llmetryToken, INSTANCE_ID, HOSTNAME)
       }
     }
 
-    // In-memory buffer: runId → pending input event (for llemtry span assembly)
+    // In-memory buffer: runId → pending input event (for llmetry span assembly)
     const pendingInputs = new Map()
 
-    if (llemtryEnabled) {
+    if (llmetryEnabled) {
       const cleanupTimer = setInterval(() => {
         const now = Date.now()
         for (const [runId, entry] of pendingInputs) {
@@ -419,8 +419,8 @@ export default {
 
       emit('llm_input', 'llm', event, ctx, data)
 
-      // Buffer for llemtry span assembly
-      if (llemtryEnabled) {
+      // Buffer for llmetry span assembly
+      if (llmetryEnabled) {
         const runId = event.runId ?? ctx.runId
         if (runId) {
           pendingInputs.set(runId, { timestamp: Date.now(), event, ctx })
@@ -459,15 +459,15 @@ export default {
 
       emit('llm_output', 'llm', event, ctx, data)
 
-      // Assemble llemtry span and send
-      if (llemtryEnabled) {
+      // Assemble llmetry span and send
+      if (llmetryEnabled) {
         const runId = event.runId ?? ctx.runId
         const input = runId ? pendingInputs.get(runId) : undefined
         if (runId) pendingInputs.delete(runId)
 
-        const span = buildLlemtrySpan(input, event, ctx)
+        const span = buildLlmetrySpan(input, event, ctx)
         sendSpan(span).catch((err) =>
-          console.error(`[telemetry] llemtry send failed: ${err.message}`)
+          console.error(`[telemetry] llmetry send failed: ${err.message}`)
         )
       }
     })
@@ -586,7 +586,7 @@ export default {
     const outputs = []
     if (fileLoggingEnabled) outputs.push(`file:${logFileName}`)
     if (eventSender) outputs.push('events:/openclaw/events')
-    if (llemtryEnabled) outputs.push('llemtry')
+    if (llmetryEnabled) outputs.push('llmetry')
     api.logger.debug?.(`[telemetry] Plugin registered — outputs: [${outputs.join(', ')}]`)
   },
 }

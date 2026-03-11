@@ -547,7 +547,7 @@ ssh -i <SSH_KEY> -p <SSH_PORT> <SSH_USER>@<VPS_IP> \
 
 ## 7.6a Telemetry (unified plugin)
 
-> Skip this section if `ENABLE_LLEMTRY_LOGGING` is not `true` in the deployed config.
+> Skip this section if `ENABLE_LLMETRY_LOGGING` is not `true` in the deployed config.
 
 **1. Events endpoint (D1 storage):**
 
@@ -560,11 +560,11 @@ curl -s -X POST "$EVENTS_URL" \
 # Expected: {"status":"ok","count":0}
 ```
 
-**2. Llemtry endpoint (Langfuse):**
+**2. Llmetry endpoint (Langfuse):**
 
 ```bash
-LLEMTRY_URL="${LOG_WORKER_URL}/llemtry"
-curl -s -X POST "$LLEMTRY_URL" \
+LLMETRY_URL="${LOG_WORKER_URL}/llmetry"
+curl -s -X POST "$LLMETRY_URL" \
   -H "Authorization: Bearer $LOG_WORKER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"resource":{"serviceName":"test"},"spans":[]}' | jq .
@@ -576,7 +576,7 @@ curl -s -X POST "$LLEMTRY_URL" \
 ```bash
 FIRST_CLAW=$(echo "$CLAWS" | head -1)
 sudo docker logs "$FIRST_CLAW" 2>&1 | grep -i '\[telemetry\]'
-# Expected: "[telemetry] Plugin registered — outputs: [file:telemetry.log, events:/openclaw/events, llemtry]"
+# Expected: "[telemetry] Plugin registered — outputs: [file:telemetry.log, events:/openclaw/events, llmetry]"
 # If misconfigured: "[telemetry] events.enabled is true but events.url or events.authToken is missing..."
 ```
 
@@ -587,17 +587,17 @@ sudo docker logs "$FIRST_CLAW" 2>&1 | grep -i '\[telemetry\]'
 FIRST_INST=$(ls -d <INSTALL_DIR>/instances/*/ | head -1)
 sudo tail -5 "${FIRST_INST}.openclaw/logs/telemetry.log" | jq .
 
-# Check Log Worker logs for event and llemtry entries
-npx wrangler tail --format json | jq 'select(.logs[].message | contains("[EVENTS]") or contains("[LLEMTRY]"))'
+# Check Log Worker logs for event and llmetry entries
+npx wrangler tail --format json | jq 'select(.logs[].message | contains("[EVENTS]") or contains("[LLMETRY]"))'
 
 # Check D1 for stored events (D1_DATABASE_NAME from workers/log-receiver/wrangler.jsonc)
 npx wrangler d1 execute <D1_DATABASE_NAME> --command="SELECT type, category, agent_id, session_id FROM events ORDER BY id DESC LIMIT 10"
 ```
 
 - [ ] Events endpoint returns `{"status":"ok","count":0}` for empty batch
-- [ ] Llemtry endpoint returns `{"status":"ok","count":0}` for empty batch
+- [ ] Llmetry endpoint returns `{"status":"ok","count":0}` for empty batch
 - [ ] Plugin logs confirm all outputs enabled (or correctly warns if misconfigured)
-- [ ] After agent message: events visible in D1 and llemtry spans in Log Worker logs
+- [ ] After agent message: events visible in D1 and llmetry spans in Log Worker logs
 - [ ] Local telemetry.log file being written
 
 ---

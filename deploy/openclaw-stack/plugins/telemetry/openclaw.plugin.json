@@ -1,7 +1,7 @@
 {
   "id": "telemetry",
   "name": "Telemetry",
-  "description": "Unified telemetry — captures LLM, session, tool, message, agent, and gateway events. Ships to local file, D1 (via Log Worker /openclaw/events), and Langfuse (via /llemtry).",
+  "description": "Unified telemetry — captures LLM, session, tool, message, agent, and gateway events. Ships to local file, D1 (via Log Worker /openclaw/events), and Langfuse (via /llmetry).",
   "version": "1.0.0",
   "configSchema": {
     "type": "object",
@@ -26,8 +26,16 @@
         "additionalProperties": false,
         "properties": {
           "enabled": {
-            "type": ["boolean", "string"],
-            "enum": [true, false, "true", "false"],
+            "type": [
+              "boolean",
+              "string"
+            ],
+            "enum": [
+              true,
+              false,
+              "true",
+              "false"
+            ],
             "description": "Enable batched event shipping to /openclaw/events endpoint",
             "default": false
           },
@@ -51,24 +59,32 @@
           }
         }
       },
-      "llemtry": {
+      "llmetry": {
         "type": "object",
-        "description": "LLM telemetry — send OTEL spans to Log Worker /llemtry for Langfuse",
+        "description": "LLM telemetry — send OTEL spans to Log Worker /llmetry for Langfuse",
         "additionalProperties": false,
         "properties": {
           "enabled": {
-            "type": ["boolean", "string"],
-            "enum": [true, false, "true", "false"],
+            "type": [
+              "boolean",
+              "string"
+            ],
+            "enum": [
+              true,
+              false,
+              "true",
+              "false"
+            ],
             "description": "Enable sending LLM telemetry spans",
             "default": false
           },
           "url": {
             "type": "string",
-            "description": "Full URL of the llemtry endpoint"
+            "description": "Full URL of the llmetry endpoint"
           },
           "authToken": {
             "type": "string",
-            "description": "Bearer token for llemtry endpoint authentication"
+            "description": "Bearer token for llmetry endpoint authentication"
           }
         }
       },
@@ -79,32 +95,62 @@
         "properties": {
           "llm": {
             "type": "string",
-            "enum": ["full", "summary", "metadata", "off"],
+            "enum": [
+              "full",
+              "summary",
+              "metadata",
+              "off"
+            ],
             "default": "full"
           },
           "session": {
             "type": "string",
-            "enum": ["full", "summary", "metadata", "off"],
+            "enum": [
+              "full",
+              "summary",
+              "metadata",
+              "off"
+            ],
             "default": "full"
           },
           "tool": {
             "type": "string",
-            "enum": ["full", "summary", "metadata", "off"],
+            "enum": [
+              "full",
+              "summary",
+              "metadata",
+              "off"
+            ],
             "default": "summary"
           },
           "message": {
             "type": "string",
-            "enum": ["full", "summary", "metadata", "off"],
+            "enum": [
+              "full",
+              "summary",
+              "metadata",
+              "off"
+            ],
             "default": "summary"
           },
           "agent": {
             "type": "string",
-            "enum": ["full", "summary", "metadata", "off"],
+            "enum": [
+              "full",
+              "summary",
+              "metadata",
+              "off"
+            ],
             "default": "full"
           },
           "gateway": {
             "type": "string",
-            "enum": ["full", "summary", "metadata", "off"],
+            "enum": [
+              "full",
+              "summary",
+              "metadata",
+              "off"
+            ],
             "default": "metadata"
           }
         }

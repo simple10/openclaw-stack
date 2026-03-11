@@ -144,7 +144,7 @@ stack:
     worker_token: ${LOG_WORKER_TOKEN}
     vector: true
     events: true
-    llemtry: true
+    llmetry: true
 
   # Total VPS resource budget for this stack — percentages resolved against VPS capacity during build
   resources:
@@ -277,7 +277,7 @@ services:
       - LOG_WORKER_URL=<%- stack.logging?.worker_url || '' %>
       - LOG_WORKER_TOKEN=<%- stack.logging?.worker_token || '' %>
       - ENABLE_EVENTS_LOGGING=<%- stack.logging?.events || false %>
-      - ENABLE_LLEMTRY_LOGGING=<%- stack.logging?.llemtry || false %>
+      - ENABLE_LLMETRY_LOGGING=<%- stack.logging?.llmetry || false %>
     deploy:
       resources:
         limits:

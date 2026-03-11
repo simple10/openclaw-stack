@@ -1,8 +1,8 @@
-# Plan: Replace direct Langfuse with llemtry in AI Gateway Worker
+# Plan: Replace direct Langfuse with llmetry in AI Gateway Worker
 
 ## Context
 
-The log receiver worker now has a `/llemtry` endpoint that accepts OTEL-inspired LLM telemetry spans and forwards them to Langfuse (and future backends). The `llm-logger` plugin already uses this endpoint. Currently the AI gateway worker has its own separate Langfuse integration with duplicate config (keys, URL). This change consolidates: the AI gateway sends llemtry spans to the log worker instead of talking to Langfuse directly.
+The log receiver worker now has a `/llmetry` endpoint that accepts OTEL-inspired LLM telemetry spans and forwards them to Langfuse (and future backends). The `llm-logger` plugin already uses this endpoint. Currently the AI gateway worker has its own separate Langfuse integration with duplicate config (keys, URL). This change consolidates: the AI gateway sends llmetry spans to the log worker instead of talking to Langfuse directly.
 
 ## Scope
 
@@ -10,7 +10,7 @@ AI gateway worker only (`workers/ai-gateway/`). No deployment. No log worker cha
 
 ## Changes
 
-### 1. Rename `langfuse.ts` → `llemtry.ts` and rewrite
+### 1. Rename `langfuse.ts` → `llmetry.ts` and rewrite
 
 **Remove:**
 
@@ -27,13 +27,13 @@ AI gateway worker only (`workers/ai-gateway/`). No deployment. No log worker cha
 
 **Add:**
 
-- `isLlemtryEnabled(env, log)` — checks `LLEMTRY_ENABLED === 'true'` and that `LLEMTRY_ENDPOINT` + `LLEMTRY_AUTH_TOKEN` are set
+- `isLlmetryEnabled(env, log)` — checks `LLMETRY_ENABLED === 'true'` and that `LLMETRY_ENDPOINT` + `LLMETRY_AUTH_TOKEN` are set
 - `reportGeneration()` rewritten to:
   1. Parse request/response (same as today)
-  2. Build an `LlemtryBatch` object with one span
-  3. POST to `env.LLEMTRY_ENDPOINT` with `Authorization: Bearer ${env.LLEMTRY_AUTH_TOKEN}`
+  2. Build an `LlmetryBatch` object with one span
+  3. POST to `env.LLMETRY_ENDPOINT` with `Authorization: Bearer ${env.LLMETRY_AUTH_TOKEN}`
 
-**Llemtry span mapping** (AI gateway has no session/agent context — send what's available):
+**Llmetry span mapping** (AI gateway has no session/agent context — send what's available):
 
 ```
 resource.serviceName       = "openclaw-ai-gateway"
@@ -64,8 +64,8 @@ span.events:
 
 ### 2. Update `index.ts`
 
-- Change imports: `langfuse` → `llemtry` (function names stay the same: `isLlemtryEnabled`, `isLlmRoute`, `reportGeneration`)
-- Rename local variable `langfuseActive` → `llemtryActive`
+- Change imports: `langfuse` → `llmetry` (function names stay the same: `isLlmetryEnabled`, `isLlmRoute`, `reportGeneration`)
+- Rename local variable `langfuseActive` → `llmetryActive`
 - No structural changes — the tee-and-report-in-background pattern stays identical
 
 ### 3. Update `wrangler.jsonc`
@@ -73,10 +73,10 @@ span.events:
 Replace the Langfuse vars section:
 
 ```jsonc
-// ---- LLM telemetry via llemtry (optional) ----
-"LLEMTRY_ENABLED": "false",  // Set to "true" to send LLM telemetry to log receiver worker
-// LLEMTRY_ENDPOINT   — URL of log receiver /llemtry endpoint, set via `wrangler secret put ...`
-// LLEMTRY_AUTH_TOKEN  — Bearer token for log receiver, set via `wrangler secret put ...`
+// ---- LLM telemetry via llmetry (optional) ----
+"LLMETRY_ENABLED": "false",  // Set to "true" to send LLM telemetry to log receiver worker
+// LLMETRY_ENDPOINT   — URL of log receiver /llmetry endpoint, set via `wrangler secret put ...`
+// LLMETRY_AUTH_TOKEN  — Bearer token for log receiver, set via `wrangler secret put ...`
 ```
 
 Remove: `LANGFUSE_ENABLED`, `LANGFUSE_BASE_URL`, and comments about `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`.
@@ -86,12 +86,12 @@ Remove: `LANGFUSE_ENABLED`, `LANGFUSE_BASE_URL`, and comments about `LANGFUSE_PU
 | File | Action |
 |------|--------|
 | `workers/ai-gateway/src/langfuse.ts` | Delete |
-| `workers/ai-gateway/src/llemtry.ts` | Create (rewritten from langfuse.ts) |
+| `workers/ai-gateway/src/llmetry.ts` | Create (rewritten from langfuse.ts) |
 | `workers/ai-gateway/src/index.ts` | Edit imports + variable names |
-| `workers/ai-gateway/wrangler.jsonc` | Replace Langfuse vars with llemtry vars |
+| `workers/ai-gateway/wrangler.jsonc` | Replace Langfuse vars with llmetry vars |
 
 ## Verification
 
 1. `cd workers/ai-gateway && npx tsc --noEmit` — type-checks cleanly
 2. Grep for `langfuse` / `LANGFUSE` in `workers/ai-gateway/` — zero results
-3. Review `llemtry.ts` output format against `workers/log-receiver/src/llemtry.ts` types
+3. Review `llmetry.ts` output format against `workers/log-receiver/src/llmetry.ts` types

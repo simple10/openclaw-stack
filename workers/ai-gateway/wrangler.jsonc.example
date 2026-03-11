@@ -33,10 +33,10 @@
     "LOG_LEVEL": "debug", // Level to console.log to Cloudflare Worker Observability
     //
     //
-    // ---- LLM telemetry via llemtry (optional) ----
-    "LLEMTRY_ENABLED": "false", // Set to "true" to send LLM telemetry to log receiver worker
-    // LLEMTRY_ENDPOINT   — URL of log receiver /llemtry endpoint, set via `wrangler secret put ...`
-    // LLEMTRY_AUTH_TOKEN  — Bearer token for log receiver, set via `wrangler secret put ...`
+    // ---- LLM telemetry via llmetry (optional) ----
+    "LLMETRY_ENABLED": "false", // Set to "true" to send LLM telemetry to log receiver worker
+    // LLMETRY_ENDPOINT   — URL of log receiver /llmetry endpoint, set via `wrangler secret put ...`
+    // LLMETRY_AUTH_TOKEN  — Bearer token for log receiver, set via `wrangler secret put ...`
     //
     //
     // ---- Provider API keys ----

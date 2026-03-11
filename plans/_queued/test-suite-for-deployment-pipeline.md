@@ -110,7 +110,7 @@ All import directly from `build/lib/config.ts`. No mocking needed — these are 
 - Preserves existing `gateway_token`
 - Sets `anthropic_base_url` = gateway URL + `/anthropic`
 - Sets `allowed_origin` = `https://` + domain
-- Sets `events_url`/`llemtry_url` from logging config
+- Sets `events_url`/`llmetry_url` from logging config
 - Per-claw ai_gateway overrides stack-level
 
 ### `generate-stack-env.test.ts`

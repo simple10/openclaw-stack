@@ -119,7 +119,7 @@ export async function handleEvents(
     )
   }
 
-  // D1 insert runs after response is sent (non-blocking, like llemtry handler)
+  // D1 insert runs after response is sent (non-blocking, like llmetry handler)
   const total = batch.events.length
   if (stmts.length > 0) {
     ctx.waitUntil(
@@ -142,7 +142,9 @@ export async function handleEvents(
 
           console.log({
             _events: true,
-            message: `[EVENTS] inserted:${inserted} errors:${validationErrors + insertErrors} total:${total} | ${catParts}`,
+            message: `[EVENTS] inserted:${inserted} errors:${
+              validationErrors + insertErrors
+            } total:${total} | ${catParts}`,
             inserted,
             errors: validationErrors + insertErrors,
             total,
@@ -150,7 +152,10 @@ export async function handleEvents(
             instance: instanceId,
           })
         } catch (err) {
-          console.error('[events] D1 batch insert failed:', err instanceof Error ? err.message : err)
+          console.error(
+            '[events] D1 batch insert failed:',
+            err instanceof Error ? err.message : err
+          )
         }
       })()
     )
@@ -180,22 +185,47 @@ function toFloatOrNull(v: unknown): number | null {
 
 // Fields that go into the meta column (small structured data)
 const META_FIELDS = new Set([
-  'model', 'provider', 'toolName', 'toolCount', 'toolNames', 'error', 'stopReason', 'success',
-  'reason', 'from', 'to', 'channelId', 'messageCount', 'tokenCount',
-  'compactedCount', 'resumedFrom', 'port', 'imagesCount',
+  'model',
+  'provider',
+  'toolName',
+  'toolCount',
+  'toolNames',
+  'error',
+  'stopReason',
+  'success',
+  'reason',
+  'from',
+  'to',
+  'channelId',
+  'messageCount',
+  'tokenCount',
+  'compactedCount',
+  'resumedFrom',
+  'port',
+  'imagesCount',
 ])
 
 // Fields that are already extracted as top-level D1 columns or as top-level
 // entry fields (agentId, sessionId, etc.) — exclude from meta/content
 const EXTRACTED_FIELDS = new Set([
-  'agentId', 'sessionId', 'sessionKey', 'runId',
-  'durationMs', 'duration_ms',
-  'inputTokens', 'input_tokens',
-  'outputTokens', 'output_tokens',
-  'cacheReadTokens', 'cache_read_tokens',
-  'cacheWriteTokens', 'cache_write_tokens',
-  'totalTokens', 'total_tokens',
-  'costTotal', 'cost_total',
+  'agentId',
+  'sessionId',
+  'sessionKey',
+  'runId',
+  'durationMs',
+  'duration_ms',
+  'inputTokens',
+  'input_tokens',
+  'outputTokens',
+  'output_tokens',
+  'cacheReadTokens',
+  'cache_read_tokens',
+  'cacheWriteTokens',
+  'cache_write_tokens',
+  'totalTokens',
+  'total_tokens',
+  'costTotal',
+  'cost_total',
 ])
 
 /**

@@ -5,7 +5,7 @@
 Currently OpenClaw has two separate logging mechanisms that overlap and leave gaps:
 
 - **debug-logger hook** (`deploy/hooks/debug-logger/`) — captures gateway internal hook events (gateway:startup, agent:bootstrap, commands, sessions) to a local JSONL file, but in practice only fires for gateway:startup and agent:bootstrap
-- **llm-logger plugin** (`deploy/plugins/llm-logger/`) — captures LLM input/output via typed plugin hooks, writes local JSONL + ships OTEL spans to Log Worker `/llemtry` endpoint for Langfuse
+- **llm-logger plugin** (`deploy/plugins/llm-logger/`) — captures LLM input/output via typed plugin hooks, writes local JSONL + ships OTEL spans to Log Worker `/llmetry` endpoint for Langfuse
 
 Neither captures the full picture. The richest data (tool calls, messages, compaction, session lifecycle) only exists in local session JSONL transcripts that aren't shipped anywhere. The dashboard currently reads these files directly, which only works when the dashboard runs inside the gateway container.
 
@@ -15,7 +15,7 @@ Neither captures the full picture. The richest data (tool calls, messages, compa
 2. Ships structured event batches to a new Log Worker `/events` endpoint
 3. Stores events in a D1 database for dashboard session exploration
 4. Optionally writes local log files (configurable)
-5. Continues shipping llemtry spans to Langfuse (existing functionality)
+5. Continues shipping llmetry spans to Langfuse (existing functionality)
 6. Granularity is configurable per event category (full/summary/metadata)
 
 ## Part 1: Unified Telemetry Plugin
@@ -52,7 +52,7 @@ Replaces both `llm-logger` plugin and `debug-logger` hook.
 
 1. **Local file** (`~/.openclaw/logs/telemetry.log`) — JSONL, replaces both llm.log and debug.log
 2. **Log Worker `/events`** — batched event shipping for D1 storage
-3. **Log Worker `/llemtry`** — existing Langfuse span format (LLM events only)
+3. **Log Worker `/llmetry`** — existing Langfuse span format (LLM events only)
 
 **Configuration schema** (in `openclaw.json → plugins.entries.telemetry.config`):
 
@@ -70,10 +70,10 @@ Replaces both `llm-logger` plugin and `debug-logger` hook.
     "flushIntervalMs": 10000 // flush every 10s
   },
 
-  // Llemtry/Langfuse (LLM telemetry only, existing)
-  "llemtry": {
+  // Llmetry/Langfuse (LLM telemetry only, existing)
+  "llmetry": {
     "enabled": true,
-    "url": "https://log-receiver.xxx.workers.dev/llemtry",
+    "url": "https://log-receiver.xxx.workers.dev/llmetry",
     "authToken": "..."
   },
 
@@ -241,7 +241,7 @@ Once events are in D1, the dashboard can query them via the Log Worker API inste
 2. Create schema migration and apply: `wrangler d1 execute openclaw-logs --file=src/schema.sql`
 3. Build `/events` endpoint in Log Worker
 4. Deploy Log Worker with D1 binding
-5. Build telemetry plugin (file + events + llemtry outputs)
+5. Build telemetry plugin (file + events + llmetry outputs)
 6. Deploy to VPS: add plugin, update openclaw.json config
 7. Verify events flowing into D1: `wrangler d1 execute openclaw-logs --command="SELECT * FROM events LIMIT 5"`
 8. Verify Langfuse still receiving spans
