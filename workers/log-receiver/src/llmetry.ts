@@ -5,17 +5,17 @@ import { sendToLangfuse } from './backends/langfuse'
 // Types — OTEL-inspired, OpenClaw-specific LLM telemetry
 // ---------------------------------------------------------------------------
 
-export interface LlemtryBatch {
+export interface LlmetryBatch {
   resource: {
     serviceName: string
     instanceId?: string
     hostname?: string
     attributes?: Record<string, string | number | boolean>
   }
-  spans: LlemtrySpan[]
+  spans: LlmetrySpan[]
 }
 
-export interface LlemtrySpan {
+export interface LlmetrySpan {
   traceId: string // sessionId — groups all LLM calls in a session
   spanId: string // runId — unique per LLM round-trip
   parentSpanId?: string
@@ -53,7 +53,7 @@ export interface LlemtrySpan {
 // Handler
 // ---------------------------------------------------------------------------
 
-export async function handleLlemtry(
+export async function handleLlmetry(
   request: Request,
   env: Env,
   ctx: ExecutionContext
@@ -63,7 +63,7 @@ export async function handleLlemtry(
     return jsonError('Empty request body', 400)
   }
 
-  let batch: LlemtryBatch
+  let batch: LlmetryBatch
   try {
     batch = JSON.parse(body)
   } catch {
@@ -71,19 +71,31 @@ export async function handleLlemtry(
   }
 
   if (!batch.resource || !Array.isArray(batch.spans)) {
-    return jsonError('Invalid llemtry batch: missing resource or spans', 400)
+    return jsonError('Invalid llmetry batch: missing resource or spans', 400)
   }
 
   // Log summary (visible in CF Workers Logs dashboard)
   const spanCount = batch.spans.length
   if (spanCount > 0) {
-    const models = [...new Set(batch.spans.map((s) => s.attributes['gen_ai.request.model']).filter(Boolean))]
-    const agents = [...new Set(batch.spans.map((s) => s.attributes['openclaw.agent.id']).filter(Boolean))]
-    const totalInput = batch.spans.reduce((sum, s) => sum + (s.attributes['gen_ai.usage.input_tokens'] ?? 0), 0)
-    const totalOutput = batch.spans.reduce((sum, s) => sum + (s.attributes['gen_ai.usage.output_tokens'] ?? 0), 0)
+    const models = [
+      ...new Set(batch.spans.map((s) => s.attributes['gen_ai.request.model']).filter(Boolean)),
+    ]
+    const agents = [
+      ...new Set(batch.spans.map((s) => s.attributes['openclaw.agent.id']).filter(Boolean)),
+    ]
+    const totalInput = batch.spans.reduce(
+      (sum, s) => sum + (s.attributes['gen_ai.usage.input_tokens'] ?? 0),
+      0
+    )
+    const totalOutput = batch.spans.reduce(
+      (sum, s) => sum + (s.attributes['gen_ai.usage.output_tokens'] ?? 0),
+      0
+    )
     console.log({
-      _llemtry: true,
-      message: `[LLEMTRY] spans:${spanCount} models:[${models.join(',')}] agents:[${agents.join(',')}] tokens:${totalInput}in/${totalOutput}out`,
+      _llmetry: true,
+      message: `[LLMETRY] spans:${spanCount} models:[${models.join(',')}] agents:[${agents.join(
+        ','
+      )}] tokens:${totalInput}in/${totalOutput}out`,
       spans: spanCount,
       models,
       agents,

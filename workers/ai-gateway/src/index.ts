@@ -2,7 +2,7 @@ import { authenticateRequest, validateAdminToken } from './auth'
 import { getProviderConfig } from './config'
 import { handlePreflight, addCorsHeaders } from './cors'
 import { jsonError } from './errors'
-import { isLlemtryEnabled, isLlmRoute, reportGeneration } from './llemtry'
+import { isLlmetryEnabled, isLlmRoute, reportGeneration } from './llmetry'
 import { createLog, logInboundRequest } from './log'
 import { matchProviderRoute } from './routing'
 import { getProviderApiKey } from './keys'
@@ -116,11 +116,11 @@ export default {
     const isGateway = providerConfig.baseUrl.includes('gateway.ai.cloudflare.com')
     const upstreamPath = isGateway ? route.gatewayPath : route.directPath
 
-    // When llemtry is enabled for an LLM route, pre-read the request body
-    // so it can be shared with both the proxy function and llemtry reporting
-    const llemtryActive = isLlemtryEnabled(env, log) && isLlmRoute(route.directPath)
-    const startTime = llemtryActive ? new Date() : undefined
-    const requestBody = llemtryActive ? await request.text() : undefined
+    // When llmetry is enabled for an LLM route, pre-read the request body
+    // so it can be shared with both the proxy function and llmetry reporting
+    const llmetryActive = isLlmetryEnabled(env, log) && isLlmRoute(route.directPath)
+    const startTime = llmetryActive ? new Date() : undefined
+    const requestBody = llmetryActive ? await request.text() : undefined
 
     let response: Response
     if (route.provider === 'anthropic') {
@@ -154,8 +154,8 @@ export default {
       }
     }
 
-    // Llemtry: tee the response stream and report in the background
-    if (llemtryActive && response.ok && response.body) {
+    // Llmetry: tee the response stream and report in the background
+    if (llmetryActive && response.ok && response.body) {
       const statusCode = response.status
       const responseHeaders = new Headers(response.headers)
       const [clientStream, reportStream] = response.body.tee()

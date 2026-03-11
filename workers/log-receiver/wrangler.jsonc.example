@@ -49,8 +49,8 @@
     //    AUTH_TOKEN — token Vector uses to authenticate to this worker
     //
     // Langfuse
-    //    LANGFUSE_BASE_URL = base URL for llemtry backend (e.g. https://cloud.langfuse.com)
-    //    LANGFUSE_PUBLIC_KEY — Langfuse public key (enables llemtry → Langfuse backend)
+    //    LANGFUSE_BASE_URL = base URL for llmetry backend (e.g. https://cloud.langfuse.com)
+    //    LANGFUSE_PUBLIC_KEY — Langfuse public key (enables llmetry → Langfuse backend)
     //    LANGFUSE_SECRET_KEY — Langfuse secret key
   }
 }

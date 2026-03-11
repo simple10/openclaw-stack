@@ -44,7 +44,7 @@ stack:
     worker_token: ${LOG_WORKER_TOKEN}
     vector: true
     events: true
-    llemtry: true
+    llmetry: true
 
   # Local Docker registry for sharing sandbox images between claws.
   # First claw to build pushes images; others pull (~30s vs ~15min build).

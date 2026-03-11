@@ -2,11 +2,13 @@ import type { Log, Provider } from './types'
 
 const MAX_OUTPUT_BYTES = 100 * 1024 // 100KB
 
-/** Returns true when llemtry is explicitly enabled and endpoint/token are configured. */
-export function isLlemtryEnabled(env: Env, log: Log): boolean {
-  if (env.LLEMTRY_ENABLED !== 'true') return false
-  if (!env.LLEMTRY_ENDPOINT || !env.LLEMTRY_AUTH_TOKEN) {
-    log.error('[llemtry] LLEMTRY_ENABLED is true but LLEMTRY_ENDPOINT and/or LLEMTRY_AUTH_TOKEN are missing')
+/** Returns true when llmetry is explicitly enabled and endpoint/token are configured. */
+export function isLlmetryEnabled(env: Env, log: Log): boolean {
+  if (env.LLMETRY_ENABLED !== 'true') return false
+  if (!env.LLMETRY_ENDPOINT || !env.LLMETRY_AUTH_TOKEN) {
+    log.error(
+      '[llmetry] LLMETRY_ENABLED is true but LLMETRY_ENDPOINT and/or LLMETRY_AUTH_TOKEN are missing'
+    )
     return false
   }
   return true
@@ -261,7 +263,7 @@ async function parseOpenAIStream(stream: ReadableStream<Uint8Array>): Promise<Pa
 }
 
 // ---------------------------------------------------------------------------
-// Llemtry reporting
+// Llmetry reporting
 // ---------------------------------------------------------------------------
 
 export interface ReportOptions {
@@ -278,7 +280,7 @@ function toNanoString(date: Date): string {
   return (BigInt(date.getTime()) * 1_000_000n).toString()
 }
 
-/** Parse the response stream and report to log worker via llemtry. Best-effort, never throws. */
+/** Parse the response stream and report to log worker via llmetry. Best-effort, never throws. */
 export async function reportGeneration(env: Env, log: Log, opts: ReportOptions): Promise<void> {
   try {
     const req = parseRequestBody(opts.requestBody)
@@ -306,7 +308,7 @@ export async function reportGeneration(env: Env, log: Log, opts: ReportOptions):
     const input: Record<string, unknown> = { messages: req.messages }
     if (req.system) input.system = req.system
 
-    // Build llemtry batch
+    // Build llmetry batch
     const batch = {
       resource: {
         serviceName: 'openclaw-ai-gateway',
@@ -320,13 +322,17 @@ export async function reportGeneration(env: Env, log: Log, opts: ReportOptions):
           startTimeUnixNano: toNanoString(opts.startTime),
           endTimeUnixNano: toNanoString(endTime),
           status: {
-            code: (opts.statusCode >= 200 && opts.statusCode < 300 ? 'OK' : 'ERROR') as 'OK' | 'ERROR',
+            code: (opts.statusCode >= 200 && opts.statusCode < 300 ? 'OK' : 'ERROR') as
+              | 'OK'
+              | 'ERROR',
           },
           attributes: {
             'gen_ai.system': opts.provider,
             'gen_ai.request.model': model,
             ...(parsed.usage?.input != null && { 'gen_ai.usage.input_tokens': parsed.usage.input }),
-            ...(parsed.usage?.output != null && { 'gen_ai.usage.output_tokens': parsed.usage.output }),
+            ...(parsed.usage?.output != null && {
+              'gen_ai.usage.output_tokens': parsed.usage.output,
+            }),
             ...(req.max_tokens != null && { 'gen_ai.request.max_tokens': req.max_tokens }),
             ...(req.temperature != null && { 'gen_ai.request.temperature': req.temperature }),
             'openclaw.session.id': 'ai-gateway',
@@ -356,27 +362,27 @@ export async function reportGeneration(env: Env, log: Log, opts: ReportOptions):
 
     const payload = JSON.stringify(batch)
 
-    const res = await fetch(env.LLEMTRY_ENDPOINT, {
+    const res = await fetch(env.LLMETRY_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${env.LLEMTRY_AUTH_TOKEN}`,
+        Authorization: `Bearer ${env.LLMETRY_AUTH_TOKEN}`,
       },
       body: payload,
     })
 
     if (!res.ok) {
       const body = await res.text()
-      log.error(`[llemtry] Ingestion failed: ${res.status} ${body}`)
+      log.error(`[llmetry] Ingestion failed: ${res.status} ${body}`)
     } else {
       log.debug(
-        `[llemtry] Reported generation ${spanId} (model=${model}, tokens=${
+        `[llmetry] Reported generation ${spanId} (model=${model}, tokens=${
           parsed.usage?.total ?? '?'
         })`
       )
     }
   } catch (err) {
-    log.error('[llemtry] Unexpected error:', err)
+    log.error('[llmetry] Unexpected error:', err)
   }
 }
 

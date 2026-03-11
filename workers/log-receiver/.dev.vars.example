@@ -3,7 +3,7 @@
 # Token to authorize requests from Vector and telemetry plugin
 AUTH_TOKEN=your-log-worker-token
 
-# Langfuse (opt-in — set keys to enable llemtry → Langfuse backend)
+# Langfuse (opt-in — set keys to enable llmetry → Langfuse backend)
 LANGFUSE_BASE_URL=https://cloud.langfuse.com
 LANGFUSE_PUBLIC_KEY=pk-lf-...
 LANGFUSE_SECRET_KEY=sk-lf-...

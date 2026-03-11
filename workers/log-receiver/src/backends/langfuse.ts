@@ -1,4 +1,4 @@
-import type { LlemtrySpan, LlemtryBatch } from '../llemtry'
+import type { LlmetrySpan, LlmetryBatch } from '../llmetry'
 
 const MAX_PAYLOAD_BYTES = 3.5 * 1024 * 1024
 
@@ -23,19 +23,21 @@ function resolveModelName(model: string): string {
 }
 
 /**
- * Convert llemtry spans to Langfuse batch ingestion format and POST to the API.
+ * Convert llmetry spans to Langfuse batch ingestion format and POST to the API.
  * Best-effort — logs errors but never throws.
  */
 export async function sendToLangfuse(
-  spans: LlemtrySpan[],
-  resource: LlemtryBatch['resource'],
+  spans: LlmetrySpan[],
+  resource: LlmetryBatch['resource'],
   env: Env,
   log: (...args: unknown[]) => void
 ): Promise<void> {
   if (spans.length === 0) return
 
   if (!env.LANGFUSE_BASE_URL) {
-    log('[langfuse] LANGFUSE_BASE_URL is not set — aborting. Set this to your Langfuse instance URL (e.g. https://cloud.langfuse.com).')
+    log(
+      '[langfuse] LANGFUSE_BASE_URL is not set — aborting. Set this to your Langfuse instance URL (e.g. https://cloud.langfuse.com).'
+    )
     return
   }
   if (!env.LANGFUSE_PUBLIC_KEY || !env.LANGFUSE_SECRET_KEY) {
@@ -146,7 +148,11 @@ export async function sendToLangfuse(
     const payload = JSON.stringify({ batch })
 
     if (payload.length > MAX_PAYLOAD_BYTES) {
-      log(`[langfuse] Batch exceeds 3.5 MB (${(payload.length / 1024 / 1024).toFixed(1)} MB), skipping`)
+      log(
+        `[langfuse] Batch exceeds 3.5 MB (${(payload.length / 1024 / 1024).toFixed(
+          1
+        )} MB), skipping`
+      )
       return
     }
 
