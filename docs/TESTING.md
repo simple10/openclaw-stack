@@ -175,10 +175,10 @@ For a rapid health check, run this single command. Source config first for varia
 source deploy/host/source-config.sh
 echo "=== VPS-1 Health ===" && \
 ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
-  "sudo -u openclaw bash -c 'cd ${INSTALL_DIR} && docker compose ps --format \"{{.Name}}: {{.Status}}\"' && \
+  "sudo -u openclaw bash -c 'cd ${STACK__STACK__INSTALL_DIR} && docker compose ps --format \"{{.Name}}: {{.Status}}\"' && \
    echo && \
    echo '=== Claw Instances ===' && \
-   ls -1 ${INSTALL_DIR}/instances/ 2>/dev/null && \
+   ls -1 ${STACK__STACK__INSTALL_DIR}/instances/ 2>/dev/null && \
    echo && \
    sudo systemctl is-active cloudflared"
 ```
@@ -195,18 +195,18 @@ ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}"
 
 ### Gateway Not Healthy
 
-1. Check container logs: `sudo -u openclaw bash -c 'cd ${INSTALL_DIR} && docker compose logs --tail 50 openclaw-stack-openclaw-<name>'`
-2. Check all containers running: `sudo -u openclaw bash -c 'cd ${INSTALL_DIR} && docker compose ps'`
+1. Check container logs: `sudo -u openclaw bash -c 'cd ${STACK__STACK__INSTALL_DIR} && docker compose logs --tail 50 openclaw-stack-openclaw-<name>'`
+2. Check all containers running: `sudo -u openclaw bash -c 'cd ${STACK__STACK__INSTALL_DIR} && docker compose ps'`
 3. Verify localhost access per claw (ports start at 18789, increment per claw): `curl -s http://localhost:<port>/ | head -5`
 
 ### No Logs in Cloudflare
 
-1. Check Vector logs: `sudo -u openclaw bash -c 'cd ${INSTALL_DIR} && docker compose logs vector'`
+1. Check Vector logs: `sudo -u openclaw bash -c 'cd ${STACK__STACK__INSTALL_DIR} && docker compose logs vector'`
 2. Verify LOG_WORKER_URL is set (base URL, no path suffix)
 3. Check Log Receiver Worker health: `curl -s https://<LOG_WORKER_URL>/health`
 
 ### Container Permission Errors
 
 1. Check container user matches volume ownership
-2. Verify per-instance `.openclaw` is owned by uid 1000: `sudo ls -la ${INSTALL_DIR}/instances/<name>/.openclaw/`
+2. Verify per-instance `.openclaw` is owned by uid 1000: `sudo ls -la ${STACK__STACK__INSTALL_DIR}/instances/<name>/.openclaw/`
 3. Review `read_only` settings if files can't be written
