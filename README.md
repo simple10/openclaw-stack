@@ -251,3 +251,7 @@ Requires [DevTools MCP](https://github.com/anthropics/devtools-mcp) installed in
 
 - OpenClaw Documentation: <https://docs.openclaw.ai>
 - OpenClaw GitHub: <https://github.com/openclaw/openclaw>
+
+## Additional Resources
+
+- [Agent Super Spy](https://github.com/simple10/agent-super-spy) - full LLM observability stack
