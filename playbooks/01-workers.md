@@ -14,6 +14,21 @@ This playbook deploys:
 - Cloudflare account with Workers enabled
 - Node.js and npm installed locally
 - `wrangler` CLI available (installed as devDependency)
+- A **workers.dev subdomain** registered for your account (one-time setup: Cloudflare Dashboard → Workers & Pages → Overview → claim your `<name>.workers.dev` subdomain)
+
+### Cloudflare API Token
+
+All `wrangler` commands in this playbook read the API token from `CLOUDFLARE_API_TOKEN` in `.env` (exported via `source-config.sh`). The token must have the following permissions:
+
+| Resource | Permission |
+|----------|------------|
+| Account — Cloudflare Tunnel | Edit |
+| Zone — DNS | Edit |
+| Account — Workers Scripts | Edit |
+| Account — Workers KV Storage | Edit |
+| Account — D1 | Edit |
+
+> **Multi-account:** If your Cloudflare API token covers multiple accounts, wrangler's `/memberships` lookup may fail or select the wrong account. Set `CLOUDFLARE_ACCOUNT_ID` in `.env` to your Cloudflare account ID (from `wrangler whoami`) to bypass the lookup. Without it, `wrangler kv namespace create` and `wrangler d1 create` may fail with a 403 even when the token is correct.
 
 ## Variables
 

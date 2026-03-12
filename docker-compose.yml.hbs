@@ -112,7 +112,9 @@ services:
     command: tunnel run
     environment:
       - TUNNEL_TOKEN={{stack.cloudflare.tunnel_token}}
-    networks: [openclaw-net]
+    # Host networking so tunnel ingress can reach localhost-bound ports
+    # (openclaw gateway ports are published on 127.0.0.1, not on the bridge network).
+    network_mode: host
     deploy:
       resources:
         limits:

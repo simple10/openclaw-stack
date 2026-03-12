@@ -10,7 +10,7 @@
   // Create namespace: wrangler kv namespace create AUTH_KV
   // Then paste the returned ID below.
   "kv_namespaces": [
-    { "binding": "AUTH_KV", "id": "" }
+    { "binding": "AUTH_KV", "id": "00000000000000000000000000000000" }
   ],
 
   // Workers Logs: enables console.log in the worker

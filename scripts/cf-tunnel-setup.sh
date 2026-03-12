@@ -21,6 +21,9 @@ set -euo pipefail
 # Environment:
 #   CF_API_TOKEN              Required — Cloudflare API token with Tunnel Edit + DNS Edit
 #   CF_TUNNEL_TOKEN           Optional — used to extract tunnel ID if --tunnel-id not given
+#
+# Local dependencies:
+#   jq                        Required — install with: brew install jq (macOS) / apt install jq (Linux)
 
 # Resolve paths via canonical config helper
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
