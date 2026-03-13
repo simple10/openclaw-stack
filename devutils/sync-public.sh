@@ -52,4 +52,4 @@ fi
 
 echo ""
 echo "Done. Review with: git log --oneline -5"
-echo "Push with: git push origin $TARGET_BRANCH"
+echo "Push with: git push public $TARGET_BRANCH:main"
