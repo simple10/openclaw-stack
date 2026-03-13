@@ -1900,13 +1900,14 @@ claws:
         document.getElementById('tpl2-before').innerHTML =
           highlight(`<span class="hl-fg3">{{!-- docker-compose.yml.hbs --}}</span>
 x-openclaw-claw: &claw
-  image: <span class="hl-green">openclaw-{{stack.project_name}}:local</span>
+  # image: per-claw (set in each claw block — varies by openclaw_version)
   runtime: sysbox-runc
 
 services:
 <span class="hl-green">{{#each claws}}</span>
   <span class="hl-green">{{../stack.project_name}}</span>-openclaw-<span class="hl-green">{{@key}}</span>:
     <<: *claw
+    image: <span class="hl-green">{{this.openclaw_image_tag}}</span>
     container_name: <span class="hl-green">{{../stack.project_name}}</span>-openclaw-<span class="hl-green">{{@key}}</span>
     ports:
       - "127.0.0.1:<span class="hl-green">{{this.gateway_port}}</span>:<span class="hl-green">{{this.gateway_port}}</span>"
@@ -1931,12 +1932,13 @@ services:
 
         let rendered = `<span class="hl-fg3"># Rendered docker-compose.yml</span>
 x-openclaw-claw: &claw
-  image: <span class="hl-teal">openclaw-openclaw-stack:local</span>
+  # image: per-claw (varies by openclaw_version)
   runtime: sysbox-runc
 
 services:
   <span class="hl-teal">openclaw-stack-openclaw-personal-claw</span>:
     <<: *claw
+    image: <span class="hl-teal">openclaw-openclaw-stack:stable</span>
     container_name: <span class="hl-teal">openclaw-stack-openclaw-personal-claw</span>
     ports:
       - "127.0.0.1:<span class="hl-teal">18789</span>:<span class="hl-teal">18789</span>"

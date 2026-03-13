@@ -52,10 +52,10 @@ This does:
 
 1. `cd /home/openclaw/openclaw` (the cloned upstream repo)
 2. **Our patch:** sed inserts a RUN apt-get install docker.io gosu && useradd -aG docker node before USER node in the upstream Dockerfile
-3. `docker build -t openclaw:local .` – builds using the **host Docker daemon** as openclaw user
+3. `docker build -t openclaw-<project>:<version> .` – builds using the **host Docker daemon** as openclaw user
 4. `git checkout -- Dockerfile` – restores the upstream file
 
-The resulting openclaw:local image is the upstream OpenClaw image **plus** docker.io (docker CLI + dockerd + containerd + runc) and gosu (for privilege dropping).
+The resulting openclaw-<project>:<version> image is the upstream OpenClaw image **plus** docker.io (docker CLI + dockerd + containerd + runc) and gosu (for privilege dropping).
 
 ### Start: `docker compose up -d`
 
@@ -66,7 +66,7 @@ Docker compose reads both docker-compose.yml (upstream) and docker-compose.overr
 
 | Container | Image | Runtime | User | Purpose |
 |---|---|---|---|---|
-| openclaw-gateway | openclaw:local | sysbox-runc | 0:0 (root) | Gateway + nested Docker |
+| openclaw-gateway | openclaw-\<project\>:\<version\> | sysbox-runc | 0:0 (root) | Gateway + nested Docker |
 | vector | timberio/vector:0.43.1-alpine | default runc | default | Log shipping |
 
 The openclaw-gateway container starts with:

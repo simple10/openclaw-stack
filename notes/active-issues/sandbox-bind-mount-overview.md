@@ -12,7 +12,7 @@ Complete Sandbox Filesystem Layer Map
 
   A. Build-Time Layers (Baked Into Images)
 
-  Gateway Image (openclaw:local)
+  Gateway Image (openclaw-<project>:<version>)
 
   Built by: Our build-openclaw.sh
   What's in it:
