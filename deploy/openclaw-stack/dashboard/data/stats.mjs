@@ -3,8 +3,8 @@
 // Ported from openclaw-dashboard/refresh.sh (Python). Zero dependencies.
 // Exports getData() with a 30-second debounce cache.
 
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
-import { execFile, execFileSync } from 'node:child_process'
+import { readFileSync, readdirSync } from 'node:fs'
+import { execFile } from 'node:child_process'
 import { join } from 'node:path'
 import JSON5 from 'json5'
 
@@ -472,25 +472,15 @@ function parseGitInfo(content) {
 }
 
 function getGit() {
-  const version = getVersion()
-  const cacheFile = `/app/.git-info-${version}`
-
-  // 1. Try versioned cache (written by entrypoint or previous dashboard run)
+  // Baked at build time by build-openclaw.sh (patch 4d)
   try {
-    return parseGitInfo(readFileSync(cacheFile, 'utf8'))
-  } catch { /* no cache */ }
+    return parseGitInfo(readFileSync('/app/.build-git-log', 'utf8'))
+  } catch { /* no build-time git log */ }
 
-  // 2. Try live git (available if .git exists in the image)
+  // Fallback: legacy .git-info-<version> (older builds)
   try {
-    const out = execFileSync('git', ['log', '--format=%h%x09%s%x09%aI', '-50'], { cwd: '/app', timeout: 5000 }).toString()
-    // Cache for next time
-    try { writeFileSync(cacheFile, out) } catch { /* read-only fs */ }
-    return parseGitInfo(out)
-  } catch { /* no .git */ }
-
-  // 3. Fallback: legacy .git-info (pre-update builds)
-  try {
-    return parseGitInfo(readFileSync('/app/.git-info', 'utf8'))
+    const version = getVersion()
+    return parseGitInfo(readFileSync(`/app/.git-info-${version}`, 'utf8'))
   } catch { return [] }
 }
 

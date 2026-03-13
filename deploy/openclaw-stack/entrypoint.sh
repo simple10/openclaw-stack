@@ -35,18 +35,7 @@ if [ -d "$openclaw_dir" ]; then
   fi
 fi
 
-# ── 1d. Version info cache ────────────────────────────────────────────
-# Host-side builds no longer include .git in the image. Cache version info
-# from package.json for the dashboard's git-info display.
-if [ ! -d /app/.git ]; then
-  VERSION=$(node -e "console.log(require('/app/package.json').version)" 2>/dev/null || echo "unknown")
-  if [ ! -f "/app/.git-info-${VERSION}" ]; then
-    echo "v${VERSION}	Host-side build (no .git)	$(date -Iseconds)" > "/app/.git-info-${VERSION}"
-    echo "[entrypoint] Created version info cache for v${VERSION}"
-  fi
-fi
-
-# ── 1f. Configure npm global prefix for skill installs ─────────────
+# ── 1d. Configure npm global prefix for skill installs ─────────────
 # Gateway runs as node (uid 1000) after gosu drops privileges.
 # npm install -g (used by skills.install) needs a writable global prefix.
 # Default /usr/local/lib/node_modules is owned by root — redirect to user dir.

@@ -11,7 +11,8 @@
 # Patches applied (each auto-skips when upstream fixes the issue):
 #   4a. Dockerfile: install Docker + gosu for nested Docker (sandbox isolation via Sysbox)
 #   4b. Dockerfile: clear build-time jiti cache (belt-and-suspenders with entrypoint §2c)
-#   4c. .dockerignore: exclude local runtime dirs (data/, deploy/) from build context
+#   4c. Dockerfile: copy CHANGELOG.md + .build-git-log into runtime stage (dashboard)
+#   4d. .dockerignore: exclude local runtime dirs (data/, deploy/) from build context
 #
 # Environment:
 #   STACK__OPENCLAW_VERSIONS     — comma-separated unique version specifiers (e.g., "stable,v2026.3.8")
@@ -51,6 +52,7 @@ cleanup() {
   if [ "$HOST_NEEDS_RESTORE" = true ]; then
     echo "[build] Restoring host to main branch..."
     git checkout main -- .dockerignore 2>/dev/null || true
+    rm -f .build-git-log 2>/dev/null || true
     git checkout main 2>/dev/null || true
     HOST_NEEDS_RESTORE=false
   fi
@@ -102,6 +104,13 @@ build_version() {
   RESOLVED_VERSION=$(python3 -c "import json; print(json.load(open('package.json'))['version'])" 2>/dev/null || echo "unknown")
   echo "[build] Resolved version: ${RESOLVED_VERSION}"
 
+  # ── 2b. Bake git log + changelog for dashboard ─────────────────
+  # Capture clean upstream history BEFORE creating the patch branch.
+  # These files enter the build stage via COPY . . but need an explicit
+  # COPY --from in the runtime stage (multi-stage Dockerfile).
+  git log --format='%h%x09%s%x09%aI' -50 > .build-git-log
+  echo "[build] Baked git log for dashboard (50 entries)"
+
   # ── 3. Create vps-patch branch ───────────────────────────────────
   local PATCH_BRANCH="vps-patch/${RESOLVED_VERSION}"
   echo "[build] Creating patch branch: ${PATCH_BRANCH}"
@@ -128,7 +137,18 @@ build_version() {
     echo "[build] Dockerfile jiti patch already present"
   fi
 
-  # 4c. .dockerignore: exclude local runtime dirs from build context
+  # 4c. Dockerfile: copy dashboard assets into runtime stage (multi-stage build)
+  # The build stage has CHANGELOG.md and .build-git-log via COPY . . but the
+  # runtime stage only selectively copies dist/, node_modules/, etc.
+  # Append our files after the last COPY --from=runtime-assets line.
+  if ! grep -q 'build-git-log' Dockerfile; then
+    echo "[build] Patching Dockerfile: add dashboard assets to runtime stage..."
+    sed -i '/COPY --from=runtime-assets.*\/app\/docs/a COPY --from=runtime-assets --chown=node:node /app/CHANGELOG.md .\nCOPY --from=runtime-assets --chown=node:node /app/.build-git-log .' Dockerfile
+  else
+    echo "[build] Dashboard assets already in Dockerfile"
+  fi
+
+  # 4d. .dockerignore: exclude local runtime dirs from build context
   if ! grep -q '^data/' .dockerignore; then
     echo "[build] Patching .dockerignore to exclude data/ and deploy/..."
     printf '\n# Local runtime dirs (not part of upstream)\ndata/\ndeploy/\nscripts/entrypoint-gateway.sh\n' >> .dockerignore
@@ -138,7 +158,7 @@ build_version() {
 
   # ── 5. Commit patches ────────────────────────────────────────────
   echo "[build] Committing patches to ${PATCH_BRANCH}..."
-  git add Dockerfile .dockerignore
+  git add Dockerfile .dockerignore .build-git-log
   if ! git diff --cached --quiet; then
     git commit -m "VPS patches for ${RESOLVED_VERSION}" --no-gpg-sign
   else
@@ -163,6 +183,7 @@ build_version() {
   # ── 8. Restore host state ────────────────────────────────────────
   echo "[build] Restoring host to main branch..."
   git checkout main -- .dockerignore 2>/dev/null || true
+  rm -f .build-git-log  # Clean up before branch switch (not on main)
   git checkout main 2>/dev/null || true
   HOST_NEEDS_RESTORE=false
 
