@@ -75,6 +75,7 @@ stack:
 # All claws inherit these. Per-claw settings override via deep merge.
 defaults:
   allow_updates: true # Allow openclaw to update in-place
+  timezone: UTC                    # IANA timezone (e.g. America/Los_Angeles) — auto-handles DST
   health_check_cron: false
   domain_path: ""
   dashboard_path: /dashboard

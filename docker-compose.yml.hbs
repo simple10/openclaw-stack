@@ -47,7 +47,7 @@ services:
     environment:
       # ── Core ──
       - NODE_ENV=production
-      - TZ=UTC
+      - TZ={{this.timezone}}
       - OPENCLAW_GATEWAY_PORT={{this.gateway_port}}
       - OPENCLAW_GATEWAY_TOKEN={{this.gateway_token}}
       - OPENCLAW_MDNS_HOSTNAME={{@key}}
