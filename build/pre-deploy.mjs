@@ -385,6 +385,11 @@ function computeDerivedValues(claws, stack, host, previousDeploy) {
     claw.llmetry_url = logUrl ? logUrl + '/llmetry' : ''
     claw.enable_events_logging = stack.logging?.events || false
     claw.enable_llmetry_logging = stack.logging?.llmetry || false
+
+    // Per-claw version: claw override > stack default > 'stable'
+    claw.openclaw_version = claw.openclaw_version ?? stack.openclaw?.version ?? 'stable'
+    claw.openclaw_image_tag =
+      'openclaw-' + (stack.project_name || 'openclaw-stack') + ':' + claw.openclaw_version
   }
 
   return autoTokens
@@ -494,6 +499,7 @@ function generateStackEnv(env, config, claws) {
   if (stack.openclaw?.source) {
     lines.push(`STACK__STACK__OPENCLAW__SOURCE=${formatEnvValue(stack.openclaw.source)}`)
   }
+  lines.push(`STACK__STACK__OPENCLAW__AUTO_UPDATE=${stack.openclaw?.auto_update ?? false}`)
   if (stack.sandbox_toolkit) {
     lines.push(`STACK__STACK__SANDBOX_TOOLKIT=${formatEnvValue(stack.sandbox_toolkit)}`)
   }
@@ -511,7 +517,8 @@ function generateStackEnv(env, config, claws) {
   // Derived
   lines.push('# Derived')
   lines.push(`STACK__STACK__INSTANCES_DIR=${formatEnvValue(installDir + '/instances')}`)
-  lines.push(`STACK__STACK__IMAGE=${formatEnvValue('openclaw-' + projectName + ':local')}`)
+  const uniqueVersions = [...new Set(Object.values(claws).map((c) => c.openclaw_version))]
+  lines.push(`STACK__OPENCLAW_VERSIONS=${formatEnvValue(uniqueVersions.join(','))}`)
   lines.push(`STACK__CLAWS__IDS=${formatEnvValue(Object.keys(claws).join(','))}`)
   lines.push('')
 
@@ -534,6 +541,7 @@ function generateStackEnv(env, config, claws) {
     lines.push(`STACK__CLAWS__${envKey}__GATEWAY_PORT=${claw.gateway_port || ''}`)
     lines.push(`STACK__CLAWS__${envKey}__DASHBOARD_PORT=${claw.dashboard_port || ''}`)
     lines.push(`STACK__CLAWS__${envKey}__HEALTH_CHECK_CRON=${claw.health_check_cron ?? false}`)
+    lines.push(`STACK__CLAWS__${envKey}__OPENCLAW_VERSION=${formatEnvValue(claw.openclaw_version)}`)
   }
   lines.push('')
 

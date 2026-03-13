@@ -42,7 +42,7 @@ printf '\033[33m[1/4] Pulling upstream changes...\033[0m\n'
 TERM=xterm-256color ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
   "sudo -u openclaw bash -c 'cd $OPENCLAW_DIR && git pull'"
 
-# Step 2: Rebuild gateway image (stack-scoped: STACK__STACK__IMAGE from stack.env)
+# Step 2: Rebuild gateway image(s) (per-claw version tags from stack.env)
 printf '\033[33m[2/4] Building gateway image...\033[0m\n'
 TERM=xterm-256color ssh -i "${ENV__SSH_KEY}" -p "${ENV__SSH_PORT}" "${ENV__SSH_USER}@${ENV__VPS_IP}" \
   "sudo -u openclaw ${STACK__STACK__INSTALL_DIR}/host/build-openclaw.sh"

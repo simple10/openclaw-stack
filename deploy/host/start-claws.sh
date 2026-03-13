@@ -29,9 +29,9 @@ FIRST_CLAW=$(echo "$INSTANCE_NAMES" | awk '{print $1}')
 
 echo "Instances: ${INSTANCE_NAMES}(${CLAW_COUNT} claw(s))" >&2
 
-# Build image
-echo "Building ${STACK__STACK__IMAGE} image..." >&2
-sudo -u openclaw INSTALL_DIR="${STACK__STACK__INSTALL_DIR}" "${OPENCLAW_HOME}/host/build-openclaw.sh" >&2
+# Build images (one per unique openclaw version specifier)
+echo "Building openclaw images (versions: ${STACK__OPENCLAW_VERSIONS})..." >&2
+sudo -u openclaw "${OPENCLAW_HOME}/host/build-openclaw.sh" >&2
 
 # Start containers (Vector is included in the main compose when enabled)
 COMPOSE_DIR="${OPENCLAW_HOME}"
