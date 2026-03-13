@@ -2071,7 +2071,6 @@ services:
         document.getElementById('merge-before').innerHTML =
           highlight(`<span class="hl-fg3"># defaults (from stack.yml)</span>
 <span class="hl-purple">defaults</span>:
-  allow_updates: false
   domain_path: ""
   dashboard_path: /dashboard
   telegram:
@@ -2087,13 +2086,11 @@ services:
   gateway_port: 18789
   dashboard_port: 6090
   telegram:
-    bot_token: 7234...
-  allow_updates: <span class="hl-green">true</span>  <span class="hl-fg3"># overrides default false</span>`)
+    bot_token: 7234...`)
 
         document.getElementById('merge-after').innerHTML =
           highlight(`<span class="hl-fg3"># Result: deepMerge(defaults, personal-claw)</span>
 <span class="hl-teal">personal-claw</span>:
-  allow_updates: <span class="hl-green">true</span>          <span class="hl-fg3"># ← claw wins</span>
   domain: openclaw.example.com  <span class="hl-fg3"># ← claw-only</span>
   domain_path: ""               <span class="hl-fg3"># ← from defaults</span>
   dashboard_path: /dashboard    <span class="hl-fg3"># ← from defaults</span>
