@@ -112,9 +112,12 @@ services:
     command: tunnel run
     environment:
       - TUNNEL_TOKEN={{stack.cloudflare.tunnel_token}}
-    # Host networking so tunnel ingress can reach localhost-bound ports
-    # (openclaw gateway ports are published on 127.0.0.1, not on the bridge network).
-    network_mode: host
+    # Bridge network — tunnel ingress routes use Docker DNS container names
+    # (e.g. http://{{stack.project_name}}-openclaw-<claw>:18789).
+    # Static IP so trustedProxies in openclaw.jsonc stays stable.
+    networks:
+      openclaw-net:
+        ipv4_address: 10.200.0.100
     read_only: true
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
@@ -204,6 +207,6 @@ networks:
     driver: bridge
     ipam:
       config:
-        # Pin the subnet to ensure trustedProxies in openclaw.json is always correct
-        # This protects against scenarios where multiple docker-compose projects are running on the same VPS
-        - subnet: 172.30.0.0/24
+        # Pin the subnet to ensure trustedProxies in openclaw.jsonc is always correct.
+        # Uses 10.x range to avoid collisions — Docker auto-assigns from 172.17.0.0/12.
+        - subnet: 10.200.0.0/24

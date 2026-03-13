@@ -41,6 +41,10 @@ else
 fi
 [ -f "$STACK_JSON" ] || { echo "Error: stack.json not found at $STACK_JSON. Run 'npm run pre-deploy'." >&2; exit 1; }
 
+# Project name for Docker DNS container names (e.g. muxxibot-openclaw-personal-claw)
+PROJECT_NAME=$(jq -r '.stack.project_name // empty' "$STACK_JSON")
+[ -n "$PROJECT_NAME" ] || { echo "Error: stack.project_name not found in $STACK_JSON." >&2; exit 1; }
+
 CF_API_BASE="https://api.cloudflare.com/client/v4"
 
 # ── Helper Functions ──────────────────────────────────────────────────
@@ -422,10 +426,11 @@ cmd_setup_routes() {
     dash_port=$(_nth "$_dash_ports" $idx)
     # Trim placeholder space for empty dash_path
     dash_path=$(echo "$dash_path" | sed 's/^ $//')
+    local container="${PROJECT_NAME}-openclaw-${name}"
     if [ -n "$dash_path" ]; then
-      echo "  ${name}: ${domain}${dash_path}/* -> localhost:${dash_port} (dashboard)" >&2
+      echo "  ${name}: ${domain}${dash_path}/* -> ${container}:${dash_port} (dashboard)" >&2
     fi
-    echo "  ${name}: ${domain} -> localhost:${gw_port} (gateway)" >&2
+    echo "  ${name}: ${domain} -> ${container}:${gw_port} (gateway)" >&2
     idx=$((idx + 1))
   done
 }
@@ -466,19 +471,22 @@ configure_tunnel_routes() {
     managed_domains_list="${managed_domains_list}${managed_domains_list:+$'\n'}${domain}"
     [ -n "$dash_domain" ] && managed_domains_list="${managed_domains_list}${managed_domains_list:+$'\n'}${dash_domain}"
 
+    # Docker DNS container name for this claw (cloudflared is on the same bridge network)
+    local container="${PROJECT_NAME}-openclaw-${name}"
+
     # Dashboard rule (path-based, must come first — CF evaluates top-to-bottom)
     if [ -n "$dash_path" ]; then
       local cf_path="${dash_path#/}"
       local dash_hostname="${dash_domain:-$domain}"
-      ingress_json=$(echo "$ingress_json" | jq -c --arg hostname "$dash_hostname" --arg path "${cf_path}*" --arg service "http://localhost:${dash_port}" \
+      ingress_json=$(echo "$ingress_json" | jq -c --arg hostname "$dash_hostname" --arg path "${cf_path}*" --arg service "http://${container}:${dash_port}" \
         '. + [{"hostname": $hostname, "path": $path, "service": $service}]')
     elif [ -n "$dash_domain" ] && [ "$dash_domain" != "$domain" ]; then
-      ingress_json=$(echo "$ingress_json" | jq -c --arg hostname "$dash_domain" --arg service "http://localhost:${dash_port}" \
+      ingress_json=$(echo "$ingress_json" | jq -c --arg hostname "$dash_domain" --arg service "http://${container}:${dash_port}" \
         '. + [{"hostname": $hostname, "service": $service}]')
     fi
 
     # Gateway rule (catch-all for the domain)
-    ingress_json=$(echo "$ingress_json" | jq -c --arg hostname "$domain" --arg service "http://localhost:${gw_port}" \
+    ingress_json=$(echo "$ingress_json" | jq -c --arg hostname "$domain" --arg service "http://${container}:${gw_port}" \
       '. + [{"hostname": $hostname, "service": $service}]')
   done
 
