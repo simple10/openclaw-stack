@@ -7,6 +7,7 @@ set -euo pipefail
 EXCLUDE_DIRS=(plans devutils cli notes)
 SOURCE_BRANCH="main"
 TARGET_BRANCH="public"
+PUBLIC_REMOTE="public"
 
 # Must be on the public branch
 current=$(git branch --show-current)
@@ -19,6 +20,17 @@ fi
 if ! git diff --quiet || ! git diff --cached --quiet; then
   echo "Error: working tree has uncommitted changes. Commit or stash first."
   exit 1
+fi
+
+# Pull any changes from the public remote (e.g. merged PRs)
+echo "Fetching from $PUBLIC_REMOTE..."
+git fetch "$PUBLIC_REMOTE"
+if [[ -n "$(git log HEAD..$PUBLIC_REMOTE/main --oneline 2>/dev/null)" ]]; then
+  echo "Merging $PUBLIC_REMOTE/main into $TARGET_BRANCH..."
+  if ! git merge "$PUBLIC_REMOTE/main" --no-edit; then
+    echo "Merge conflicts with $PUBLIC_REMOTE/main. Resolve them, then run this script again."
+    exit 1
+  fi
 fi
 
 # Merge main without committing
