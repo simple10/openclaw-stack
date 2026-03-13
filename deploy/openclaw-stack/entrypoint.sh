@@ -80,15 +80,7 @@ if [ -d /app/.git ]; then
   fi
 fi
 
-# ── 1f. Create openclaw CLI symlink ──────────────────────────────────
-# /app/openclaw.mjs has #!/usr/bin/env node shebang and is executable.
-# Symlink to /usr/local/bin so 'openclaw' works anywhere in the container.
-if [ ! -L /usr/local/bin/openclaw ]; then
-  ln -sf /app/openclaw.mjs /usr/local/bin/openclaw
-  echo "[entrypoint] Created /usr/local/bin/openclaw symlink"
-fi
-
-# ── 1g. Configure npm global prefix for skill installs ─────────────
+# ── 1f. Configure npm global prefix for skill installs ─────────────
 # Gateway runs as node (uid 1000) after gosu drops privileges.
 # npm install -g (used by skills.install) needs a writable global prefix.
 # Default /usr/local/lib/node_modules is owned by root — redirect to user dir.
@@ -100,7 +92,7 @@ echo "prefix=$npm_global" > /home/node/.npmrc
 export PATH="$npm_global/bin:$PATH"
 echo "[entrypoint] npm global prefix set to $npm_global"
 
-# ── 1h. Auto-generate gateway shims from sandbox-toolkit.yaml ──────
+# ── 1g. Auto-generate gateway shims from sandbox-toolkit.yaml ──────
 # Shims satisfy the gateway's load-time skill binary preflight checks.
 # Real binaries live in sandbox images — shims are gateway-only (not bind-mounted).
 SKILL_BINS="/opt/skill-bins"
