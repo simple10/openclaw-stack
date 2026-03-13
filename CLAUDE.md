@@ -35,6 +35,7 @@ All deployment steps are in modular playbooks under `playbooks/`:
 
 ## General Rules
 
+- **Check CHANGELOG.md before deploying to existing VPS.** If the VPS was set up before a breaking change, follow the migration steps. Add new entries (newest-first) when making changes that would break existing deployments.
 - **Preserve comments in config files.** Comments document intent and aid future maintenance.
 - **Update stale comments.** If code changes make a comment inaccurate, fix the comment.
 - **Add comments for non-obvious settings.** Explain *why*, not *what*.
