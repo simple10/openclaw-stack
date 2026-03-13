@@ -25,7 +25,7 @@
 │  ├ cron: host-alert.sh (15m) ─────────────┼─────────────┼──► Telegram  │
 │  └ cron: backup.sh (daily 3am)            │             │              │
 │                                           │             │              │
-│  Containers (gateway-net 172.30.0.0/24)   │             │              │
+│  Containers (openclaw-net 172.30.0.0/24)  │             │              │
 │  ┌────────────────────────────────────────┼─────────────┼────────────┐ │
 │  │                                        │             │            │ │
 │  │  openclaw-gateway (Sysbox runtime)     │             │            │ │

@@ -115,6 +115,9 @@ services:
     # Host networking so tunnel ingress can reach localhost-bound ports
     # (openclaw gateway ports are published on 127.0.0.1, not on the bridge network).
     network_mode: host
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     deploy:
       resources:
         limits:
@@ -199,3 +202,8 @@ services:
 networks:
   openclaw-net:
     driver: bridge
+    ipam:
+      config:
+        # Pin the subnet to ensure trustedProxies in openclaw.json is always correct
+        # This protects against scenarios where multiple docker-compose projects are running on the same VPS
+        - subnet: 172.30.0.0/24

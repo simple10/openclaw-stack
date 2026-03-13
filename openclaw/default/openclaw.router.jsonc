@@ -48,7 +48,8 @@
         "lockoutMs": 300000
       }
     },
-    // cloudflared connects via Docker bridge gateway IP. Must be exact IPs — CIDR ranges NOT supported.
+    // cloudflared (host network) → 127.0.0.1:port → Docker NAT masquerades source to bridge gateway IP.
+    // Subnet pinned to 172.30.0.0/24 in docker-compose.yml. Must be exact IPs — CIDR ranges NOT supported.
     "trustedProxies": [
       "172.30.0.1"
     ],
