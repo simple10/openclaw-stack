@@ -135,11 +135,23 @@ if command -v dockerd > /dev/null 2>&1; then
     echo "[entrypoint] Nested Docker daemon ready (took ${elapsed:-0}s)"
 
     # ── 2a-pre. Login to sandbox registry ──────────────────────────
+    # Retry login in case registry is still starting up (depends_on: service_healthy
+    # should prevent this, but belt-and-suspenders for restarts / network blips).
     if [ -n "$REGISTRY_URL" ] && [ -n "${SANDBOX_REGISTRY_TOKEN:-}" ]; then
       echo "[entrypoint] Logging into sandbox registry at ${REGISTRY_URL}..."
-      echo "$SANDBOX_REGISTRY_TOKEN" | docker login "$REGISTRY_URL" \
-        -u "${SANDBOX_REGISTRY_USER:-openclaw}" --password-stdin 2>/dev/null || \
-        echo "[entrypoint] WARNING: Registry login failed (registry may not be ready yet)"
+      login_ok=false
+      for attempt in 1 2 3 4 5; do
+        if echo "$SANDBOX_REGISTRY_TOKEN" | docker login "$REGISTRY_URL" \
+            -u "${SANDBOX_REGISTRY_USER:-openclaw}" --password-stdin 2>&1; then
+          login_ok=true
+          break
+        fi
+        echo "[entrypoint] Registry login attempt $attempt failed, retrying in 2s..."
+        sleep 2
+      done
+      if [ "$login_ok" = false ]; then
+        echo "[entrypoint] WARNING: Registry login failed after 5 attempts — builds will skip registry cache"
+      fi
     fi
 
     # Export registry URL for rebuild-sandboxes.sh
