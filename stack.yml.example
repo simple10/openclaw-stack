@@ -29,7 +29,8 @@ stack:
   sandbox_toolkit: openclaw/default/sandbox-toolkit.yaml
 
   openclaw:
-    version: stable                    # stable | latest | v2026.2.26
+    version: stable                    # Stack-wide default: stable | latest | v2026.X.Y
+    auto_update: true                  # Daily host-side rebuild when new stable tag available
     source: https://github.com/openclaw/openclaw.git
 
   cloudflare:
@@ -74,7 +75,6 @@ stack:
 # ── Claw Defaults ─────────────────────────────────────────────
 # All claws inherit these. Per-claw settings override via deep merge.
 defaults:
-  allow_updates: true # Allow openclaw to update in-place
   timezone: UTC                    # IANA timezone (e.g. America/Los_Angeles) — auto-handles DST
   health_check_cron: false
   domain_path: ""
@@ -99,8 +99,8 @@ claws:
     health_check_cron: true  # Enable health check cron on the main claw - not needed on each claw
 
   # work-claw:
+  #   openclaw_version: v2026.3.8  # Pinned — auto-update skips pinned versions
   #   domain: openclaw-work.${ROOT_DOMAIN}
-  #   allow_updates: false    # Prevent work-claw from auto updating
   #   gateway_port: 18790
   #   dashboard_port: 6091
   #   telegram:

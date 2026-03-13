@@ -399,75 +399,40 @@ sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose down && docker comp
 
 ## Updating OpenClaw
 
-The `openclaw update` CLI command works inside Docker when `ALLOW_OPENCLAW_UPDATES=true` is set for the claw (updates persist across restart but not compose recreate). For permanent host-level updates, rebuild from the host git repo using the build script.
-
-The build script auto-patches the Dockerfile and restores the git working tree after building, so `git pull` always works cleanly. The image is tagged with the stack's project name (e.g., `openclaw-openclaw:local`) to avoid conflicts when multiple stacks share a VPS.
+Updates are handled host-side by `build-openclaw.sh`. Each claw can run a different version via `openclaw_version` in `stack.yml` (defaults to `stable`). When `auto_update: true` is set in `stack.yml`, a daily cron job checks for new versions and rebuilds automatically.
 
 ```bash
-#!/bin/bash
-# Image name is stack-scoped: openclaw-<project>:local
-# Source stack config for STACK__STACK__IMAGE
-source <INSTALL_DIR>/host/source-config.sh
-
-# 1. Tag current state for rollback
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && git tag -f pre-update'
-docker tag "${STACK__STACK__IMAGE}" "${STACK__STACK__IMAGE%:*}:rollback-$(date +%Y%m%d)" 2>/dev/null || true
-
-# 2. Review changes before applying
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && git fetch origin main && git log --oneline HEAD..origin/main'
-# (review output, then proceed)
-
-# 3. Pull and rebuild
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && git pull origin main'
+# Manual update: rebuild all version specifiers
 sudo -u openclaw <INSTALL_DIR>/host/build-openclaw.sh
 
-# 4. Recreate containers with the new image
+# Recreate containers with new images
 sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d'
 
-# 5. Verify new version
+# Verify
 openclaw --version
-# Verify each claw is responding
-for CLAW in $(sudo docker ps --format '{{.Names}}' --filter 'name=-openclaw-'); do
-  GW_PORT=$(sudo docker port "$CLAW" | grep -oP '0\.0\.0\.0:\K\d+' | head -1)
-  echo "$CLAW (port $GW_PORT):"
-  curl -s "http://localhost:${GW_PORT}${OPENCLAW_DOMAIN_PATH}/" | head -3
-done
-
-# 6. Cleanup old rollback images (keep last 3)
-docker images --format '{{.Repository}}:{{.Tag}}' | grep "${STACK__STACK__IMAGE%:*}:rollback-" | sort -r | tail -n +4 | xargs -r docker rmi
 ```
 
-> **Note:** Step 4 automatically stops the old container and starts a new one from the rebuilt image. Expect a brief gateway downtime during the restart.
+> **Note:** `docker compose up -d` only recreates containers whose image changed. Claws on an unchanged pinned version won't restart.
 
 ### Rollback Procedure
 
-If an update causes issues, roll back to the previous known-good state:
+Each build creates an immutable version tag (e.g., `openclaw-muxxibot:v2026.3.12`) alongside the mutable specifier tag (`:stable`). To rollback, pin the claw to the previous version in `stack.yml`:
 
-```bash
-#!/bin/bash
-source <INSTALL_DIR>/host/source-config.sh
-
-# 1. Revert source to pre-update tag
-sudo -u openclaw bash -c 'cd <INSTALL_DIR>/openclaw && git checkout pre-update'
-
-# 2. Restore the previous Docker image
-docker tag "${STACK__STACK__IMAGE%:*}:rollback-$(date +%Y%m%d)" "${STACK__STACK__IMAGE}"
-
-# 3. Recreate containers with the old image
-sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d'
-
-# 4. Verify
-openclaw --version
-# Verify each claw is responding
-for CLAW in $(sudo docker ps --format '{{.Names}}' --filter 'name=-openclaw-'); do
-  GW_PORT=$(sudo docker port "$CLAW" | grep -oP '0\.0\.0\.0:\K\d+' | head -1)
-  echo "$CLAW (port $GW_PORT):"
-  curl -s "http://localhost:${GW_PORT}${OPENCLAW_DOMAIN_PATH}/" | head -3
-done
+```yaml
+claws:
+  personal-claw:
+    openclaw_version: v2026.3.8  # Pin to previous known-good version
 ```
 
-> If the rollback date tag doesn't match today, list available rollback images with:
-> `docker images --format '{{.Repository}}:{{.Tag}}' | grep "${STACK__STACK__IMAGE%:*}:rollback-"`
+Then rebuild and redeploy:
+
+```bash
+npm run pre-deploy && scripts/sync-deploy.sh --all --force
+sudo -u openclaw <INSTALL_DIR>/host/build-openclaw.sh
+sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d'
+```
+
+> List available version-tagged images: `docker images | grep openclaw-`
 
 ---
 

@@ -36,3 +36,16 @@
     delaycompress
     compress
 }
+
+# Auto-update log — host-side openclaw version update checks.
+{{INSTALL_DIR}}/logs/auto-update.log
+{
+    su root root
+    weekly
+    rotate 4
+    missingok
+    notifempty
+    copytruncate
+    delaycompress
+    compress
+}

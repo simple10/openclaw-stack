@@ -6,6 +6,51 @@ When deploying to a VPS that was set up before a breaking change, follow the **M
 
 ---
 
+## 2026-03-13 — Host-side auto-update with per-claw versioning
+
+**BREAKING:** In-container updates (`ALLOW_OPENCLAW_UPDATES`) are removed. Updates are now handled host-side by `build-openclaw.sh`. Each claw can run a different OpenClaw version via `openclaw_version` in `stack.yml`. `.git` is no longer included in the Docker image.
+
+**What changed:**
+- `build/pre-deploy.mjs`: per-claw `openclaw_version` + `openclaw_image_tag`, new `STACK__OPENCLAW_VERSIONS` env var, removed `STACK__STACK__IMAGE` + `allow_updates`
+- `docker-compose.yml.hbs`: image tag moved from anchor to per-claw block, removed `ALLOW_OPENCLAW_UPDATES` + `OPENCLAW_SYSTEMD_UNIT`, added `OPENCLAW_ALLOW_INSECURE_PRIVATE_WS`, `SHELL`, `TERM`
+- `deploy/host/build-openclaw.sh`: rewritten for multi-version support — loops over unique specifiers, dual-tags (mutable specifier + immutable version), version state files
+- `deploy/host/auto-update-openclaw.sh`: new daily cron script — checks for new versions, rebuilds changed specifiers, recreates containers
+- `deploy/host/register-cron-jobs.sh`: added auto-update cron registration
+- `deploy/openclaw-stack/entrypoint.sh`: removed section 1d (git/branch/exclude handling) — no-op without `.git`
+- `stack.yml.example`: added `auto_update: true`, per-claw `openclaw_version` example, removed `allow_updates`
+
+**Migration:**
+
+1. Update `stack.yml`:
+   ```yaml
+   stack:
+     openclaw:
+       version: stable        # Stack-wide default
+       auto_update: true      # Enable daily host-side update check
+
+   defaults:
+     # Remove allow_updates entirely (delete the line)
+
+   claws:
+     personal-claw:
+       # No openclaw_version → inherits stack.openclaw.version (stable)
+     # To pin a claw:
+     # work-claw:
+     #   openclaw_version: v2026.3.8
+   ```
+
+2. Rebuild and redeploy:
+   ```bash
+   npm run pre-deploy && scripts/sync-deploy.sh --all --force
+   sudo -u openclaw <INSTALL_DIR>/host/build-openclaw.sh
+   sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d'
+   sudo bash <INSTALL_DIR>/host/register-cron-jobs.sh
+   ```
+
+**Verify:** `docker images | grep openclaw-` shows version-tagged images (e.g., `:stable`, `:v2026.3.12`). `cat <INSTALL_DIR>/.openclaw-versions/stable` shows resolved version. `cat /etc/cron.d/openclaw-auto-update` exists if auto-update enabled.
+
+---
+
 ## 2026-03-13 — Pinned bridge subnet + cloudflared networking
 
 **BREAKING:** The `openclaw-net` Docker bridge subnet is now pinned to `10.200.0.0/24` (was auto-assigned, typically `172.x.0.0/24`). Cloudflared reverted from `network_mode: host` to bridge networking with a static IP (`10.200.0.100`). Tunnel ingress routes must use Docker DNS container names (not `localhost`).

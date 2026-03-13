@@ -4,7 +4,7 @@
      Claw service blocks are auto-generated from stack.yml claws. --}}
 
 x-openclaw-claw: &claw
-  image: openclaw-{{stack.project_name}}:local
+  # image: per-claw (set in each claw block — varies by openclaw_version)
   runtime: sysbox-runc
   read_only: false
   tmpfs:
@@ -31,6 +31,7 @@ services:
 {{#each claws}}
   {{../stack.project_name}}-openclaw-{{@key}}:
     <<: *claw
+    image: {{this.openclaw_image_tag}}
     container_name: {{../stack.project_name}}-openclaw-{{@key}}
 {{#if ../stack.sandbox_registry_container}}
     depends_on:
@@ -47,11 +48,14 @@ services:
     environment:
       # ── Core ──
       - NODE_ENV=production
+      - CI=true
       - TZ={{this.timezone}}
       - OPENCLAW_GATEWAY_PORT={{this.gateway_port}}
       - OPENCLAW_GATEWAY_TOKEN={{this.gateway_token}}
       - OPENCLAW_MDNS_HOSTNAME={{@key}}
-      - ALLOW_OPENCLAW_UPDATES={{this.allow_updates}}
+      - OPENCLAW_ALLOW_INSECURE_PRIVATE_WS=1
+      - SHELL=bash
+      - TERM=xterm-256color
       # ── AI Provider ──
       - ANTHROPIC_API_KEY={{this.anthropic_api_key}}
       - ANTHROPIC_BASE_URL={{this.anthropic_base_url}}

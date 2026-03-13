@@ -387,7 +387,7 @@ function parseTokens(knownSids, sidToKey, today, d7, d30) {
 
 // ── Version ──────────────────────────────────────────────────────────
 
-// Always read live from package.json so in-container updates are detected
+// Always read live from package.json for current version
 function getVersion() {
   try {
     return JSON.parse(readFileSync('/app/package.json', 'utf8')).version || '—'
@@ -480,7 +480,7 @@ function getGit() {
     return parseGitInfo(readFileSync(cacheFile, 'utf8'))
   } catch { /* no cache */ }
 
-  // 2. Try live git (available when ALLOW_OPENCLAW_UPDATES=true)
+  // 2. Try live git (available if .git exists in the image)
   try {
     const out = execFileSync('git', ['log', '--format=%h%x09%s%x09%aI', '-50'], { cwd: '/app', timeout: 5000 }).toString()
     // Cache for next time
