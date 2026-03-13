@@ -135,7 +135,7 @@ const CONFIG_HTML = /* html */ `<!DOCTYPE html>
       <p style="font-size:0.85rem; color:var(--dim); margin-bottom:1rem;">
         A gateway auth token was generated for OpenClaw. Run this in your OpenClaw container:
       </p>
-      <pre style="background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:0.6rem 0.75rem; font-family:var(--mono); font-size:0.8rem; color:var(--accent); margin-bottom:1rem; overflow-x:auto;">openclaw models auth paste-token --provider openai-codex --expiresIn 999d</pre>
+      <pre style="background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:0.6rem 0.75rem; font-family:var(--mono); font-size:0.8rem; color:var(--accent); margin-bottom:1rem; overflow-x:auto;">openclaw models auth paste-token --provider openai-codex --expires-in 999d</pre>
       <p style="font-size:0.85rem; color:var(--dim); margin-bottom:0.5rem;">Then paste this token when prompted:</p>
       <div class="field">
         <textarea id="codex-token-display" readonly style="min-height:60px; font-size:0.75rem; color:var(--success); cursor:text;"></textarea>
