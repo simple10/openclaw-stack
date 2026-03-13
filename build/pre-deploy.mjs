@@ -540,7 +540,7 @@ function generateStackEnv(env, config, claws) {
     )
     lines.push(`STACK__CLAWS__${envKey}__GATEWAY_PORT=${claw.gateway_port || ''}`)
     lines.push(`STACK__CLAWS__${envKey}__DASHBOARD_PORT=${claw.dashboard_port || ''}`)
-    lines.push(`STACK__CLAWS__${envKey}__HEALTH_CHECK_CRON=${claw.health_check_cron ?? false}`)
+    lines.push(`STACK__CLAWS__${envKey}__STATUS_REPORT_CRON=${claw.status_report_cron ?? false}`)
     lines.push(`STACK__CLAWS__${envKey}__OPENCLAW_VERSION=${formatEnvValue(claw.openclaw_version)}`)
   }
   lines.push('')
