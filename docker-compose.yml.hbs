@@ -36,7 +36,7 @@ services:
 {{#if ../stack.sandbox_registry_container}}
     depends_on:
       sandbox-registry:
-        condition: service_started
+        condition: service_healthy
 {{/if}}
     ports:
       - "127.0.0.1:{{this.gateway_port}}:{{this.gateway_port}}"
@@ -177,6 +177,8 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+      start_period: 10s
+      start_interval: 2s
     deploy:
       resources:
         limits:
