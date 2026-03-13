@@ -55,7 +55,7 @@ User Browser                    Cloudflare Edge                         VPS
      |                               |<──────────────────────────────────|
      |                               |                                   |
      |                               |──── Forward via tunnel ────────>  |
-     |                               |     (172.30.0.1 Docker bridge)    |
+     |                               |     (host network → localhost)    |
      |                               |                                   |
      |<──── HTTPS response ──────────|<────────────────────────────────  |
 ```
@@ -63,7 +63,7 @@ User Browser                    Cloudflare Edge                         VPS
 - **Port 443**: Not open. Cloudflare terminates TLS at the edge; `cloudflared` connects outbound.
 - **Port 222**: SSH only (key-based, `adminclaw` user, fail2ban protected).
 - **Docker port binding**: All containers bind to `127.0.0.1` only via `daemon.json`.
-- **Gateway `--bind lan`**: Required because `cloudflared` connects via Docker bridge IP (`172.30.0.1`), not loopback.
+- **Gateway `--bind lan`**: Required because cloudflared (host network) connects to `127.0.0.1:port`, which Docker NATs through the bridge gateway (`172.30.0.1`). The gateway sees the bridge gateway IP, not loopback.
 
 ### Cloudflare Access
 
