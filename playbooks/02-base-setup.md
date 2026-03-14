@@ -58,11 +58,15 @@ sudo apt update && sudo apt upgrade -y
 
 # Install essential packages
 sudo apt install -y \
-    curl wget git vim htop tmux unzip jq \
+    curl wget git vim htop tmux unzip jq cronie \
     ca-certificates gnupg lsb-release \
     apt-transport-https software-properties-common \
     ufw fail2ban auditd
 ```
+
+> **Why cronie?** Ubuntu ships Vixie cron which ignores `CRON_TZ` in `/etc/cron.d/` files — all jobs run in system time (UTC).
+> cronie is a drop-in replacement that supports `CRON_TZ` for timezone-aware scheduling with automatic DST handling.
+> Installing cronie automatically replaces Vixie cron and preserves all existing `/etc/cron.d/` files.
 
 **If `apt update` fails with "Could not resolve" or network errors:**
 

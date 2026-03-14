@@ -6,6 +6,50 @@ When deploying to a VPS that was set up before a breaking change, follow the **M
 
 ---
 
+## 2026-03-14 — Replace Vixie cron with cronie, add stack.openclaw.auto_update_time config
+
+Vixie cron (Ubuntu default) ignores `CRON_TZ` in `/etc/cron.d/` files, causing all timezone-aware schedules to run in UTC instead of the configured timezone. cronie is a drop-in replacement with native `CRON_TZ` support and automatic DST handling. Also adds configurable `stack.openclaw.auto_update_time` schedule and comprehensive timezone abbreviation support (70+ abbreviations covering Americas, Europe, Asia, Oceania, Africa). Full IANA timezone names are also accepted (e.g. `Asia/Tokyo`).
+
+**What changed:**
+- `playbooks/02-base-setup.md`: added `cronie` to apt install list
+- `.claude/skills/setup-vps/SKILL.md`: added `cronie` to apt install
+- `build/tz-abbreviations.mjs`: new file — comprehensive TZ abbreviation → IANA mapping
+- `build/parse-schedule-time.mjs`: new file — parses `"9:30 AM PST"` or `"9:30 AM Asia/Tokyo"` to cron expressions
+- `build/pre-deploy.mjs`: imports new modules, parses `stack.openclaw.auto_update_time`, resolves `{{CRON_TZ_LINE}}` in cron templates
+- `stack.yml.example`: added `stack.openclaw.auto_update_time` schedule
+- `deploy/host/register-cron-jobs.sh`: auto-update cron uses configurable time + `CRON_TZ`, all CRON_TZ emission is conditional
+- `deploy/host/cron-openclaw-backup`: added `CRON_TZ` header
+- `deploy/host/cron-openclaw-session-prune`: added `CRON_TZ` header
+- `playbooks/08c-deploy-report.md`: fixed stale `HOSTALERT_DAILY_REPORT_TIME` references
+
+**Migration:**
+
+1. Install cronie (replaces Vixie cron, preserves existing cron files):
+   ```bash
+   sudo apt install -y cronie
+   ```
+
+2. Verify cronie is active:
+   ```bash
+   dpkg -l cronie | grep '^ii' && systemctl status cronie
+   ```
+
+3. Add `stack.openclaw.auto_update_time` to `stack.yml` (optional — defaults to `3:00 AM PST`):
+   ```yaml
+   stack:
+     openclaw:
+       auto_update_time: "3:00 AM PST"
+   ```
+
+4. Rebuild and deploy:
+   ```bash
+   npm run pre-deploy
+   scripts/sync-deploy.sh
+   sudo bash <INSTALL_DIR>/host/register-cron-jobs.sh
+   ```
+
+---
+
 ## 2026-03-14 — Rename VPS status report cron, fix bind mount path
 
 The daily VPS status report cron job has been renamed and the sandbox bind mount path reverted from `/tmp/.host-status` to `/workspace/.host-status`. This avoids conflicts with OpenClaw's upstream "healthcheck" skill which was being incorrectly triggered by the old "Daily VPS Health Check" cron name and prompt.

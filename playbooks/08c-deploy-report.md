@@ -116,15 +116,16 @@ All URLs are protected by Cloudflare Access.
 
 | Job | Schedule | Status |
 |-----|----------|--------|
-| Backup | Daily at 3:00 AM UTC (30-day retention) | Active |
+| Backup | Daily at 3:00 AM (30-day retention) | Active |
 | Host alerter | Every 15 minutes via Telegram | <see note> |
-| Daily report | Daily at <HOSTALERT_DAILY_REPORT_TIME> via Telegram | <see note> |
+| Daily report | Daily at <host.host_alerter.daily_report> via Telegram | <see note> |
 | Maintenance checker | Daily (30 min before daily report) | Active |
+| Auto-update | Daily at <stack.openclaw.auto_update_time> | <see note> |
 ```
 
 Read `HOSTALERT_TELEGRAM_BOT_TOKEN` and `HOSTALERT_TELEGRAM_CHAT_ID` from `.env`.
 
-**If both are set:** Host alerter and daily report are active. Show status as `Active` in both rows. For the daily report schedule, use the value of `HOSTALERT_DAILY_REPORT_TIME` (default: `9:00 AM UTC`).
+**If both are set:** Host alerter and daily report are active. Show status as `Active` in both rows. For the daily report schedule, read `host.host_alerter.daily_report` from `stack.yml` (default: `9:30 AM PST`). For auto-update, show `Active` if `stack.openclaw.auto_update: true`, otherwise `Disabled`.
 
 **If either is empty:** Show status as `Not configured` for both rows and append:
 

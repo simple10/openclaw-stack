@@ -1,2 +1,3 @@
 # OpenClaw daily backup — runs as root to access uid 1000 owned directories
+{{CRON_TZ_LINE}}
 0 3 * * * root {{INSTALL_DIR}}/host/backup.sh >> {{INSTALL_DIR}}/logs/backup.log 2>&1
