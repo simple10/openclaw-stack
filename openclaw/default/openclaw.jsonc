@@ -94,9 +94,10 @@
     "defaults": {
       // Set default models here if needed - or use openclaw cli or Control UI after deploy
       // "model": {
-      //   "primary": "openai-codex/gpt-5.3-codex"
+      //   "primary": "openai-codex/gpt-5.4"
       // },
       // "models": {
+      //   "openai-codex/gpt-5.4": {},
       //   "openai-codex/gpt-5.3-codex": {}
       // },
       "userTimezone": "America/Los_Angeles", // Default timezone - can be updated by OpenClaw
