@@ -23,8 +23,6 @@ deploy/
     register-cron-jobs.sh Install all crons + logrotate + OpenClaw CLI crons
     openclaw-wrapper.sh OpenClaw CLI wrapper for host
     logrotate-openclaw  Logrotate config ({{INSTALL_DIR}} resolved by pre-deploy)
-    cron-openclaw-backup  Daily backup cron
-    cron-openclaw-session-prune  Session pruning cron
   setup/              <- Deploy-time scripts (tier 3) -- run once during setup
     system-hardening.sh SSH/UFW/fail2ban hardening
     setup-infra.sh      Create directories, clone repo

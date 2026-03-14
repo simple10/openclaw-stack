@@ -24,6 +24,7 @@ import {
 import { join, resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { spawn, spawnSync } from 'child_process'
+import { parseScheduleTime, setWarnFn } from './lib/parse-schedule-time.mjs'
 import { randomUUID, randomBytes } from 'crypto'
 import * as yaml from 'js-yaml'
 import * as dotenv from 'dotenv'
@@ -55,6 +56,7 @@ function success(msg) {
 function warn(msg) {
   console.log(`\x1b[33m⚠ ${msg}\x1b[0m`)
 }
+setWarnFn((msg) => warn(msg))
 
 /** Read a file relative to project root */
 function readRoot(path) {
@@ -395,49 +397,8 @@ function computeDerivedValues(claws, stack, host, previousDeploy) {
   return autoTokens
 }
 
-// ── Step 8: Parse human-readable time → cron expression + IANA timezone ──────
-
-const TZ_ABBREVIATIONS = {
-  PST: 'America/Los_Angeles',
-  PDT: 'America/Los_Angeles',
-  EST: 'America/New_York',
-  EDT: 'America/New_York',
-  CST: 'America/Chicago',
-  CDT: 'America/Chicago',
-  MST: 'America/Denver',
-  MDT: 'America/Denver',
-  UTC: 'UTC',
-  GMT: 'Europe/London',
-  CET: 'Europe/Berlin',
-  CEST: 'Europe/Berlin',
-}
-
-function parseDailyReportTime(timeStr) {
-  const fallback = { cronExpr: '30 9 * * *', ianaTz: 'America/Los_Angeles' }
-  if (!timeStr) return fallback
-
-  const match = String(timeStr).match(/^(\d{1,2}):(\d{2})\s*(AM|PM)\s*(\w+)$/i)
-  if (!match) {
-    warn(`Could not parse daily_report time "${timeStr}" — using default 9:30 AM PST`)
-    return fallback
-  }
-
-  let hour = parseInt(match[1], 10)
-  const minute = parseInt(match[2], 10)
-  const ampm = match[3].toUpperCase()
-  const tzAbbr = match[4].toUpperCase()
-
-  if (ampm === 'PM' && hour !== 12) hour += 12
-  if (ampm === 'AM' && hour === 12) hour = 0
-
-  const ianaTz = TZ_ABBREVIATIONS[tzAbbr]
-  if (!ianaTz) {
-    warn(`Unknown timezone abbreviation "${match[4]}" — using America/Los_Angeles`)
-    return { cronExpr: `${minute} ${hour} * * *`, ianaTz: 'America/Los_Angeles' }
-  }
-
-  return { cronExpr: `${minute} ${hour} * * *`, ianaTz }
-}
+// ── Step 8: Schedule time parsing ─────────────────────────────────────────────
+// parseScheduleTime imported from ./parse-schedule-time.mjs (supports TZ abbreviations + full IANA names)
 
 // ── Step 9: Generate stack.env ───────────────────────────────────────────────
 // Bash-sourceable key=value file for shell scripts.
@@ -524,11 +485,22 @@ function generateStackEnv(env, config, claws) {
 
   // Derived: host alerter schedule
   const hostAlerter = (config.host || {}).host_alerter || {}
-  const schedule = parseDailyReportTime(hostAlerter.daily_report)
+  const schedule = parseScheduleTime(hostAlerter.daily_report || '9:30 AM PST', 'daily_report')
   lines.push('# Derived: host alerter schedule')
   lines.push(`STACK__HOST__HOSTALERT__CRON_EXPR=${formatEnvValue(schedule.cronExpr)}`)
   lines.push(`STACK__HOST__HOSTALERT__CRON_TZ=${formatEnvValue(schedule.ianaTz)}`)
-  lines.push('')
+
+  // Derived: auto-update schedule (from stack.openclaw.auto_update_time)
+  const autoUpdateSchedule = parseScheduleTime(
+    stack.openclaw?.auto_update_time || '3:00 AM PST',
+    'stack.openclaw.auto_update_time'
+  )
+  lines.push(
+    `STACK__STACK__OPENCLAW__AUTO_UPDATE_CRON_EXPR=${formatEnvValue(autoUpdateSchedule.cronExpr)}`
+  )
+  lines.push(
+    `STACK__STACK__OPENCLAW__AUTO_UPDATE_CRON_TZ=${formatEnvValue(autoUpdateSchedule.ianaTz)}`
+  )
 
   // Per-claw (merged with defaults)
   lines.push('# Per-claw (merged with defaults)')
@@ -705,7 +677,7 @@ async function main() {
     .map(([envVar]) => envVar)
   writeFileSync(join(DEPLOY_DIR, 'openclaw-stack', 'empty-env-vars'), emptyVars.join('\n') + '\n')
 
-  // 7d-post. Resolve {{INSTALL_DIR}} in host/ files (cron configs, logrotate)
+  // 7d-post. Resolve {{INSTALL_DIR}} in host/ files (logrotate, etc.)
   const installDir = String(stack.install_dir || '/home/openclaw')
   const hostDir = join(DEPLOY_DIR, 'host')
   if (existsSync(hostDir)) {
@@ -714,8 +686,12 @@ async function main() {
       const stat = statSync(filePath)
       if (!stat.isFile()) continue
       const content = readFileSync(filePath, 'utf-8')
-      if (content.includes('{{INSTALL_DIR}}')) {
-        writeFileSync(filePath, content.replaceAll('{{INSTALL_DIR}}', installDir))
+      let updated = content
+      if (updated.includes('{{INSTALL_DIR}}')) {
+        updated = updated.replaceAll('{{INSTALL_DIR}}', installDir)
+      }
+      if (updated !== content) {
+        writeFileSync(filePath, updated)
       }
     }
   }

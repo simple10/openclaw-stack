@@ -56,11 +56,13 @@ Run a full system update and install essential packages.
 ```bash
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y \
-    curl wget git vim htop tmux unzip jq \
+    curl wget git vim htop tmux unzip jq cronie \
     ca-certificates gnupg lsb-release \
     apt-transport-https software-properties-common \
     ufw fail2ban
 ```
+
+**Why cronie?** Ubuntu ships Vixie cron which ignores `CRON_TZ` in `/etc/cron.d/` files. cronie is a drop-in replacement with native `CRON_TZ` support for timezone-aware scheduling with DST handling.
 
 **If `apt` is not available** (RHEL/Fedora/etc.), adapt: use `dnf` or `yum` with equivalent packages. Replace `ufw` with `firewalld` and adjust Section 4 accordingly.
 

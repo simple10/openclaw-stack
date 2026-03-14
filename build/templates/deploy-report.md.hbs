@@ -1,0 +1,119 @@
+# Stack Deployment Report
+
+**Date:** {{date}}
+**VPS IP:** {{vps_ip}}
+**Hostname:** {{hostname}}
+
+---
+
+## VPS Users
+
+| User | Password | Purpose |
+|------|----------|---------|
+| `adminclaw` | `{{adminclaw_password}}` | SSH admin, passwordless sudo, use for emergency KVM login |
+| `openclaw` | `{{openclaw_password}}` | App runtime, no SSH, no sudo |
+
+> These passwords are for emergency VNC/console access only. Normal access is via SSH key.
+
+---
+
+## SSH Access
+
+```bash
+ssh -i {{ssh_key}} -p {{ssh_port}} adminclaw@{{vps_ip}}
+```
+
+---
+
+## Claws
+
+All URLs are protected by Cloudflare Access.
+
+{{#each claws}}
+### {{name}}
+
+| Service | {{name}} URL |
+|-|-|
+| **Chat & Control UI** | [https://{{domain}}{{domain_path}}](https://{{domain}}{{domain_path}}/?token={{gateway_token}}) |
+| **Dashboard** | <https://{{domain}}{{dashboard_path}}/> |
+| **Token** | `{{gateway_token}}` |
+
+{{/each}}
+
+
+## Workers
+
+### AI Gateway Proxy (Cloudflare)
+
+LLM proxy — routes API requests through per-user auth with KV-based credential storage.
+
+| Service | Details |
+|-|-|
+| Config | <{{ai_gateway_url}}/config><br>Web UI for managing provider API keys and user credentials |
+| Anthropic | <{{ai_gateway_url}}/anthropic/v1/messages> |
+| OpenAI | <{{ai_gateway_url}}/openai/v1/chat/completions> |
+| Admin Token | `{{ai_gateway_token}}`<br>Controls user creation, deletion, and credential access. Keep it safe. |
+
+{{#if ai_proxy_configured}}
+Provider credentials configured.
+{{else}}
+> Visit the Config URL above to add API keys.
+{{/if}}
+
+### Log Receiver (Cloudflare)
+
+Accepts container logs from Vector and Cloudflare real-time logs.
+
+| Service | Details |
+|-|-|
+| Vector Logs | <{{log_worker_url}}> |
+{{#if logging_llmetry}}
+| LLMetry | <{{log_worker_url}}/llmetry> |
+{{/if}}
+| Auth Token | `{{log_worker_token}}` |
+
+{{#if egress_proxy_url}}
+### Egress Proxy (VPS Container)
+
+Accessed via Cloudflare tunnel. Used by the AI Gateway to route requests through the VPS IP, bypassing WAF blocking of Cloudflare Worker IPs.
+
+| Service | Details |
+|-|-|
+| Proxy | <{{egress_proxy_url}}>?`_proxyUpstreamURL_`<br>Forwards requests to the upstream URL parameter |
+| Access Token | `{{egress_proxy_token}}` |
+
+{{/if}}
+
+
+## Automated Jobs
+
+| Job | Schedule | Status |
+|-----|----------|--------|
+| Backup | Daily at 3:00 AM (30-day retention) | Active |
+| Host alerter | Every 15 minutes via Telegram | {{alerter_status}} |
+| Daily Status Report | Daily at {{daily_report_time}} via Telegram | {{alerter_status}} |
+| Maintenance checker | Daily (30 min before daily report) | Active |
+| Auto-update | Daily at {{auto_update_time}} | {{auto_update_status}} |
+
+{{#unless alerter_active}}
+> **Host alerter & daily report** are not configured. To enable disk/memory/CPU alerts and daily health reports via Telegram:
+>
+> 1. Follow [`docs/TELEGRAM.md`](../docs/TELEGRAM.md) to create a Telegram bot and get your chat ID
+> 2. Tell Claude to update the host alerter with your bot token and chat ID
+{{/unless}}
+
+
+## Quick Reference
+
+| Task | Command |
+|------|---------|
+| SSH | `./scripts/ssh-vps.sh`<br> `./scripts/ssh-openclaw.sh`<br>`./scripts/ssh-agent.sh` |
+| Logs | `./scripts/logs-openclaw.sh`<br>`./scripts/logs-docker.sh`<br>`./scripts/logs-explorer.sh` |
+| OpenClaw CLI | `./scripts/openclaw.sh [command]`<br>Or SSH into openclaw container then run `openclaw` |
+| Run backup | `claude "run the backup script on the vps"` |
+| Update OpenClaw | `claude "update openclaw"` |
+| Update Sandboxes | `claude "update ffmpeg in the sandbox toolkit"` |
+
+> To add or update provider API keys, visit the AI Gateway Config URL above. For advanced configuration (Cloudflare AI Gateway, Claude Code subscription), see [`docs/AI-GATEWAY-CONFIG.md`](../docs/AI-GATEWAY-CONFIG.md).
+
+> **Note:** User passwords and the AI Gateway admin token are always available via `source scripts/lib/source-config.sh` (stored in `.env`).

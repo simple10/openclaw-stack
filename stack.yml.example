@@ -17,7 +17,8 @@ host:
   host_alerter:
     telegram_bot_token: ${HOSTALERT_TELEGRAM_BOT_TOKEN}
     telegram_chat_id: ${HOSTALERT_TELEGRAM_CHAT_ID}
-    daily_report: "9:30 AM PST"
+    daily_report: "9:30 AM PST"            # time + TZ abbreviation or IANA name
+
 
 # ── Stack ─────────────────────────────────────────────────────
 stack:
@@ -30,8 +31,11 @@ stack:
 
   openclaw:
     version: stable                    # Stack-wide default: stable | latest | v2026.X.Y
-    auto_update: true                  # Daily host-side rebuild when new stable tag available
-    source: https://github.com/openclaw/openclaw.git
+    source: https://github.com/openclaw/openclaw.git # Source repo to use for building from source
+    # Optional scheduled rebuilds of openclaw docker images
+    # Will also restart each openclaw container with the new version unless the claw is pinned to a version (see openclaw_version below)
+    auto_update: true                  # Daily host-side docker image rebuild when new stable tag available, or always rebuild when latest
+    auto_update_time: "3:00 AM PST"    # Time to run the update auto-update-openclaw cron script (TZ abbreviation or IANA name)
 
   cloudflare:
     tunnel_token: ${CLOUDFLARE_TUNNEL_TOKEN}

@@ -27,6 +27,22 @@ packages:
   - build-essential
   - file
 
+# Gateway shims for package binaries.
+# Tools (below) auto-shim their bins. Packages don't — list binaries here
+# that skills or preflight checks need to find on the gateway PATH.
+# Binaries already present on the gateway are auto-skipped (won't be shadowed).
+shims:
+  - curl
+  - wget
+  - jq
+  - grep
+  - git
+  - python3
+  - node
+  - rustc
+  - cargo
+  - file
+
 # Tools installed via custom scripts. Each tool needs at least `apt` or `install`:
 #   apt      — apt package name; all apt tools are batched into one layer.
 #              Debian bookworm apt repo is significantly behind the latest versions for most bins.
@@ -107,6 +123,10 @@ tools:
   summarize:
     install: npm i -g @steipete/summarize
 
+  # Twitter/X CLI
+  xurl:
+    install: npm install -g @xdevplatform/xurl
+
   # --- Skills: brew tools ---
   # Just use `brew install <pkg>` — the build script (rebuild-sandboxes.sh) auto-wraps
   # it to run as the linuxbrew user with HOMEBREW_NO_AUTO_UPDATE=1.
@@ -158,6 +178,9 @@ tools:
 
   pandoc:
     install: brew install pandoc
+
+  # openai-whisper:
+  #   install: brew install openai-whisper
 
   # --- Skills: uv + Python tools ---
   # uv installed via brew; nano-pdf via uv tool install (must come after uv in this file).

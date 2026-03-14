@@ -10,13 +10,14 @@
 // Output (JSON):
 // {
 //   "packages": ["curl", "wget", ...],
+//   "shims": ["jq", "curl", ...],
 //   "tools": {
 //     "gifgrep": { "version": "0.2.1", "install": "curl ...", "bins": ["gifgrep"] },
 //     "claude-code": { "install": "npm install ...", "bins": ["claude"] },
 //     "ffmpeg": { "bins": ["ffmpeg", "ffprobe"] },
 //     ...
 //   },
-//   "allBins": ["gifgrep", "claude", "ffmpeg", "ffprobe", "convert", "identify", "mogrify"]
+//   "allBins": ["jq", "curl", ..., "gifgrep", "claude", "ffmpeg", "ffprobe"]
 // }
 
 import { readFileSync } from 'node:fs';
@@ -41,9 +42,9 @@ if (stripMode) {
 
 // Keep all lines (including blanks) for folded scalar handling, strip comments
 const allLines = raw.split('\n');
-const result = { packages: [], tools: {}, allBins: [] };
+const result = { packages: [], shims: [], tools: {}, allBins: [] };
 
-let section = null;       // 'packages' | 'tools'
+let section = null;       // 'packages' | 'shims' | 'tools'
 let currentTool = null;   // tool name when inside a tools entry
 
 let i = 0;
@@ -69,6 +70,13 @@ while (i < allLines.length) {
   if (section === 'packages') {
     const m = line.match(/^\s+-\s+(.+)/);
     if (m) result.packages.push(m[1].trim());
+    i++;
+    continue;
+  }
+
+  if (section === 'shims') {
+    const m = line.match(/^\s+-\s+(.+)/);
+    if (m) result.shims.push(m[1].trim());
     i++;
     continue;
   }
@@ -130,7 +138,8 @@ while (i < allLines.length) {
   i++;
 }
 
-// Compute allBins: for each tool, use bins if specified, otherwise [toolName]
+// Compute allBins: shims from packages + bins from tools
+result.allBins.push(...result.shims);
 for (const [name, tool] of Object.entries(result.tools)) {
   const bins = tool.bins || [name];
   tool.bins = bins;

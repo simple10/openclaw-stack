@@ -246,9 +246,15 @@ sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose ps'
 sudo docker logs --tail 5 $(sudo docker ps --format '{{.Names}}' | grep 'vector$')
 cat /etc/cron.d/openclaw-backup
 cat /etc/cron.d/openclaw-alerts
+
+# Verify cronie (not Vixie cron) for CRON_TZ support
+dpkg -l cronie | grep -q '^ii' && echo "OK: cronie installed" || echo "FAIL: cronie not installed (CRON_TZ won't work)"
+
+# Verify CRON_TZ is set in all cron files
+grep -r CRON_TZ /etc/cron.d/openclaw-* /etc/cron.d/cron-openclaw-*
 ```
 
-**Expected:** SSH on port `<SSH_PORT>` only (22 removed), fail2ban active, all containers running (including cloudflared), cron jobs present.
+**Expected:** SSH on port `<SSH_PORT>` only (22 removed), fail2ban active, all containers running (including cloudflared), cron jobs present, cronie installed, CRON_TZ set in all timezone-aware cron files.
 
 ### Port Binding & External Reachability
 
@@ -417,7 +423,7 @@ cat /etc/cron.d/openclaw-maintenance
 openclaw cron list
 ```
 
-**Expected:** Both scripts exit 0 with no errors. `health.json` and `maintenance.json` contain valid JSON with current timestamps. Workspace copies exist. Both host cron entries exist. `openclaw cron list` shows "Daily VPS Health Check" with status `ok`.
+**Expected:** Both scripts exit 0 with no errors. `health.json` and `maintenance.json` contain valid JSON with current timestamps. Workspace copies exist. Both host cron entries exist. `openclaw cron list` shows "Daily VPS Status Report" with status `ok`.
 
 ### Telegram Delivery Test
 

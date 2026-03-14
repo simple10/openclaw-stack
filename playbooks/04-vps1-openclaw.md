@@ -238,14 +238,18 @@ connections yet, the output will show an empty device list — that's normal.
 
 ## 4.5 Deploy Cron Jobs, Logrotate, and OpenClaw CLI Crons
 
-Install all host-level scheduled tasks and logrotate config. The script handles:
+Install all host-level scheduled tasks and logrotate config. The `register-cron-jobs.sh` script handles:
 
 - **Static crons:** backup (`cron-openclaw-backup`), session-prune (`cron-openclaw-session-prune`) → `/etc/cron.d/`
 - **Dynamic crons:** alerts (15-min health check + daily report), maintenance (30 min before report) → `/etc/cron.d/`
 - **Logrotate:** `logrotate-openclaw` → `/etc/logrotate.d/openclaw`
-- **OpenClaw CLI crons:** Daily VPS Health Check registered on each claw via `openclaw cron add`
+- **Auto-update cron:** daily openclaw version check (if `auto_update: true`)
+- **OpenClaw CLI crons:** Daily VPS Status Report registered on each claw via `openclaw cron add`
 
-Schedule and timezone are pre-resolved from `host.host_alerter.daily_report` in `stack.yml` by `npm run pre-deploy`.
+> **Prerequisite:** cronie must be installed (see playbook 02). Vixie cron (Ubuntu default)
+> does not support `CRON_TZ` — all timezone-aware scheduling requires cronie.
+
+Schedule and timezone are pre-resolved from `host.host_alerter.daily_report` and `stack.openclaw.auto_update_time` in `stack.yml` by `npm run pre-deploy`.
 
 ```bash
 ssh -i ${SSH_KEY} -p ${SSH_PORT} ${SSH_USER}@${VPS_IP} \
