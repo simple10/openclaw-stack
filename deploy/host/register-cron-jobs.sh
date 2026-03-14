@@ -161,40 +161,41 @@ for CLAW in "${CLAWS[@]}"; do
 
   # Check per-claw toggle (default: disabled)
   envKey=$(echo "$CLAW" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
-  varName="STACK__CLAWS__${envKey}__HEALTH_CHECK_CRON"
+  varName="STACK__CLAWS__${envKey}__STATUS_REPORT_CRON"
   if [ "${!varName:-false}" != "true" ]; then
-    echo "    CLI health check cron disabled for $CLAW, skipping."
+    echo "    Status report cron disabled for $CLAW, skipping."
     continue
   fi
 
   # Idempotent: skip if already registered
   # shellcheck disable=SC2086
-  if openclaw --instance "$CLAW" cron list 2>/dev/null | grep -q "Daily VPS Health Check"; then
-    echo "    Cron job 'Daily VPS Health Check' already registered on $CLAW, skipping."
+  if openclaw --instance "$CLAW" cron list 2>/dev/null | grep -q "Daily VPS Status Report"; then
+    echo "    Cron job 'Daily VPS Status Report' already registered on $CLAW, skipping."
     continue
   fi
 
-  echo "    Registering 'Daily VPS Health Check' on $CLAW..."
+  echo "    Registering 'Daily VPS Status Report' on $CLAW..."
   # shellcheck disable=SC2086
   openclaw --instance "$CLAW" cron add \
-    --name "Daily VPS Health Check" \
+    --name "Daily VPS Status Report" \
     --cron "${CRON_EXPR}" \
     --tz "${CRON_TZ}" \
     --session isolated \
     --wake next-heartbeat \
     --agent main \
+    --light-context \
     --announce \
     --best-effort-deliver \
     ${DELIVERY_FLAGS} \
-    --message "Read the VPS health report files and analyze them:
+    --message "Read the VPS status report files and analyze them:
 
-1. Read /tmp/.host-status/health.json (resource metrics)
-2. Read /tmp/.host-status/maintenance.json (OS maintenance)
+1. Read /workspace/.host-status/health.json (resource metrics)
+2. Read /workspace/.host-status/maintenance.json (OS maintenance)
 
 Analyze for issues that need human attention:
 
-Health (health.json):
-- containers: check each entry — \"stopped\" or \"restarting\" means a claw is down
+Resource status (health.json):
+- containers: inspect each entry — \"stopped\" or \"restarting\" means a claw is down
 - containers_ok is false means at least one expected container is not running
 - disk_pct approaching or exceeding disk_threshold
 - memory_pct approaching or exceeding memory_threshold
@@ -204,14 +205,14 @@ Health (health.json):
 - backup_ok is false or backup_age_hours > 36
 - timestamp older than 30 minutes (monitoring may be broken)
 
-Maintenance (maintenance.json):
+Maintenance status (maintenance.json):
 - security_updates > 0 (pending security patches)
 - reboot_required is true
 - failed_services is not \"none\"
 - uptime_days > 90 (consider scheduled reboot)
-- timestamp older than 26 hours (checker may not be running)
+- timestamp older than 26 hours (maintenance monitor may not be running)
 
-If everything looks healthy, respond with exactly: HEARTBEAT_OK
+If everything looks good, respond with exactly: HEARTBEAT_OK
 
 If any issues are found, send a concise alert with:
 - What's wrong (use emoji indicators: critical, warning)

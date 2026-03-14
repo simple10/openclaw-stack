@@ -195,15 +195,14 @@
           // Group chats and subagent spawns still get sandboxed.
           "mode": "non-main",
           "docker": {
-            // Host-status reports (health.json, maintenance.json) written by host cron scripts.
-            // Bind into sandbox at /tmp/.host-status (NOT /workspace/) because the sandbox image
-            // has readOnlyRoot and Docker 20.10 can't create sub-mount points in a read-only rootfs.
-            // /tmp is tmpfs (writable), so Docker can create the mount point there.
-            // Cron job reads the reports and notifies user over Telegram if there are any issues.
-            // Optionally comment this out if health_check_cron is disabled in stack.yml
+            // VPS status reports (health.json, maintenance.json) written by host cron scripts.
+            // Bind into sandbox workspace so the read tool can access them at /workspace/.host-status/.
+            // The status report cron reads these and notifies the user over Telegram if there are any issues.
+            // Optionally comment this out if status_report_cron is disabled in stack.yml
             "dangerouslyAllowExternalBindSources": true,
+            "dangerouslyAllowReservedContainerTargets": true,
             "binds": [
-              "/home/node/.openclaw/workspace/.host-status:/tmp/.host-status:ro"
+              "/home/node/.openclaw/workspace/.host-status:/workspace/.host-status:ro"
             ]
           }
         },

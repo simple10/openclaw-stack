@@ -6,11 +6,72 @@ When deploying to a VPS that was set up before a breaking change, follow the **M
 
 ---
 
+## 2026-03-14 — Rename VPS status report cron, fix bind mount path
+
+The daily VPS status report cron job has been renamed and the sandbox bind mount path reverted from `/tmp/.host-status` to `/workspace/.host-status`. This avoids conflicts with OpenClaw's upstream "healthcheck" skill which was being incorrectly triggered by the old "Daily VPS Health Check" cron name and prompt.
+
+**What changed:**
+
+- `stack.yml.example`: `health_check_cron` renamed to `status_report_cron`
+- `build/pre-deploy.mjs`: env var `HEALTH_CHECK_CRON` renamed to `STATUS_REPORT_CRON`
+- `deploy/host/register-cron-jobs.sh`: cron renamed from "Daily VPS Health Check" to "Daily VPS Status Report", prompt reworded to avoid "health"/"check" language, file paths updated to `/workspace/.host-status/`
+- `openclaw/*/openclaw.jsonc`: bind mount reverted from `/tmp/.host-status` to `/workspace/.host-status`, removed `dangerouslyAllowReservedContainerTargets`, kept `dangerouslyAllowExternalBindSources`
+
+**Migration:**
+
+1. Update `stack.yml` — rename the toggle:
+
+   ```yaml
+   defaults:
+     status_report_cron: false    # was: health_check_cron
+
+   claws:
+     personal-claw:
+       status_report_cron: true   # was: health_check_cron
+   ```
+
+2. Update `openclaw.jsonc` for each claw — change the sandbox docker bind:
+
+   ```jsonc
+   // In agents.main.sandbox.docker:
+   "dangerouslyAllowExternalBindSources": true,
+   "dangerouslyAllowReservedContainerTargets": true,
+   "binds": [
+     "/home/node/.openclaw/workspace/.host-status:/workspace/.host-status:ro"
+   ]
+   ```
+
+3. Rebuild and deploy:
+
+   ```bash
+   npm run pre-deploy
+   scripts/sync-deploy.sh --all --force
+   ```
+
+4. On the VPS, remove the old cron job and re-register:
+
+   ```bash
+   # Remove old cron (run inside the claw container or via openclaw CLI):
+   openclaw --instance personal-claw cron remove --name "Daily VPS Health Check"
+
+   # Re-register cron jobs:
+   sudo bash /home/<project>/openclaw/host/register-cron-jobs.sh
+   ```
+
+5. Restart the claw container to pick up the new bind mount:
+
+   ```bash
+   sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d --force-recreate'
+   ```
+
+---
+
 ## 2026-03-13 — Host-side auto-update with per-claw versioning
 
 **BREAKING:** In-container updates (`ALLOW_OPENCLAW_UPDATES`) are removed. Updates are now handled host-side by `build-openclaw.sh`. Each claw can run a different OpenClaw version via `openclaw_version` in `stack.yml`. `.git` is no longer included in the Docker image.
 
 **What changed:**
+
 - `build/pre-deploy.mjs`: per-claw `openclaw_version` + `openclaw_image_tag`, new `STACK__OPENCLAW_VERSIONS` env var, removed `STACK__STACK__IMAGE` + `allow_updates`
 - `docker-compose.yml.hbs`: image tag moved from anchor to per-claw block, removed `ALLOW_OPENCLAW_UPDATES` + `OPENCLAW_SYSTEMD_UNIT`, added `OPENCLAW_ALLOW_INSECURE_PRIVATE_WS`, `SHELL`, `TERM`
 - `deploy/host/build-openclaw.sh`: rewritten for multi-version support — loops over unique specifiers, dual-tags (mutable specifier + immutable version), version state files
@@ -22,6 +83,7 @@ When deploying to a VPS that was set up before a breaking change, follow the **M
 **Migration:**
 
 1. Update `stack.yml`:
+
    ```yaml
    stack:
      openclaw:
@@ -40,6 +102,7 @@ When deploying to a VPS that was set up before a breaking change, follow the **M
    ```
 
 2. Rebuild and redeploy:
+
    ```bash
    npm run pre-deploy && scripts/sync-deploy.sh --all --force
    sudo -u openclaw <INSTALL_DIR>/host/build-openclaw.sh
@@ -56,6 +119,7 @@ When deploying to a VPS that was set up before a breaking change, follow the **M
 **BREAKING:** The `openclaw-net` Docker bridge subnet is now pinned to `10.200.0.0/24` (was auto-assigned, typically `172.x.0.0/24`). Cloudflared reverted from `network_mode: host` to bridge networking with a static IP (`10.200.0.100`). Tunnel ingress routes must use Docker DNS container names (not `localhost`).
 
 **What changed:**
+
 - `docker-compose.yml.hbs`: openclaw-net pinned to `10.200.0.0/24`, cloudflared on bridge with `ipv4_address: 10.200.0.100`
 - `openclaw.jsonc` (all configs): `trustedProxies` changed to `["10.200.0.100"]`
 - `cf-tunnel-setup.sh`: generates routes using Docker DNS names (e.g., `http://<project>-openclaw-<claw>:18789`) instead of `localhost`
@@ -64,6 +128,7 @@ When deploying to a VPS that was set up before a breaking change, follow the **M
 **Migration:**
 
 1. Update `trustedProxies` in each claw's `openclaw.jsonc` (live on VPS or local per-claw config):
+
    ```jsonc
    "trustedProxies": ["10.200.0.100"]
    ```
@@ -73,6 +138,7 @@ When deploying to a VPS that was set up before a breaking change, follow the **M
    - Manually update in Cloudflare Dashboard: change `http://localhost:<port>` to `http://<project>-openclaw-<claw>:<port>` for each route
 
 3. Recreate containers (network subnet change requires `down` + `up`):
+
    ```bash
    sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose down && docker compose up -d'
    ```

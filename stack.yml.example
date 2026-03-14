@@ -76,7 +76,7 @@ stack:
 # All claws inherit these. Per-claw settings override via deep merge.
 defaults:
   timezone: UTC                    # IANA timezone (e.g. America/Los_Angeles) — auto-handles DST
-  health_check_cron: false
+  status_report_cron: false
   domain_path: ""
   dashboard_path: /dashboard
   telegram:
@@ -96,7 +96,7 @@ claws:
     dashboard_port: 6090
     telegram:
       bot_token: ${PERSONAL_CLAW_TELEGRAM_BOT_TOKEN}
-    health_check_cron: true  # Enable health check cron on the main claw - not needed on each claw
+    status_report_cron: true  # Enable VPS status report cron on one claw - not needed on each
 
   # work-claw:
   #   openclaw_version: v2026.3.8  # Pinned — auto-update skips pinned versions
