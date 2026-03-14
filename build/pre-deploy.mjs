@@ -502,12 +502,6 @@ function generateStackEnv(env, config, claws) {
     `STACK__STACK__OPENCLAW__AUTO_UPDATE_CRON_TZ=${formatEnvValue(autoUpdateSchedule.ianaTz)}`
   )
 
-  // Shared CRON_TZ for static cron templates (backup, session-prune)
-  // Also stash on stack object for {{CRON_TZ_LINE}} template resolution (step 7d-post)
-  stack._cronTz = schedule.ianaTz
-  lines.push(`STACK__HOST__CRON_TZ=${formatEnvValue(schedule.ianaTz)}`)
-  lines.push('')
-
   // Per-claw (merged with defaults)
   lines.push('# Per-claw (merged with defaults)')
   for (const [name, claw] of Object.entries(claws)) {
@@ -683,7 +677,7 @@ async function main() {
     .map(([envVar]) => envVar)
   writeFileSync(join(DEPLOY_DIR, 'openclaw-stack', 'empty-env-vars'), emptyVars.join('\n') + '\n')
 
-  // 7d-post. Resolve {{INSTALL_DIR}} in host/ files (cron configs, logrotate)
+  // 7d-post. Resolve {{INSTALL_DIR}} in host/ files (logrotate, etc.)
   const installDir = String(stack.install_dir || '/home/openclaw')
   const hostDir = join(DEPLOY_DIR, 'host')
   if (existsSync(hostDir)) {
@@ -695,12 +689,6 @@ async function main() {
       let updated = content
       if (updated.includes('{{INSTALL_DIR}}')) {
         updated = updated.replaceAll('{{INSTALL_DIR}}', installDir)
-      }
-      // Resolve {{CRON_TZ_LINE}} — either "CRON_TZ=<value>" or empty (remove line + trailing newline)
-      if (updated.includes('{{CRON_TZ_LINE}}')) {
-        const cronTz = String(stack._cronTz || '')
-        const cronTzLine = cronTz ? `CRON_TZ=${cronTz}` : ''
-        updated = updated.replace(/\{\{CRON_TZ_LINE\}\}\n?/g, cronTzLine ? cronTzLine + '\n' : '')
       }
       if (updated !== content) {
         writeFileSync(filePath, updated)

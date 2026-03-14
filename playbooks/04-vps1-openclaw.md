@@ -238,7 +238,7 @@ connections yet, the output will show an empty device list — that's normal.
 
 ## 4.5 Deploy Cron Jobs, Logrotate, and OpenClaw CLI Crons
 
-Install all host-level scheduled tasks and logrotate config. The script handles:
+Install all host-level scheduled tasks and logrotate config. The `register-cron-jobs.sh` script handles:
 
 - **Static crons:** backup (`cron-openclaw-backup`), session-prune (`cron-openclaw-session-prune`) → `/etc/cron.d/`
 - **Dynamic crons:** alerts (15-min health check + daily report), maintenance (30 min before report) → `/etc/cron.d/`

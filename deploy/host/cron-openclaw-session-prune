@@ -1,3 +1,0 @@
-# OpenClaw session & log pruning — runs as root (uid 1000 owned directories)
-{{CRON_TZ_LINE}}
-30 3 * * * root {{INSTALL_DIR}}/host/session-prune.sh >> {{INSTALL_DIR}}/logs/session-prune.log 2>&1

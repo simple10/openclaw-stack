@@ -11,6 +11,7 @@ When deploying to a VPS that was set up before a breaking change, follow the **M
 Vixie cron (Ubuntu default) ignores `CRON_TZ` in `/etc/cron.d/` files, causing all timezone-aware schedules to run in UTC instead of the configured timezone. cronie is a drop-in replacement with native `CRON_TZ` support and automatic DST handling. Also adds configurable `stack.openclaw.auto_update_time` schedule and comprehensive timezone abbreviation support (70+ abbreviations covering Americas, Europe, Asia, Oceania, Africa). Full IANA timezone names are also accepted (e.g. `Asia/Tokyo`).
 
 **What changed:**
+
 - `playbooks/02-base-setup.md`: added `cronie` to apt install list
 - `.claude/skills/setup-vps/SKILL.md`: added `cronie` to apt install
 - `build/tz-abbreviations.mjs`: new file — comprehensive TZ abbreviation → IANA mapping
@@ -18,23 +19,24 @@ Vixie cron (Ubuntu default) ignores `CRON_TZ` in `/etc/cron.d/` files, causing a
 - `build/pre-deploy.mjs`: imports new modules, parses `stack.openclaw.auto_update_time`, resolves `{{CRON_TZ_LINE}}` in cron templates
 - `stack.yml.example`: added `stack.openclaw.auto_update_time` schedule
 - `deploy/host/register-cron-jobs.sh`: auto-update cron uses configurable time + `CRON_TZ`, all CRON_TZ emission is conditional
-- `deploy/host/cron-openclaw-backup`: added `CRON_TZ` header
-- `deploy/host/cron-openclaw-session-prune`: added `CRON_TZ` header
 - `playbooks/08c-deploy-report.md`: fixed stale `HOSTALERT_DAILY_REPORT_TIME` references
 
 **Migration:**
 
 1. Install cronie (replaces Vixie cron, preserves existing cron files):
+
    ```bash
    sudo apt install -y cronie
    ```
 
 2. Verify cronie is active:
+
    ```bash
    dpkg -l cronie | grep '^ii' && systemctl status cronie
    ```
 
 3. Add `stack.openclaw.auto_update_time` to `stack.yml` (optional — defaults to `3:00 AM PST`):
+
    ```yaml
    stack:
      openclaw:
@@ -42,6 +44,7 @@ Vixie cron (Ubuntu default) ignores `CRON_TZ` in `/etc/cron.d/` files, causing a
    ```
 
 4. Rebuild and deploy:
+
    ```bash
    npm run pre-deploy
    scripts/sync-deploy.sh
@@ -55,6 +58,7 @@ Vixie cron (Ubuntu default) ignores `CRON_TZ` in `/etc/cron.d/` files, causing a
 The daily VPS status report cron job has been renamed and the sandbox bind mount path reverted from `/tmp/.host-status` to `/workspace/.host-status`. This avoids conflicts with OpenClaw's upstream "healthcheck" skill which was being incorrectly triggered by the old "Daily VPS Health Check" cron name and prompt.
 
 **What changed:**
+
 - `stack.yml.example`: `health_check_cron` renamed to `status_report_cron`
 - `build/pre-deploy.mjs`: env var `HEALTH_CHECK_CRON` renamed to `STATUS_REPORT_CRON`
 - `deploy/host/register-cron-jobs.sh`: cron renamed from "Daily VPS Health Check" to "Daily VPS Status Report", prompt reworded to avoid "health"/"check" language, file paths updated to `/workspace/.host-status/`
@@ -63,6 +67,7 @@ The daily VPS status report cron job has been renamed and the sandbox bind mount
 **Migration:**
 
 1. Update `stack.yml` — rename the toggle:
+
    ```yaml
    defaults:
      status_report_cron: false    # was: health_check_cron
@@ -73,6 +78,7 @@ The daily VPS status report cron job has been renamed and the sandbox bind mount
    ```
 
 2. Update `openclaw.jsonc` for each claw — change the sandbox docker bind:
+
    ```jsonc
    // In agents.main.sandbox.docker:
    "dangerouslyAllowExternalBindSources": true,
@@ -83,12 +89,14 @@ The daily VPS status report cron job has been renamed and the sandbox bind mount
    ```
 
 3. Rebuild and deploy:
+
    ```bash
    npm run pre-deploy
    scripts/sync-deploy.sh --all --force
    ```
 
 4. On the VPS, remove the old cron job and re-register:
+
    ```bash
    # Remove old cron (run inside the claw container or via openclaw CLI):
    openclaw --instance personal-claw cron remove --name "Daily VPS Health Check"
@@ -98,6 +106,7 @@ The daily VPS status report cron job has been renamed and the sandbox bind mount
    ```
 
 5. Restart the claw container to pick up the new bind mount:
+
    ```bash
    sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose up -d --force-recreate'
    ```
@@ -109,6 +118,7 @@ The daily VPS status report cron job has been renamed and the sandbox bind mount
 **BREAKING:** In-container updates (`ALLOW_OPENCLAW_UPDATES`) are removed. Updates are now handled host-side by `build-openclaw.sh`. Each claw can run a different OpenClaw version via `openclaw_version` in `stack.yml`. `.git` is no longer included in the Docker image.
 
 **What changed:**
+
 - `build/pre-deploy.mjs`: per-claw `openclaw_version` + `openclaw_image_tag`, new `STACK__OPENCLAW_VERSIONS` env var, removed `STACK__STACK__IMAGE` + `allow_updates`
 - `docker-compose.yml.hbs`: image tag moved from anchor to per-claw block, removed `ALLOW_OPENCLAW_UPDATES` + `OPENCLAW_SYSTEMD_UNIT`, added `OPENCLAW_ALLOW_INSECURE_PRIVATE_WS`, `SHELL`, `TERM`
 - `deploy/host/build-openclaw.sh`: rewritten for multi-version support — loops over unique specifiers, dual-tags (mutable specifier + immutable version), version state files
@@ -120,6 +130,7 @@ The daily VPS status report cron job has been renamed and the sandbox bind mount
 **Migration:**
 
 1. Update `stack.yml`:
+
    ```yaml
    stack:
      openclaw:
@@ -138,6 +149,7 @@ The daily VPS status report cron job has been renamed and the sandbox bind mount
    ```
 
 2. Rebuild and redeploy:
+
    ```bash
    npm run pre-deploy && scripts/sync-deploy.sh --all --force
    sudo -u openclaw <INSTALL_DIR>/host/build-openclaw.sh
@@ -154,6 +166,7 @@ The daily VPS status report cron job has been renamed and the sandbox bind mount
 **BREAKING:** The `openclaw-net` Docker bridge subnet is now pinned to `10.200.0.0/24` (was auto-assigned, typically `172.x.0.0/24`). Cloudflared reverted from `network_mode: host` to bridge networking with a static IP (`10.200.0.100`). Tunnel ingress routes must use Docker DNS container names (not `localhost`).
 
 **What changed:**
+
 - `docker-compose.yml.hbs`: openclaw-net pinned to `10.200.0.0/24`, cloudflared on bridge with `ipv4_address: 10.200.0.100`
 - `openclaw.jsonc` (all configs): `trustedProxies` changed to `["10.200.0.100"]`
 - `cf-tunnel-setup.sh`: generates routes using Docker DNS names (e.g., `http://<project>-openclaw-<claw>:18789`) instead of `localhost`
@@ -162,6 +175,7 @@ The daily VPS status report cron job has been renamed and the sandbox bind mount
 **Migration:**
 
 1. Update `trustedProxies` in each claw's `openclaw.jsonc` (live on VPS or local per-claw config):
+
    ```jsonc
    "trustedProxies": ["10.200.0.100"]
    ```
@@ -171,6 +185,7 @@ The daily VPS status report cron job has been renamed and the sandbox bind mount
    - Manually update in Cloudflare Dashboard: change `http://localhost:<port>` to `http://<project>-openclaw-<claw>:<port>` for each route
 
 3. Recreate containers (network subnet change requires `down` + `up`):
+
    ```bash
    sudo -u openclaw bash -c 'cd <INSTALL_DIR> && docker compose down && docker compose up -d'
    ```
