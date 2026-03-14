@@ -63,6 +63,11 @@ if [ -f "$TOOLKIT_CONFIG" ] && [ -f "$TOOLKIT_PARSER" ]; then
   TOOLKIT_JSON=$(node "$TOOLKIT_PARSER" "$TOOLKIT_CONFIG")
 
   for bin in $(echo "$TOOLKIT_JSON" | node -e "process.stdin.on('data',d=>console.log(JSON.parse(d).allBins.join(' ')))"); do
+    # Skip binaries that already exist on PATH — shimming would shadow them
+    # and break gateway processes that depend on the real binary (e.g. node, git).
+    if command -v "$bin" > /dev/null 2>&1; then
+      continue
+    fi
     if [ ! -f "$SKILL_BINS/$bin" ]; then
       cat > "$SKILL_BINS/$bin" << 'SHIM'
 #!/bin/sh
@@ -183,13 +188,13 @@ if command -v dockerd > /dev/null 2>&1; then
       fi
     done
 
-    # Sandbox builds are non-fatal — gateway starts even if builds fail.
-    # Failures are logged but don't prevent the gateway from running.
-    # Missing images will surface during deployment verification or when agents run.
+    # Sandbox builds are non-fatal and run in the background so the gateway
+    # starts immediately. Missing/stale images will surface when agents run.
     (
       set +e
       /app/openclaw-stack/rebuild-sandboxes.sh
-    ) || true
+    ) &
+    echo "[entrypoint] Sandbox build started in background (PID $!)"
   fi
 else
   echo "[entrypoint] Docker not installed, skipping sandbox bootstrap"
