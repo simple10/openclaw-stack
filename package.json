@@ -5,6 +5,8 @@
   "scripts": {
     "pre-deploy": "node build/pre-deploy.mjs",
     "pre-deploy:dry": "node build/pre-deploy.mjs --dry-run",
+    "deploy-report": "node build/generate-deploy-report.mjs",
+    "deploy-report:save": "node build/generate-deploy-report.mjs --save --print",
     "test": "vitest run",
     "test:watch": "vitest"
   },
