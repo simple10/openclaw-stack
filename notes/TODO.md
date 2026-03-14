@@ -2,9 +2,6 @@
 
 AGENTS: IGNORE THIS TODO LIST - for development only
 
-- [ ] Generate report data during pre-build - then have deploy render the report
-- [x] Move host.host_alerter.auto_update_time to host.auto_update.openclaw in stack.yml
-- [x] Move build/tz-abbreviation.mgs and parse-schedule-time.mjs to build/lib
 - [ ] Refactor build scripts into libs and add full test coverage
 - [ ] Carefully scan playbooks for var references to ensure they're all coming from source-config.sh (except rare exceptions for SSH vars)
   - Ensure no "dangling" vars that reference var names that don't actually exist
