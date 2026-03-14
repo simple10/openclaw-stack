@@ -32,10 +32,10 @@ The daily VPS status report cron job has been renamed and the sandbox bind mount
    ```jsonc
    // In agents.main.sandbox.docker:
    "dangerouslyAllowExternalBindSources": true,
+   "dangerouslyAllowReservedContainerTargets": true,
    "binds": [
      "/home/node/.openclaw/workspace/.host-status:/workspace/.host-status:ro"
    ]
-   // Remove dangerouslyAllowReservedContainerTargets if present
    ```
 
 3. Rebuild and deploy:

@@ -196,6 +196,7 @@
             // The status report cron reads these and notifies the user over Telegram if there are any issues.
             // Optionally comment this out if status_report_cron is disabled in stack.yml
             "dangerouslyAllowExternalBindSources": true,
+            "dangerouslyAllowReservedContainerTargets": true,
             "binds": [
               "/home/node/.openclaw/workspace/.host-status:/workspace/.host-status:ro"
             ]

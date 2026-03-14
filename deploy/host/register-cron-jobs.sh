@@ -183,6 +183,7 @@ for CLAW in "${CLAWS[@]}"; do
     --session isolated \
     --wake next-heartbeat \
     --agent main \
+    --light-context \
     --announce \
     --best-effort-deliver \
     ${DELIVERY_FLAGS} \
